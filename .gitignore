@@ -17,3 +17,6 @@ __pycache__/
 
 # OS junk
 .DS_Store
+
+# Internal authoring instructions (kept locally, not part of the guide)
+src/AUTHORING.txt
