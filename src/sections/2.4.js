@@ -1,5 +1,5 @@
 /* Section 2.4 — Developments Leading to Modern Operating Systems
-   Original teaching material. Built step by step (see AUTHORING.txt). */
+   Original teaching material. Built step by step. */
 Guide.section({
   id: '2.4',
   title: 'Developments Leading to Modern Operating Systems',
@@ -13,7 +13,7 @@ Guide.section({
     'Explain what a distributed operating system and object-oriented design add to an operating system.',
   ],
   terms: [
-    ['Monolithic kernel', 'A kernel that holds almost the whole operating system (scheduling, file systems, networking, device drivers, memory management and more) as one large program that runs as a single process in one shared address space.'],
+    ['Monolithic kernel', 'A kernel design in which almost the whole operating system (scheduling, file systems, networking, device drivers, memory management and more) runs together in kernel mode in one shared kernel address space, so its parts call one another directly instead of sending messages. The word describes how the kernel is built, not a single process: kernel code runs on behalf of whichever process made a system call, and in kernel threads and interrupt handlers.'],
     ['Microkernel', 'A small kernel that keeps only the essential core functions (address spaces, interprocess communication and basic scheduling) and leaves every other OS service to server processes that run in user mode.'],
     ['Address space', 'The range of memory addresses a process is allowed to use. The hardware, set up by the kernel, keeps each process inside its own address space, so one process cannot read or damage another\'s memory.'],
     ['Interprocess communication (IPC)', 'Any mechanism that lets separate processes exchange data; in a microkernel it is the kernel delivering messages from one process to another.'],
@@ -325,7 +325,7 @@ Guide.section({
           ];
           if (mode === 'mono') {
             k.push(s('rect', { x: 12, y: 146, width: 616, height: 88, rx: 12, class: 's-os', 'stroke-width': 2.5 }));
-            k.push(s('text', { x: 618, y: 227, 'text-anchor': 'end', 'font-size': 12.5, style: 'fill:var(--os)', 'font-weight': 700 }, 'one big program · one address space'));
+            k.push(s('text', { x: 618, y: 227, 'text-anchor': 'end', 'font-size': 12.5, style: 'fill:var(--os)', 'font-weight': 700 }, 'kernel mode · one shared address space'));
             MONO_TILES.forEach((t, j) => k.push(tile(monoTile(j), t, lit.has('t' + j))));
             k.push(box(BOX.app, lit.has('app')), box(BOX.app2, false, true));
           } else {
@@ -345,7 +345,7 @@ Guide.section({
         el.append(h('div', { class: 'split l fill' },
           h('div', { class: 'stack', style: { gap: '8px' } },
             h('h3', { class: 'm0', html: '<span class="t">Monolithic kernel</span>' }),
-            h('p', { class: 'small m0', html: 'Almost the whole OS lives inside the <span class="t">kernel</span>: scheduling, the file system, networking, device drivers, memory management and more. It is <b>one large program</b> that runs as a single process in <b>one <span class="t">address space</span></b>, so any part can call any other part directly.' }),
+            h('p', { class: 'small m0', html: 'Almost the whole OS lives inside the <span class="t">kernel</span>: scheduling, the file system, networking, device drivers, memory management and more. All of it runs in kernel mode in <b>one shared <span class="t">address space</span></b>, so any part can call any other part directly, with no messages. (That is a structure, not one process: kernel code runs for whichever process made a system call.)' }),
             h('h3', { class: 'm0', style: { marginTop: '4px' }, html: '<span class="t">Microkernel</span>' }),
             h('p', { class: 'small m0', html: 'Only the essential core stays in the kernel: managing <b>address spaces</b>, <span class="t">interprocess communication (IPC)</span> and <b>basic scheduling</b>. Every other service runs as a separate <span class="t" data-t="server process">server process</span> in <span class="t">user mode</span>. Servers and applications cooperate by <b>sending messages</b>, and the microkernel delivers each one.' }),
             h('div', { class: 'callout warn m0', 'data-label': 'Common mistake', html: 'A microkernel system does <b>not</b> offer fewer services. The same services exist; they have moved <b>out of the kernel</b> into user-mode processes.' }),
@@ -433,7 +433,7 @@ Guide.section({
           presets.set(d);
           if (d === 'micro') found.add('simple');
           kind.textContent = d === 'mono' ? 'Monolithic kernel' : d === 'micro' ? 'Microkernel' : 'Mixed design';
-          kindSub.innerHTML = d === 'mono' ? 'Every service runs in kernel mode inside one program. Direct calls are fast, but all of this code is trusted completely.'
+          kindSub.innerHTML = d === 'mono' ? 'Every service runs in kernel mode in one shared kernel address space. Direct calls are fast, but all of this code is trusted completely.'
             : d === 'micro' ? 'Only IPC, address spaces and basic scheduling remain in kernel mode. Everything else is an ordinary process that talks by messages.'
             : 'Some services moved out, some stayed in. Many real systems land somewhere in between.';
           meter.firstChild.style.width = (nIn() / SVC.length) * 100 + '%';
@@ -996,7 +996,7 @@ Guide.section({
       kind: 'check',
       quiz: [
         { q: 'Which functions does a <b>microkernel</b> keep inside the kernel?',
-          choices: ['Address-space management, interprocess communication (IPC) and basic scheduling', 'File systems, device drivers and networking', 'Every OS service, compiled into one large program with one address space', 'None: every OS service runs in user mode'],
+          choices: ['Address-space management, interprocess communication (IPC) and basic scheduling', 'File systems, device drivers and networking', 'Every OS service, running together in kernel mode in one shared address space', 'None: every OS service runs in user mode'],
           answer: 0,
           feedback: [null, 'Those are exactly the services a microkernel moves out of the kernel into user-mode server processes.', 'That describes a monolithic kernel, the opposite design.', 'Something privileged must still manage address spaces, deliver messages and switch the processor between processes.'],
           why: 'A microkernel keeps only the essential core (address spaces, IPC and basic scheduling). Everything else runs as server processes in user mode that communicate by messages.' },
@@ -1058,7 +1058,7 @@ Guide.section({
 <p>Five developments answered these forces: <b>microkernel architecture</b>, <b>multithreading</b>, <b>symmetric multiprocessing (SMP)</b>, <b>distributed operating systems</b> and <b>object-oriented design</b>.</p>
 
 <h3>Monolithic kernel vs microkernel</h3>
-<p>A <b>monolithic kernel</b> holds almost the whole OS: scheduling, file systems, networking, device drivers, memory management and more. It is one large program that runs as a single process in one address space, so any part can call any other part directly, like a function call.</p>
+<p>A <b>monolithic kernel</b> holds almost the whole OS: scheduling, file systems, networking, device drivers, memory management and more. All of these services run together in kernel mode in one shared kernel address space, so any part can call any other part directly, like a function call, with no messages. "Monolithic" describes this structure, not a single process: the same kernel code runs on behalf of whichever process made a system call, as well as in kernel threads and interrupt handlers. In a microkernel, by contrast, most services are separate user-mode server processes that exchange messages.</p>
 <p>A <b>microkernel</b> keeps only the essential core in the kernel: <b>address spaces</b> (which memory each process may use), <b>interprocess communication (IPC)</b> and <b>basic scheduling</b>. Every other service (file system, device drivers, networking, the virtual-memory policy) runs as an ordinary <b>server process in user mode</b>. Applications and servers cooperate by sending <b>messages</b>, and the microkernel delivers each one. The OS offers the same services; they have simply moved out of the kernel.</p>
 <p><b>One file read.</b> Monolithic: one system call into the kernel, where the file system calls the driver directly (1 trip, 0 messages). Microkernel: application → file server → disk-driver process → file server → application, each hop a message through the kernel (4 messages, 4 trips). That message passing is the classic performance price of a microkernel.</p>
 <h4>Benefits of a microkernel</h4>

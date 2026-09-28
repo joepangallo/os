@@ -610,6 +610,11 @@ body.print .print-bar { display: flex; gap: 10px; justify-content: center; paddi
 @media print { body.print .print-bar { display: none !important; } }
 body.narrow table.tbl { display: block; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
+.quiz-pill.fixed { background: var(--warn); border-color: var(--warn); color: #fff; opacity: .8; }
+.route-top { display: none; }
+body.narrow .route-top { display: block; }
+body.narrow .route-bottom { display: none; }
+
 </style>
 </head>
 <body>
@@ -651,6 +656,10 @@ body.narrow table.tbl { display: block; max-width: 100%; overflow-x: auto; -webk
     return a;
   }
   const hashStr = (s) => { let x = 2166136261; for (let i = 0; i < s.length; i++) { x ^= s.charCodeAt(i); x = Math.imul(x, 16777619); } return x >>> 0; };
+  // fingerprint of a whole question (prompt, choices, answer, type, pairs...): any edit invalidates saved attempts
+  const qfp = (q) => hashStr(JSON.stringify(q, (k, v) => (typeof v === 'function' || k === 'source' || k === 'qid' ? undefined : v))).toString(36);
+  const quizIds = (questions) => questions.map((q, i) => i + ':' + qfp(q));
+  const quizFp = (questions) => hashStr(quizIds(questions).join('|')).toString(36);
   const fmt = (v, d = 2) => (Math.round(v * 10 ** d) / 10 ** d).toLocaleString('en-US', { maximumFractionDigits: d });
   Guide.util = { clamp, esc, range, shuffle, seeded: mulberry32, hash: hashStr, fmt, sleep: (ms) => new Promise((r) => setTimeout(r, ms)) };
 
@@ -727,9 +736,39 @@ body.narrow table.tbl { display: block; max-width: 100%; overflow-x: auto; -webk
   const iconBtn = (name, label, onclick, cls = 'tb-btn') => h('button', { class: cls, title: label, 'aria-label': label, onclick, html: ICON[name] });
 
   /* ------------------------------------------------------------ persistence */
+  const BAD_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+  const dict = () => Object.create(null);
+  const isObj = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
+  const okKey = (k, max = 64) => typeof k === 'string' && k.length > 0 && k.length <= max && !BAD_KEYS.has(k);
+  const okInt = (v, lo = 0, hi = 100000) => Number.isInteger(v) && v >= lo && v <= hi;
+  /* Saved progress is untrusted input: rebuild it field by field from an allowlist into fresh
+     null-prototype objects, dropping anything malformed, instead of merging the parsed JSON. */
+  function parseStore(raw) {
+    const out = { visited: dict(), quiz: dict(), known: dict(), chLast: dict(), qstate: dict(), qdraw: dict(), last: null, theme: null, route: 'full' };
+    let src = null;
+    try { src = JSON.parse(raw, (k, v) => (BAD_KEYS.has(k) ? undefined : v)); } catch (e) { return out; }
+    if (!isObj(src)) return out;
+    if (isObj(src.visited)) for (const k of Object.keys(src.visited)) if (okKey(k) && src.visited[k]) out.visited[k] = 1;
+    if (isObj(src.known)) for (const k of Object.keys(src.known)) if (okKey(k, 200)) out.known[k] = src.known[k] ? 1 : 0;
+    if (isObj(src.quiz)) for (const k of Object.keys(src.quiz)) {
+      const r = src.quiz[k];
+      if (okKey(k) && isObj(r) && okInt(r.best) && okInt(r.total) && r.best <= r.total) out.quiz[k] = { best: r.best, total: r.total, last: okInt(r.last) ? r.last : 0, learned: okInt(r.learned) && r.learned <= r.total ? r.learned : 0, fp: typeof r.fp === 'string' ? r.fp.slice(0, 32) : '' };
+    }
+    if (isObj(src.chLast)) for (const k of Object.keys(src.chLast)) if (/^\d{1,2}$/.test(k) && okKey(src.chLast[k])) out.chLast[k] = src.chLast[k];
+    if (isObj(src.qdraw)) for (const k of Object.keys(src.qdraw)) {
+      const a = src.qdraw[k];
+      if (okKey(k) && Array.isArray(a) && a.length <= 200 && a.every((x) => okKey(x, 96))) out.qdraw[k] = a.slice();
+    }
+    if (isObj(src.qstate)) for (const k of Object.keys(src.qstate)) if (okKey(k) && isObj(src.qstate[k])) out.qstate[k] = src.qstate[k]; // deep-validated when a quiz restores it
+    if (okKey(src.last)) out.last = src.last;
+    if (src.theme === 'dark' || src.theme === 'light') out.theme = src.theme;
+    if (src.route === 'core') out.route = 'core';
+    return out;
+  }
+  Guide._parseStore = parseStore;
   const store = (() => {
-    const data = { visited: {}, quiz: {}, last: null, theme: null, known: {} };
-    try { const raw = localStorage.getItem(STORE_KEY); if (raw) Object.assign(data, JSON.parse(raw)); } catch (e) { /* storage blocked */ }
+    let data = parseStore('null');
+    try { const raw = localStorage.getItem(STORE_KEY); if (raw) data = parseStore(raw); } catch (e) { /* storage blocked */ }
     let t = null;
     const save = () => { clearTimeout(t); t = setTimeout(() => { try { localStorage.setItem(STORE_KEY, JSON.stringify(data)); } catch (e) { /* ignore */ } }, 120); };
     return { data, save };
@@ -1036,7 +1075,7 @@ body.narrow table.tbl { display: block; max-width: 100%; overflow-x: auto; -webk
     return i;
   }
   function step(d) { go(neighbor(d)); }
-  function setRoute(r) { store.data.route = r; store.save(); updateChrome(); }
+  function setRoute(r) { store.data.route = r; store.save(); const sl = slides[cur]; if (sl && (sl.type === 'home' || sl.type === 'chapter')) go(cur, { keepFocus: true }); else updateChrome(); }
   function sectionJump(d) {
     const sl = slides[cur];
     let i = cur + d;
@@ -1075,7 +1114,7 @@ body.narrow table.tbl { display: block; max-width: 100%; overflow-x: auto; -webk
     fitT = setTimeout(() => {
       if (fit() && cur >= 0) {
         const sl = slides[cur];
-        const layoutAware = sl.type === 'home' || sl.type === 'chapter' || (sl.type === 'step' && /narrow/.test(String(sl.step.render || '') + String(sl.step.html || '')));
+        const layoutAware = sl.type === 'home' || sl.type === 'chapter' || (sl.type === 'step' && (sl.sec.layoutAware || (sl.sec.pseudo && sl.ch && sl.ch.layoutAware) || /narrow/.test(String(sl.step.render || '') + String(sl.step.html || ''))));
         if (layoutAware) go(cur, { keepFocus: true }); // quizzes restore from saved state; other slides just reflow with CSS
       } else checkOverflow();
     }, 60);
@@ -1160,21 +1199,23 @@ body.narrow table.tbl { display: block; max-width: 100%; overflow-x: auto; -webk
   }
 
   /* ------------------------------------------------------------ home */
+  const onRoute = (x) => x.type === 'step' && (!coreRoute() || isCore(x));
   function progressOfChapter(n) {
-    const keys = slides.filter((x) => x.ch && x.ch.num === n && x.type === 'step').map((x) => x.key);
+    const keys = slides.filter((x) => x.ch && x.ch.num === n && onRoute(x)).map((x) => x.key);
     if (!keys.length) return 0;
     return keys.filter((k) => store.data.visited[k]).length / keys.length;
   }
   // quiz mastery: best first-try score saved for each section's check step
   function secMastery(sec) {
     let best = 0, total = 0, seen = false;
-    sec.steps.forEach((st, i) => { if (!st.quiz) return; const rec = store.data.quiz[sec.id + '/' + (i + 1)]; total += st.quiz.length; if (rec) { seen = true; best += rec.best || 0; } });
-    return seen && total ? { best, total, pct: best / total } : null;
+    let learned = 0;
+    sec.steps.forEach((st, i) => { if (!st.quiz) return; const rec = store.data.quiz[sec.id + '/' + (i + 1)]; total += st.quiz.length; if (rec && rec.fp === quizFp(st.quiz)) { seen = true; best += rec.best || 0; learned += Math.max(rec.learned || 0, rec.best || 0); } });
+    return seen && total ? { best, total, learned, pct: best / total } : null;
   }
   function masteryChip(m) {
     if (!m) return null;
     const cls = m.pct >= 0.8 ? 'ok' : m.pct >= 0.5 ? 'warn' : 'bad';
-    return h('span', { class: 'chip ' + cls, title: `Best quiz score: ${m.best} of ${m.total} right on the first try` }, `quiz ${m.best}/${m.total}`);
+    return h('span', { class: 'chip ' + cls, title: `First try: best ${m.best} of ${m.total} right on a first attempt${m.learned != null ? ` · learned: ${m.learned} of ${m.total} answered correctly after retries` : ''}` }, `quiz ${m.best}/${m.total}`);
   }
   function chapterMastery(n) {
     const ms = sectionsOf(n).map(secMastery).filter(Boolean);
@@ -1200,6 +1241,8 @@ body.narrow table.tbl { display: block; max-width: 100%; overflow-x: auto; -webk
     const secCount = Object.keys(Guide.sections).length;
     const stepKeys = slides.filter((x) => x.type === 'step').map((x) => x.key);
     const overall = stepKeys.length ? stepKeys.filter((k) => store.data.visited[k]).length / stepKeys.length : 0;
+    const coreKeys = slides.filter((x) => x.type === 'step' && isCore(x)).map((x) => x.key);
+    const routeDone = coreKeys.length ? coreKeys.filter((k) => store.data.visited[k]).length / coreKeys.length : 0;
     const lastIdx = store.data.last && store.data.last !== 'home' ? slideIndex(store.data.last) : -1;
     const firstStep = slides.findIndex((x) => x.type === 'chapter');
     const resume = lastIdx > 0 ? lastIdx : firstStep;
@@ -1212,7 +1255,10 @@ body.narrow table.tbl { display: block; max-width: 100%; overflow-x: auto; -webk
         h('p', {}, 'An interactive companion to Chapters 1–5 of ', h('i', {}, 'Operating Systems: Internals and Design Principles'), '. Every section explains one idea in plain language, lets you run it yourself, then checks your understanding.')),
       h('div', { class: 'stack home-go', style: { alignItems: 'flex-end', gap: '8px', flex: 'none' } },
         resumeSl ? h('button', { class: 'btn primary lg', onclick: () => go(resume) }, lastIdx > 0 ? `Continue: ${slideLabel(resumeSl)}` : 'Start with Chapter 1', h('span', { html: ICON.right, style: { width: '18px', display: 'inline-flex' } })) : null,
-        h('div', { class: 'small muted' }, `Your progress: ${Math.round(overall * 100)}% of steps visited`))));
+        h('div', { class: 'small muted' }, coreRoute()
+          ? `Core path: ${Math.round(routeDone * 100)}% done · all steps: ${Math.round(overall * 100)}%`
+          : `Your progress: ${Math.round(overall * 100)}% of steps visited`),
+        h('div', { class: 'route-top' }, routeSeg()))));
     const cards = h('div', { class: 'chcards' });
     for (const c of sortedChapters()) {
       const secs = sectionsOf(c.num);
@@ -1222,7 +1268,7 @@ body.narrow table.tbl { display: block; max-width: 100%; overflow-x: auto; -webk
         h('div', { class: 'tt' }, c.title),
         h('ul', {}, secs.map((x) => h('li', { style: { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } }, `${x.id} ${x.short || x.title}`))),
         h('div', { style: { marginTop: 'auto' } }, h('div', { class: 'meter' }, h('i', { style: { width: pct * 100 + '%' } })),
-          h('div', { class: 'xs muted', style: { marginTop: '3px' } }, `${Math.round(pct * 100)}% visited`, (() => { const m = chapterMastery(c.num); return m ? ` · quizzes ${m.tried}/${m.of}, ${Math.round(m.pct * 100)}% right` : ''; })()))));
+          h('div', { class: 'xs muted', style: { marginTop: '3px' } }, `${Math.round(pct * 100)}% ${coreRoute() ? 'of core path' : 'visited'}`, (() => { const m = chapterMastery(c.num); return m ? ` · quizzes ${m.tried}/${m.of}, ${Math.round(m.pct * 100)}% right` : ''; })()))));
     }
     cards.style.flex = '1'; cards.style.minHeight = '0';
     wrap.append(cards);
@@ -1238,7 +1284,7 @@ body.narrow table.tbl { display: block; max-width: 100%; overflow-x: auto; -webk
       h('div', { class: 'card tight' }, h('h4', {}, 'Colour language used in every diagram'), legend()),
       h('div', { class: 'card tight' }, h('h4', {}, 'Getting around'),
         h('div', { class: 'small', html: '<kbd>←</kbd> <kbd>→</kbd> step · <kbd>T</kbd> contents · <kbd>G</kbd> glossary · <kbd>?</kbd> all shortcuts. Dotted words like <span class="t" data-t="operating system">operating system</span> show a definition.' }),
-        h('div', { class: 'row gap-s', style: { marginTop: '6px' } }, routeSeg(), h('button', { class: 'btn sm', type: 'button', onclick: openPrint }, 'Printable guide')))));
+        h('div', { class: 'row gap-s', style: { marginTop: '6px' } }, h('div', { class: 'route-bottom' }, routeSeg()), h('button', { class: 'btn sm', type: 'button', onclick: openPrint }, 'Printable guide')))));
     body.append(wrap);
   }
   function legend() {
@@ -1337,7 +1383,7 @@ body.narrow table.tbl { display: block; max-width: 100%; overflow-x: auto; -webk
   /* ------------------------------------------------------------ chapter / final quizzes */
   function poolFor(secs) {
     const pool = [];
-    for (const sec of secs) sec.steps.forEach((st, si) => (st.quiz || []).forEach((q, qi) => pool.push(Object.assign({}, q, { source: sec.id, qid: `${sec.id}:${si}:${qi}` }))));
+    for (const sec of secs) sec.steps.forEach((st, si) => (st.quiz || []).forEach((q, qi) => pool.push(Object.assign({}, q, { source: sec.id, qid: `${sec.id}:${si}:${qi}:${qfp(q)}` }))));
     return pool;
   }
   function sampledQuiz(body, ctx, secs, n, key, blurb) {
@@ -1589,12 +1635,36 @@ body.narrow table.tbl { display: block; max-width: 100%; overflow-x: auto; -webk
     let cur = 0;
     let order = range(qs.length);
     // restore a saved attempt (answers, tries, current question) so leaving the step or rotating the device keeps the work
-    const ids = o.ids || qs.map((q, i) => i + ':' + hashStr(String(q.q)));
+    const ids = o.ids || quizIds(questions);
     let startPos = 0, startSum = false;
     const saved = o.key && store.data.qstate && store.data.qstate[o.key];
-    if (saved && Array.isArray(saved.ids) && saved.ids.join('|') === ids.join('|') && Array.isArray(saved.st) && saved.st.length === qs.length) {
-      st = saved.st; if (Array.isArray(saved.order) && saved.order.length) order = saved.order;
-      startPos = saved.pos || 0; startSum = saved.mode === 'sum';
+    const RES = [null, 'right', 'late', 'wrong', 'fixed'];
+    const idxArr = (a, n) => Array.isArray(a) && a.length <= 64 && a.every((x) => Number.isInteger(x) && x >= 0 && x < n);
+    function cleanQ(q, x) {
+      if (!isObj(x) || !okInt(x.tries, 0, 50) || typeof x.done !== 'boolean' || !RES.includes(x.res === undefined ? null : x.res)) return null;
+      const c = { tries: x.tries, done: x.done, res: x.res || null };
+      if (x.retry === true) c.retry = true;
+      const n = (q.choices || q.items || q.pairs || []).length;
+      if (x.wrong !== undefined) { if (!idxArr(x.wrong, n)) return null; c.wrong = x.wrong.slice(); }
+      if (q.type === 'multi' && x.sel !== undefined) { if (!idxArr(x.sel, n)) return null; c.sel = x.sel.slice(); }
+      if (q.type === 'order' && x.arr !== undefined) { if (!idxArr(x.arr, n) || x.arr.length !== n || new Set(x.arr).size !== n) return null; c.arr = x.arr.slice(); }
+      if (q.type === 'match') {
+        const rights = q.pairs.map((p) => p[1]);
+        if (x.opts !== undefined) { if (!Array.isArray(x.opts) || x.opts.length !== rights.length || !x.opts.every((v) => rights.includes(v))) return null; c.opts = x.opts.slice(); }
+        if (x.sel !== undefined) { if (!Array.isArray(x.sel) || x.sel.length !== rights.length || !x.sel.every((v) => v === '' || rights.includes(v))) return null; c.sel = x.sel.slice(); }
+      }
+      if (q.type === 'bucket' && x.sel !== undefined) { if (!Array.isArray(x.sel) || x.sel.length !== q.items.length || !x.sel.every((v) => Number.isInteger(v) && v >= -1 && v < q.buckets.length)) return null; c.sel = x.sel.slice(); }
+      if (q.type === 'num' && x.val !== undefined) { if (typeof x.val !== 'string' || x.val.length > 40) return null; c.val = x.val; }
+      return c;
+    }
+    if (isObj(saved) && Array.isArray(saved.ids) && saved.ids.join('|') === ids.join('|') && Array.isArray(saved.st) && saved.st.length === qs.length) {
+      const cleaned = saved.st.map((x, i) => cleanQ(qs[i], x));
+      const ordOk = idxArr(saved.order, qs.length) && saved.order.length > 0 && new Set(saved.order).size === saved.order.length;
+      if (cleaned.every(Boolean) && ordOk) {
+        st = cleaned; order = saved.order.slice();
+        startPos = okInt(saved.pos, 0, order.length - 1) ? saved.pos : 0;
+        startSum = saved.mode === 'sum';
+      }
     }
     function saveState() {
       if (!o.key) return;
@@ -1615,8 +1685,12 @@ body.narrow table.tbl { display: block; max-width: 100%; overflow-x: auto; -webk
     function saveBest() {
       if (!o.key) return;
       const right = st.filter((x) => x.res === 'right').length;
-      const rec = store.data.quiz[o.key] || { best: 0, total: qs.length };
-      rec.best = Math.max(rec.best || 0, right); rec.total = qs.length; rec.last = right;
+      const fp = hashStr(ids.join('|')).toString(36);
+      let rec = store.data.quiz[o.key];
+      if (!rec || rec.fp !== fp || rec.total !== qs.length) rec = { best: 0, total: qs.length, fp };   // questions changed: old best no longer applies
+      const learned = st.filter((x) => x.res === 'right' || x.res === 'late' || x.res === 'fixed').length;
+      rec.best = Math.max(rec.best || 0, right); rec.total = qs.length; rec.last = right; rec.fp = fp;
+      rec.learned = Math.max(rec.learned || 0, learned);
       store.data.quiz[o.key] = rec; store.save();
     }
     function paintTop() {
@@ -1624,7 +1698,8 @@ body.narrow table.tbl { display: block; max-width: 100%; overflow-x: auto; -webk
       order.forEach((qi, k) => pills.append(h('button', { type: 'button', class: 'quiz-pill' + (qi === cur && main.dataset.mode !== 'sum' ? ' on' : '') + (st[qi].res ? ' ' + st[qi].res : ''), title: `Question ${k + 1}`, onclick: () => show(k) }, String(k + 1))));
       const done = order.filter((qi) => st[qi].done).length;
       const right = order.filter((qi) => st[qi].res === 'right').length;
-      score.textContent = `${right} right first try · ${done}/${order.length} answered`;
+      const fixed = order.filter((qi) => st[qi].res === 'fixed').length;
+      score.textContent = `${right} right first try${fixed ? ` · ${fixed} fixed on retry` : ''} · ${done}/${order.length} answered`;
       const allDone = order.every((qi) => st[qi].done);
       const pos = order.indexOf(cur);
       bNext.textContent = allDone ? 'See results ▶' : 'Next question ▶';
@@ -1637,15 +1712,18 @@ body.narrow table.tbl { display: block; max-width: 100%; overflow-x: auto; -webk
     }
     function restart(idxs) {
       order = idxs;
-      idxs.forEach((qi) => (st[qi] = { tries: 0, done: false, res: null }));
+      const retry = idxs.length < qs.length;   // retrying missed questions: a correct answer now counts as "fixed", never as first try
+      idxs.forEach((qi) => (st[qi] = retry ? { tries: 0, done: false, res: null, retry: true } : { tries: 0, done: false, res: null }));
       show(0);
       saveState();
     }
     function summary() {
       main.dataset.mode = 'sum';
       const right = order.filter((qi) => st[qi].res === 'right').length;
-      const missed = order.filter((qi) => st[qi].res !== 'right');
-      const pct = Math.round((right / order.length) * 100);
+      const fixedN = order.filter((qi) => st[qi].res === 'fixed').length;
+      const isRetry = order.some((qi) => st[qi].retry);
+      const missed = order.filter((qi) => st[qi].res !== 'right' && st[qi].res !== 'fixed');
+      const pct = Math.round(((isRetry ? fixedN : right) / order.length) * 100);
       const what = o.source ? 'these sections' : 'this section';
       const msg = pct === 100 ? `Perfect. You have ${what} nailed.` : pct >= 80 ? 'Strong work. Review the explanations for the ones you missed.' : pct >= 50 ? 'Good start. Revisit the steps for the questions you missed, then try again.' : `This is a good time to go back through ${what} and then retry.`;
       const cmpId = (a, b) => { const [a1, a2] = a.split('.').map(Number); const [b1, b2] = b.split('.').map(Number); return a1 - b1 || a2 - b2; };
@@ -1653,7 +1731,8 @@ body.narrow table.tbl { display: block; max-width: 100%; overflow-x: auto; -webk
       main.innerHTML = '';
       main.append(h('div', { class: 'quiz-sum', style: { gridColumn: '1 / -1' } }, h('div', { class: 'stack', style: { alignItems: 'center' } },
         h('div', { class: 'big', style: { fontSize: '64px', color: pct >= 80 ? 'var(--ok)' : pct >= 50 ? 'var(--warn)' : 'var(--bad)' } }, pct + '%'),
-        h('div', { class: 'lead b' }, `${right} of ${order.length} correct on the first try`),
+        h('div', { class: 'lead b' }, isRetry ? `You fixed ${fixedN} of the ${order.length} you had missed` : `${right} of ${order.length} correct on the first try`),
+        isRetry ? h('div', { class: 'small muted' }, 'Retries improve what you have learned, not your first-try score.') : null,
         h('div', { class: 'muted' }, msg),
         o.source && revisit.length ? h('div', { class: 'row small', style: { justifyContent: 'center', gap: '6px' } }, h('span', {}, 'Sections to revisit:'),
           revisit.map((x) => h('button', { class: 'btn sm', type: 'button', title: (Guide.sections[x] || {}).title || '', onclick: () => go(slideIndex(x + '/1')) }, '§' + x))) : null,
@@ -1690,8 +1769,8 @@ body.narrow table.tbl { display: block; max-width: 100%; overflow-x: auto; -webk
       const api = {
         finish(correct) {
           s.done = true;
-          s.res = correct ? (s.tries === 0 ? 'right' : 'late') : 'wrong';
-          const verdict = s.res === 'right' ? '<div class="verdict ok">✓ Correct!</div>' : s.res === 'late' ? '<div class="verdict warn">✓ Correct on the second try</div>' : '<div class="verdict bad">✗ Not this time. The correct answer is shown in green.</div>';
+          s.res = correct ? (s.retry ? 'fixed' : s.tries === 0 ? 'right' : 'late') : 'wrong';
+          const verdict = s.res === 'right' ? '<div class="verdict ok">✓ Correct!</div>' : s.res === 'late' ? '<div class="verdict warn">✓ Correct on the second try</div>' : s.res === 'fixed' ? '<div class="verdict warn">✓ Correct on this retry</div>' : '<div class="verdict bad">✗ Not this time. The correct answer is shown in green.</div>';
           fb.innerHTML = verdict + whyHtml();
           saveBest(); paintTop(); saveState();
         },
@@ -1700,7 +1779,7 @@ body.narrow table.tbl { display: block; max-width: 100%; overflow-x: auto; -webk
           if (s.tries >= q.max) return api.finish(false);
           fb.innerHTML = `<div class="verdict bad">✗ Not quite. Try once more.</div>${extra ? `<div>${extra}</div>` : ''}${q.hint ? `<div class="why"><b>Hint:</b> ${q.hint}</div>` : ''}`;
         },
-        final() { fb.innerHTML = (s.res === 'right' ? '<div class="verdict ok">✓ Correct!</div>' : s.res === 'late' ? '<div class="verdict warn">✓ Correct on the second try</div>' : '<div class="verdict bad">✗ The correct answer is shown in green.</div>') + whyHtml(); },
+        final() { fb.innerHTML = (s.res === 'right' ? '<div class="verdict ok">✓ Correct!</div>' : s.res === 'late' ? '<div class="verdict warn">✓ Correct on the second try</div>' : s.res === 'fixed' ? '<div class="verdict warn">✓ Correct on this retry</div>' : '<div class="verdict bad">✗ The correct answer is shown in green.</div>') + whyHtml(); },
       };
       fb.innerHTML = `<div class="muted">${QIDLE[q.type]}</div>` + (q.hint ? `<div class="why small"><b>Hint:</b> ${q.hint}</div>` : '');
       RENDER[q.type === 'tf' ? 'mc' : q.type](q, s, box, api, left);
@@ -1787,7 +1866,7 @@ body.narrow table.tbl { display: block; max-width: 100%; overflow-x: auto; -webk
             box.append(row);
           });
         }
-        function move(a, b) { if (s.done || b < 0 || b >= s.arr.length) return; const [x] = s.arr.splice(a, 1); s.arr.splice(b, 0, x); paint(false); }
+        function move(a, b) { if (s.done || b < 0 || b >= s.arr.length) return; const [x] = s.arr.splice(a, 1); s.arr.splice(b, 0, x); paint(false); saveState(); }
         const chk = checkBtn(() => {
           if (s.done) return;
           const right = s.arr.filter((v, k) => v === k).length;
@@ -1869,7 +1948,7 @@ body.narrow table.tbl { display: block; max-width: 100%; overflow-x: auto; -webk
           paint();
         } }, 'Check answer');
         inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') chk.click(); });
-        inp.addEventListener('input', () => inp.classList.remove('wrong'));
+        inp.addEventListener('input', () => { inp.classList.remove('wrong'); s.val = inp.value; saveState(); });
         box.append(h('div', { class: 'qnum' }, inp, q.unit ? h('span', { class: 'b', html: q.unit }) : null, chk));
         function paint() {
           if (s.done) { inp.value = String(q.answer); inp.disabled = true; chk.disabled = true; inp.classList.remove('wrong'); inp.classList.add('right'); }
@@ -1885,7 +1964,9 @@ body.narrow table.tbl { display: block; max-width: 100%; overflow-x: auto; -webk
   /* ------------------------------------------------------------ drawers, glossary, notes, help */
   let returnFocus = null;
   function setOverlayState() {
-    [els.toc, els.gloss, els.notes, els.modal].forEach((d) => { const on = d.classList.contains('on'); d.inert = !on; d.setAttribute('aria-hidden', on ? 'false' : 'true'); });
+    let anyOpen = false;
+    [els.toc, els.gloss, els.notes, els.modal].forEach((d) => { const on = d.classList.contains('on'); anyOpen = anyOpen || on; d.inert = !on; d.setAttribute('aria-hidden', on ? 'false' : 'true'); });
+    els.app.inert = anyOpen;   // everything behind an open panel is unreachable, so Tab stays inside the panel
   }
   function openDrawer(which) {
     const prev = document.activeElement;
@@ -1897,7 +1978,8 @@ body.narrow table.tbl { display: block; max-width: 100%; overflow-x: auto; -webk
     if (which === 'notes') { renderNotes(); els.notes.classList.add('on'); setTimeout(() => { const b = els.notes.querySelector('button'); if (b) b.focus(); }, 60); }
     setOverlayState();
   }
-  function closeAll(keepScrim) {
+  function closeAll(keepScrimArg) {
+    const keepScrim = keepScrimArg === true;   // handlers bound as onclick: closeAll receive an Event, which must not keep the backdrop
     const wasOpen = [els.toc, els.gloss, els.notes, els.modal].some((d) => d.classList.contains('on'));
     const focusInside = document.activeElement && document.activeElement.closest && document.activeElement.closest('.drawer, .modal');
     [els.toc, els.gloss, els.notes, els.modal].forEach((d) => d.classList.remove('on'));
@@ -1979,7 +2061,7 @@ body.narrow table.tbl { display: block; max-width: 100%; overflow-x: auto; -webk
       routeSeg(),
       h('div', { class: 'row', style: { marginTop: '12px' } }, h('button', { class: 'btn sm', type: 'button', onclick: () => { closeAll(); openPrint(); } }, 'Printable study guide')),
       h('div', { class: 'row', style: { marginTop: '16px', justifyContent: 'space-between' } },
-        h('button', { class: 'btn sm danger', onclick: () => { store.data.visited = {}; store.data.quiz = {}; store.data.known = {}; store.save(); closeAll(); go(cur); toast('Progress cleared.'); } }, 'Reset my progress'),
+        h('button', { class: 'btn sm danger', onclick: () => { const d = store.data; d.visited = dict(); d.quiz = dict(); d.known = dict(); d.qstate = dict(); d.qdraw = dict(); d.chLast = dict(); d.last = null; store.save(); closeAll(); go(cur); toast('Progress cleared.'); } }, 'Reset my progress'),
         h('button', { class: 'btn primary', onclick: closeAll }, 'Got it'))));
     els.modal.classList.add('on');
     setOverlayState();
@@ -2022,10 +2104,23 @@ body.narrow table.tbl { display: block; max-width: 100%; overflow-x: auto; -webk
     document.addEventListener('keydown', (e) => {
       if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return;
       const t = e.target;
-      if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) { if (e.key === 'Escape') { t.blur(); closeAll(); } return; }
+      if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) && !(e.key === 'Tab' && t.closest && t.closest('.drawer.on, .modal.on'))) { if (e.key === 'Escape') { t.blur(); closeAll(); } return; }
       const k = e.key;
-      const inPanel = t && t.closest && t.closest('.drawer.on, .modal.on');
-      if (inPanel) { if (k === 'Escape') { e.preventDefault(); closeAll(); } return; }
+      const openPanel = [els.toc, els.gloss, els.notes, els.modal].find((d) => d.classList.contains('on'));
+      if (openPanel && k === 'Tab') {   // keep focus cycling inside the open panel
+        const f = [...openPanel.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')].filter((x) => !x.disabled && x.getClientRects().length);
+        if (!f.length) { e.preventDefault(); return; }
+        const first = f[0], last = f[f.length - 1], a = document.activeElement;
+        if (!openPanel.contains(a)) { e.preventDefault(); first.focus(); }
+        else if (e.shiftKey && a === first) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && a === last) { e.preventDefault(); first.focus(); }
+        return;
+      }
+      if (openPanel) {   // while a panel is open only Escape (or the panel's own key) acts; slides never move behind it
+        const own = { t: els.toc, g: els.gloss, n: els.notes, '?': els.modal }[k.toLowerCase()];
+        if (k === 'Escape' || own === openPanel) { e.preventDefault(); closeAll(); }
+        return;
+      }
       const arrows = k === 'ArrowRight' || k === 'ArrowLeft' || k === 'ArrowUp' || k === 'ArrowDown' || k === 'Home' || k === 'End';
       if (arrows && t && t.closest && t.closest('[role="tablist"], .seg, [role="radiogroup"], [role="listbox"], [role="slider"], [role="menu"], [data-keys]')) return;
       if (k === 'ArrowRight' || k === 'PageDown') { e.preventDefault(); step(1); }
@@ -2061,7 +2156,7 @@ body.narrow table.tbl { display: block; max-width: 100%; overflow-x: auto; -webk
     }
     window.addEventListener('resize', onResize);
     if (window.ResizeObserver) new ResizeObserver(onResize).observe(els.stage);
-    window.addEventListener('hashchange', () => { const i = slideIndex(location.hash.slice(1)); if (i >= 0 && i !== cur) go(i); });
+    window.addEventListener('hashchange', () => { const i = slideIndex(keyFromHash()); if (i >= 0 && i !== cur) go(i); });
   }
 
   /* ------------------------------------------------------------ print (PDF study guide) */
@@ -2126,6 +2221,11 @@ body.narrow table.tbl { display: block; max-width: 100%; overflow-x: auto; -webk
     document.title = 'Operating Systems Chapters 1-5 Study Guide';
   }
 
+  function keyFromHash() {
+    const raw = String(location.hash || '').slice(1, 80);
+    try { return decodeURIComponent(raw); } catch (e) { return ''; }   // malformed fragment such as #% → home
+  }
+
   /* ------------------------------------------------------------ start */
   Guide.start = function () {
     buildGlossary();
@@ -2136,7 +2236,7 @@ body.narrow table.tbl { display: block; max-width: 100%; overflow-x: auto; -webk
     applyTheme();
     bindGlobal();
     fit();
-    const initial = slideIndex(decodeURIComponent(location.hash.slice(1)));
+    const initial = slideIndex(keyFromHash());
     go(initial >= 0 ? initial : 0);
     if (registerErrors.length) console.error('[guide] registration errors:\n' + registerErrors.join('\n'));
   };
@@ -2154,6 +2254,7 @@ body.narrow table.tbl { display: block; max-width: 100%; overflow-x: auto; -webk
     slides: () => slides.map((x, i) => ({ i, key: x.key, type: x.type, sec: x.sec ? x.sec.id : null, step: x.i ?? null, title: x.step ? x.step.title : x.title, kind: x.step ? x.step.kind || null : null, hasQuiz: !!(x.step && x.step.quiz) })),
     go: (key) => { const i = slideIndex(key); if (i < 0) return false; go(i); return true; },
     current: () => slides[cur] && slides[cur].key,
+    quizIds: (questions) => quizIds(questions),
     errors: () => renderErrors.slice(),
     registerErrors: () => registerErrors.slice(),
     metrics() {
@@ -4076,6 +4177,7 @@ Guide.chapter({
             paint();
           }
           function reset() {
+            running = false; // Reset (and every setting change) stops the typist: nothing arrives until the student presses Start again
             tick = 0; pos = 0; buf = []; typed = []; mem = ''; nTyped = 0; nOk = 0; nLost = 0;
             event = 'Press <b>Start typing</b>, or <b>One key</b> to go slowly. The typist never waits: keys arrive whether or not anyone is ready for them.';
             paint();
@@ -4384,6 +4486,7 @@ Guide.chapter({
   });
 })();
 
+if (Guide.sections['1.1']) Guide.sections['1.1'].layoutAware = true;
 </script>
 <script>
 /* ======================= section 1.2 ======================= */
@@ -5402,6 +5505,7 @@ Guide.chapter({
   });
 })();
 
+if (Guide.sections['1.2']) Guide.sections['1.2'].layoutAware = true;
 </script>
 <script>
 /* ======================= section 1.3 ======================= */
@@ -5531,7 +5635,11 @@ Guide.chapter({
       .sec-1-3 .cell-in.bad { border-color: var(--bad); background: var(--bad-bg); }
       .sec-1-3 .mrow { display: grid; grid-template-columns: 38px 76px minmax(0, 1fr); gap: 8px; align-items: center; padding: 2px 6px; border-radius: 9px; border: 2px solid transparent; }
       .sec-1-3 .mrow.pc { background: var(--cpu-bg); border-color: var(--cpu); }
-      .sec-1-3 .mrow .hint { font-family: var(--mono); font-size: 13px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .sec-1-3 .mrow .hint { font-family: var(--mono); font-size: 13px; line-height: 1.2; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .sec-1-3 .mrow .hint .was { font-family: var(--font); font-size: 12.5px; font-weight: 700; color: var(--warn); }
+      .sec-1-3 .cell-in.wr { border-color: var(--warn); background: var(--hl); }
+      .sec-1-3 .mrow.just .cell-in { outline: 3px solid var(--warn); outline-offset: 1px; }
+      .sec-1-3 .live-key { display: inline-block; width: 12px; height: 12px; border-radius: 3px; border: 2px solid var(--warn); background: var(--hl); vertical-align: -1px; margin-right: 4px; }
     `,
 
     steps: [
@@ -6026,15 +6134,18 @@ Guide.chapter({
             ['Double a number', [0x1940, 0x5940, 0x2941, 0, 0, 0], [7, 0, 0, 0], 0x941],
             ['A negative number', [0x1940, 0x5941, 0x2942, 0, 0, 0], [0x8005, 2, 0, 0], 0x942],
           ];
-          const inputs = {}, hints = {}, rows = {};
+          // src = the words the student typed (their program + data). The boxes show LIVE memory while the machine runs;
+          // Reset (or any edit) reloads memory from src, so a program that rewrote itself gets its original words back.
+          const inputs = {}, hints = {}, rows = {}, src = {};
           const mk = (a) => {
             const inp = h('input', { type: 'text', maxlength: 4, spellcheck: 'false', class: 'cell-in', 'aria-label': 'Contents of address ' + hex(a, 3) });
-            inp.addEventListener('input', () => { inp.classList.toggle('bad', parseHex(inp.value) == null); resetMachine('Memory edited, so the machine was reset. Press Step or Run.'); });
+            inp.addEventListener('input', () => { src[a] = inp.value; resetMachine('Memory edited, so the machine was reset and your program reloaded. Press Step or Run.'); });
             inputs[a] = inp; hints[a] = h('span', { class: 'hint' });
             rows[a] = h('div', { class: 'mrow' }, h('span', { class: 'mono b' }, hex(a, 3)), inp, hints[a]);
             return rows[a];
           };
-          const image = () => { const m = new Map(); [...PA, ...DA].forEach((a) => m.set(a, parseHex(inputs[a].value) ?? 0)); return m; };
+          const image = () => { const m = new Map(); [...PA, ...DA].forEach((a) => m.set(a, parseHex(src[a]) ?? 0)); return m; };
+          const meaning = (a, w) => (DA.includes(a) ? '= ' + (signed(w) || '0') : w === 0 ? 'halt (stop)' : OPS[opOf(w)] ? OPS[opOf(w)].short(addrOf(w)) : 'opcode ' + opOf(w) + ': unknown here');
           let M;
           const regs = h('div', { class: 'row gap-s' });
           const log = h('div', { class: 'log grow', style: { minHeight: '120px' } });
@@ -6042,36 +6153,54 @@ Guide.chapter({
           const sel = h('select', { class: 'mono', style: { font: 'inherit', fontSize: '15px', padding: '4px 6px', borderRadius: '8px', border: '1px solid var(--line-2)', background: 'var(--panel)', color: 'var(--ink)' } }, DA.map((a) => h('option', { value: a }, hex(a, 3))));
           const pred = h('input', { type: 'text', maxlength: 4, class: 'cell-in', placeholder: '????', 'aria-label': 'Your predicted value in hex' });
           function resetMachine(msg) {
-            M = { pc: 0x300, ir: null, ac: 0, mem: image(), halted: false, cycles: 0, why: '' };
+            M = { pc: 0x300, ir: null, ac: 0, mem: image(), halted: false, cycles: 0, why: '', wrote: null, selfMod: '', selfModAt: null };
             log.replaceChildren(h('div', { class: 'muted' }, msg || 'Ready. PC = 300.'));
+            Object.values(rows).forEach((r) => r.classList.remove('flash'));   // no leftover glow from before the reset
             paint();
           }
           function paint() {
             regs.replaceChildren(...[['PC', hex(M.pc, 3)], ['IR', M.ir == null ? '––––' : hex(M.ir)], ['AC', hex(M.ac) + ' (' + (signed(M.ac) || '0') + ')']].map(([n, v]) => h('span', { class: 'chip cpu mono' }, n + ' ' + v)), h('span', { class: 'chip mono' }, 'cycles ' + M.cycles));
-            PA.forEach((a) => {
-              const w = parseHex(inputs[a].value), op = w == null ? null : opOf(w), O = OPS[op];
-              hints[a].textContent = w == null ? 'not a hex word' : w === 0 ? 'halt (stop)' : O ? O.short(addrOf(w)) : 'opcode ' + op + ': unknown here';
-              rows[a].classList.toggle('pc', !M.halted && M.pc === a);
+            // every box shows the word in memory NOW, decoded fresh on every paint (so a rewritten instruction shows its new meaning)
+            [...PA, ...DA].forEach((a) => {
+              const orig = parseHex(src[a]), live = M.mem.get(a) ?? 0, changed = live !== (orig ?? 0), inp = inputs[a];
+              const shown = changed ? hex(live) : (src[a] ?? '');
+              if (inp.value !== shown) inp.value = shown;   // unchanged cells keep exactly what the student typed
+              inp.classList.toggle('bad', !changed && orig == null);
+              inp.classList.toggle('wr', changed);
+              hints[a].replaceChildren(!changed && orig == null ? 'not a hex word' : meaning(a, live),
+                ...(changed ? [h('br'), h('span', { class: 'was' }, 'changed · was ' + (orig == null ? '????' : hex(orig)))] : []));
+              rows[a].classList.toggle('pc', PA.includes(a) && !M.halted && M.pc === a);
+              rows[a].classList.toggle('just', M.wrote === a);
             });
-            DA.forEach((a) => {
-              const w0 = parseHex(inputs[a].value) ?? 0, now = M.mem.get(a) ?? 0;
-              hints[a].innerHTML = now !== w0 ? `<b style="color:var(--warn)">now ${hex(now)} (${signed(now) || '0'})</b>` : '= ' + (signed(w0) || '0');
-            });
-            if (!M.halted) verdict.innerHTML = '<span class="muted">Type your prediction, then press <b>Run to the end</b> (or step one cycle at a time).</span>';
+            if (!M.halted) verdict.innerHTML = M.selfMod || '<span class="muted">Type your prediction, then press <b>Run to the end</b> (or step one cycle at a time).</span>';
             else {
               const cell = +sel.value, v = M.mem.get(cell) ?? 0, p = parseHex(pred.value);
               verdict.innerHTML = `<b>${M.why}</b> Cell ${hex(cell, 3)} holds <b class="mono">${hex(v)}</b> (${signed(v) || '0'}). ` +
-                (p == null ? 'You did not enter a prediction.' : p === v ? '<b style="color:var(--ok)">✓ Your prediction was right.</b>' : `<b style="color:var(--bad)">✗ You predicted ${hex(p)}.</b> Step through again and watch the AC.`);
+                (p == null ? 'You did not enter a prediction.' : p === v ? '<b style="color:var(--ok)">✓ Your prediction was right.</b>' : `<b style="color:var(--bad)">✗ You predicted ${hex(p)}.</b> Step through again and watch the AC.`) +
+                (M.selfModAt != null ? ` <span style="color:var(--warn)">Along the way the program rewrote its own instruction at ${hex(M.selfModAt, 3)}.</span>` : '');
             }
           }
           function cycle() {
             if (M.halted) return;
             const at = M.pc, w = M.mem.get(at) ?? 0, op = opOf(w), a = addrOf(w);
-            M.ir = w; M.pc = (at + 1) & 0xFFF; M.cycles++;
+            M.ir = w; M.pc = (at + 1) & 0xFFF; M.cycles++; M.wrote = null;
             let line;
             if (op === 0) { M.halted = true; M.why = `Halted after ${M.cycles} cycles.`; line = 'halt: the machine stops'; }
             else if (op === 1) { M.ac = M.mem.get(a) ?? 0; line = `load: AC ← [${hex(a, 3)}] = ${hex(M.ac)}`; }
-            else if (op === 2) { M.mem.set(a, M.ac); line = `store: [${hex(a, 3)}] ← AC = ${hex(M.ac)}` + (PA.includes(a) ? ' (it overwrote an instruction!)' : ''); }
+            else if (op === 2) {
+              const old = M.mem.get(a) ?? 0;
+              M.mem.set(a, M.ac); M.wrote = a;
+              line = `store: [${hex(a, 3)}] ← AC = ${hex(M.ac)}`;
+              if (PA.includes(a)) {
+                // a store into the program area: the program has just rewritten one of its own instructions
+                line += old === M.ac ? ' (an instruction cell, but it already held that word)' : ` (it overwrote the instruction ${hex(old)}!)`;
+                if (old !== M.ac) {
+                  M.selfModAt = a;
+                  const when = a === M.pc ? 'The very next fetch' : a > M.pc ? `When the PC reaches ${hex(a, 3)}, the fetch` : `Cell ${hex(a, 3)} has already run, but any later fetch from it`;
+                  M.selfMod = `<b style="color:var(--warn)">The program rewrote itself.</b> Cell ${hex(a, 3)} held the instruction <b class="mono">${hex(old)}</b>; the store replaced it with <b class="mono">${hex(M.ac)}</b>. Instructions and data share one memory, so the processor cannot tell them apart. ${when} gets the new word: <span class="mono">${meaning(a, M.ac)}</span>. Reset puts your program back.`;
+                }
+              }
+            }
             else if (op === 5) {
               const sum = toInt(M.ac) + toInt(M.mem.get(a) ?? 0);
               M.ac = fromInt(sum);
@@ -6082,8 +6211,10 @@ Guide.chapter({
             log.append(h('div', {}, h('b', {}, `#${M.cycles}  `), `fetch ${hex(at, 3)}: ${hex(w)} → `, line));
             log.scrollTop = log.scrollHeight;
             paint();
+            const r = M.wrote != null && rows[M.wrote];
+            if (r) { r.classList.remove('flash'); void r.offsetWidth; r.classList.add('flash'); }   // one-shot glow on the cell just written
           }
-          const load = (k) => { const [, P, D, cell] = PRESETS[k]; PA.forEach((a, i) => { inputs[a].value = hex(P[i]); inputs[a].classList.remove('bad'); }); DA.forEach((a, i) => { inputs[a].value = hex(D[i]); inputs[a].classList.remove('bad'); }); sel.value = cell; pred.value = ''; resetMachine('Loaded “' + PRESETS[k][0] + '”. Predict, then run.'); };
+          const load = (k) => { const [, P, D, cell] = PRESETS[k]; PA.forEach((a, i) => { src[a] = hex(P[i]); }); DA.forEach((a, i) => { src[a] = hex(D[i]); }); sel.value = cell; pred.value = ''; resetMachine('Loaded “' + PRESETS[k][0] + '”. Predict, then run.'); };
           sel.addEventListener('change', () => paint());
           pred.addEventListener('input', () => { if (M.halted) paint(); });
           el.append(h('div', { class: 'split r fill' },
@@ -6092,7 +6223,7 @@ Guide.chapter({
               h('div', { class: 'grid-2', style: { gap: '10px', alignItems: 'start' } },
                 h('div', { class: 'card mem tight stack', style: { gap: '4px' } }, h('h4', { class: 'm0' }, 'Program (edit any word)'), PA.map(mk)),
                 h('div', { class: 'stack', style: { gap: '10px' } },
-                  h('div', { class: 'card mem tight stack', style: { gap: '4px' } }, h('h4', { class: 'm0' }, 'Data'), DA.map(mk)),
+                  h('div', { class: 'card mem tight stack', style: { gap: '4px' } }, h('div', { class: 'row', style: { justifyContent: 'space-between', flexWrap: 'nowrap' } }, h('h4', { class: 'm0' }, 'Data'), h('span', { class: 'xs muted', title: 'The boxes show memory as it is right now. Reset puts back the words you typed.' }, h('span', { class: 'live-key' }), 'changed by the program')), DA.map(mk)),
                   h('div', { class: 'card tight xs', html: '<b>Opcodes:</b> 1 = load AC · 2 = store AC · 5 = add to AC. <b>0000</b> = halt, a stop code added just for this lab. Numbers use sign-magnitude, so 8005 is −5.' }))),
               h('div', { class: 'callout tip m0 small', 'data-label': 'Challenge' }, 'Start from “3 + 2”. Change exactly one instruction so that cell 941 ends up holding 0006. Predict first, then run it.',
                 ctx.ui.reveal('Show one answer', '<div class="small" style="margin-top:4px">Change 301 from <b class="mono">5941</b> to <b class="mono">5940</b>: the add reads 940 again, so AC = 3 + 3 = 6 and the store writes 0006 into 941.</div>'))),
@@ -6100,7 +6231,7 @@ Guide.chapter({
               h('h4', { class: 'm0' }, '1 · Predict'),
               h('div', { class: 'row gap-s small' }, 'When it halts, cell', sel, 'will hold', pred, h('span', { class: 'xs muted' }, '(hex)')),
               h('h4', { class: 'm0' }, '2 · Run'),
-              h('div', { class: 'row gap-s' }, h('button', { class: 'btn', onclick: cycle }, 'Step one cycle'), h('button', { class: 'btn primary', onclick: () => { let n = 0; while (!M.halted && n++ < 50) cycle(); } }, 'Run to the end'), h('button', { class: 'btn ghost', onclick: () => resetMachine() }, 'Reset')),
+              h('div', { class: 'row gap-s' }, h('button', { class: 'btn', onclick: cycle }, 'Step one cycle'), h('button', { class: 'btn primary', onclick: () => { let n = 0; while (!M.halted && n++ < 50) cycle(); } }, 'Run to the end'), h('button', { class: 'btn ghost', title: 'Stop, set PC = 300 and reload memory with the words you typed', onclick: () => resetMachine('Reset. Memory reloaded with the words you typed; PC = 300.') }, 'Reset')),
               regs, log, verdict)));
           load(0);
         },
@@ -6320,7 +6451,7 @@ Guide.chapter({
 </table>
 <p><b>Capacity:</b> 4 opcode bits give 2<sup>4</sup> = 16 different opcodes. 12 address bits give 2<sup>12</sup> = 4,096 (4K) directly addressable words. In general, k bits give 2<sup>k</sup> patterns; a 16-bit instruction with a 6-bit opcode would leave 10 address bits, reaching 2<sup>10</sup> = 1,024 words.</p>
 <p><b>Hexadecimal</b> is used because each hex digit is exactly four bits. So the first hex digit of an instruction word is its opcode and the last three are its address. Worked example: 1940 hex = 0001 1001 0100 0000 → opcode 0001 (load AC), address 940. Note that 940 is hex: 9×256 + 4×16 = 2,368 in decimal. As a data word, 8005 hex = 1000 0000 0000 0101 → sign 1 (negative), magnitude 5, value −5.</p>
-<p>Memory cannot tell instructions from data. A word acts as an instruction when the PC fetches it, and as data when an instruction’s address field points at it.</p>
+<p>Memory cannot tell instructions from data. A word acts as an instruction when the PC fetches it, and as data when an instruction’s address field points at it. One consequence: a store whose address points into the program area overwrites an instruction, so the program changes itself. The next time the PC reaches that cell, the processor fetches and runs the new word, not the one the programmer wrote.</p>
 <h3>5. Tracing the example program (3 + 2)</h3>
 <p>Memory before the run: program at 300: <b>1940</b>, 301: <b>5941</b>, 302: <b>2941</b>; data at 940: <b>0003</b>, 941: <b>0002</b>. The PC starts at 300. Three instruction cycles make six stages ([x] means “the word stored at address x”):</p>
 <table>
@@ -6353,6 +6484,7 @@ Guide.chapter({
   });
 })();
 
+if (Guide.sections['1.3']) Guide.sections['1.3'].layoutAware = true;
 </script>
 <script>
 /* ======================= section 1.4 ======================= */
@@ -7084,7 +7216,8 @@ Guide.chapter({
             paint();
           }
           let auto = false;
-          const autoBtn = h('button', { class: 'btn', type: 'button', onclick: () => { auto = !auto; autoBtn.classList.toggle('on', auto); autoBtn.textContent = auto ? 'Pause auto-run' : 'Auto-run'; } }, 'Auto-run');
+          const setAuto = (v) => { auto = v; autoBtn.classList.toggle('on', auto); autoBtn.textContent = auto ? 'Pause auto-run' : 'Auto-run'; };
+          const autoBtn = h('button', { class: 'btn', type: 'button', onclick: () => setAuto(!auto) }, 'Auto-run');
           ctx.every(1000, () => { if (auto) stepOnce(); });
           const irqBtn = h('button', { class: 'btn intr', type: 'button', onclick: () => {
             if (st.pending) { ctx.toast('The printer’s request is already waiting.'); return; }
@@ -7096,7 +7229,7 @@ Guide.chapter({
             if (st.kernel) { ctx.toast('The handler runs with interrupts disabled; RETURN turns them back on.'); enSeg.set(st.en); return; }
             st.en = v; say(v ? 'Interrupts enabled again: a pending request will be noticed at the next interrupt stage.' : 'Interrupts disabled (on a real machine only the OS is allowed to do this). The interrupt stage is now skipped, so any request stays pending.', 'muted'); paint();
           });
-          const resetBtn = h('button', { class: 'btn ghost', type: 'button', onclick: () => { st = fresh(); log.replaceChildren(); say('Reset. Press “Run next stage”, raise an interrupt at any moment, and watch when it is noticed.'); paint(); } }, 'Reset');
+          const resetBtn = h('button', { class: 'btn ghost', type: 'button', onclick: () => { setAuto(false); st = fresh(); log.replaceChildren(); say('Reset. Press “Run next stage”, raise an interrupt at any moment, and watch when it is noticed.'); paint(); } }, 'Reset');
           st = fresh();
           el.append(h('div', { class: 'split fill' },
             h('div', { class: 'stack' }, h('div', { class: 'card white tight' }, panWrap(ctx, svg, 520)),
@@ -7516,6 +7649,7 @@ Guide.chapter({
   });
 })();
 
+if (Guide.sections['1.4']) Guide.sections['1.4'].layoutAware = true;
 </script>
 <script>
 /* ======================= section 1.5 ======================= */
@@ -8557,6 +8691,7 @@ Guide.chapter({
   });
 })();
 
+if (Guide.sections['1.5']) Guide.sections['1.5'].layoutAware = true;
 </script>
 <script>
 /* ======================= section 1.6 ======================= */
@@ -9607,6 +9742,7 @@ Guide.chapter({
   });
 })();
 
+if (Guide.sections['1.6']) Guide.sections['1.6'].layoutAware = true;
 </script>
 <script>
 /* ======================= section 1.7 ======================= */
@@ -10722,6 +10858,7 @@ void on_disk_interrupt() {   // runs when the disk interrupts
   });
 })();
 
+if (Guide.sections['1.7']) Guide.sections['1.7'].layoutAware = true;
 </script>
 <script>
 /* ======================= section 1.8 ======================= */
@@ -11831,7 +11968,7 @@ void on_disk_interrupt() {   // runs when the disk interrupts
 <script>
 /* ======================= section 2.1 ======================= */
 /* Section 2.1 — Operating System Objectives and Functions
-   Original teaching material. Built step by step (see AUTHORING.txt). */
+   Original teaching material. Built step by step. */
 Guide.section({
   id: '2.1',
   title: 'Operating System Objectives and Functions',
@@ -12928,11 +13065,12 @@ Guide.section({
     <p>So an OS should be built from <b>modules</b> with <b>clearly defined interfaces</b> and <b>good documentation</b>, so a change stays inside the module it concerns. In a tangled design, where parts reach into each other's data, a change ripples into many parts, and every extra edit is another chance to add a fault (in this section's illustrative model: 13 edits and a new fault, versus 6 edits and none).</p>`,
 });
 
+if (Guide.sections['2.1']) Guide.sections['2.1'].layoutAware = true;
 </script>
 <script>
 /* ======================= section 2.2 ======================= */
 /* Section 2.2 — The Evolution of Operating Systems
-   Original teaching material. Built step by step (see AUTHORING.txt). */
+   Original teaching material. Built step by step. */
 Guide.section({
   id: '2.2',
   title: 'The Evolution of Operating Systems',
@@ -13956,6 +14094,7 @@ Guide.section({
   `,
 });
 
+if (Guide.sections['2.2']) Guide.sections['2.2'].layoutAware = true;
 </script>
 <script>
 /* ======================= section 2.3 ======================= */
@@ -13963,8 +14102,7 @@ Guide.section({
    Section 2.3 — Major Achievements
    The four big ideas every modern OS is built on: the process, memory
    management, information protection and security, and scheduling and
-   resource management. Original teaching material, built step by step
-   (see AUTHORING.txt). Shared helpers live in the IIFE so nothing leaks
+   resource management. Original teaching material, built step by step. Shared helpers live in the IIFE so nothing leaks
    into the global scope.
    ===================================================================== */
 (() => {
@@ -14390,7 +14528,7 @@ Guide.section({
         render(el, ctx) {
           const { h, s } = ctx;
           const CODE = [['+5', '+5', '+5', '+5', '+5', 'jmp 0'], ['+100', '+100', '+100', '+100', '+100', 'jmp 0']];
-          let st, busy = false;
+          let st, busy = false, gen = 0;                   // gen: bumped by Reset so a switch in progress stops
           const fresh = () => ({ regs: { idx: 0, pc: 0, base: 2000, limit: 600, r1: 0 }, hl: [], check: null, badBlock: false,
             rows: [{ n: 'A', base: 2000, limit: 600, pc: 0, r1: 0, inc: 5, state: 'running' }, { n: 'B', base: 4000, limit: 400, pc: 0, r1: 0, inc: 100, state: 'ready' }] });
           const svg = s('svg', { viewBox: '0 0 660 400', width: '100%', role: 'img', 'aria-label': 'Processor registers and main memory with the process list' });
@@ -14449,17 +14587,17 @@ Guide.section({
             draw();
           }
           async function sw() {
-            setBusy(true);
+            setBusy(true); const g = gen, live = () => ctx.alive && g === gen;
             const r = st.regs, cur = r.idx, nx = 1 - cur, a = st.rows[cur], b = st.rows[nx];
             st.check = null; st.badBlock = false;
             a.pc = r.pc; a.r1 = r.r1; a.state = 'ready'; st.hl = ['regs', 'row' + cur]; draw();
             log(`<span style="color:var(--intr)"><b>Interrupt.</b></span> OS saves ${a.n}'s context (PC ${a.pc}, R1 ${a.r1}) in entry ${cur}.`);
-            await ctx.sleep(900); if (!ctx.alive) return;
+            await ctx.sleep(900); if (!live()) return;
             st.hl = ['row' + nx]; draw(); log(`OS picks the next process: ${b.n} (entry ${nx}).`);
-            await ctx.sleep(900); if (!ctx.alive) return;
+            await ctx.sleep(900); if (!live()) return;
             Object.assign(r, { idx: nx, pc: b.pc, base: b.base, limit: b.limit, r1: b.r1 }); b.state = 'running'; st.hl = ['regs', 'row' + nx]; draw();
             log(`OS loads ${b.n}'s context: index ${nx}, PC ${b.pc}, base ${b.base}, limit ${b.limit}, R1 ${b.r1}. <b>${b.n} runs.</b>`);
-            await ctx.sleep(700); if (!ctx.alive) return;
+            await ctx.sleep(700); if (!live()) return;
             st.hl = []; draw(); setBusy(false);
           }
           function bad() {
@@ -14468,12 +14606,12 @@ Guide.section({
             st.badBlock = true; st.hl = []; draw();
             log(`<span style="color:var(--bad)"><b>${w.n} tries address ${addr}</b></span>, past its limit of ${r.limit}. The hardware refuses and interrupts the OS, which would normally end ${w.n} with a bounds error. (Here it lets ${w.n} carry on.)`);
           }
-          function reset() { st = fresh(); logEl.replaceChildren(); log('A is running from the start of its block. B is ready and has never run.'); draw(); }
+          function reset() { gen++; setBusy(false); st = fresh(); logEl.replaceChildren(); log('A is running from the start of its block. B is ready and has never run.'); draw(); }
           el.append(h('div', { class: 'split l fill' },
             h('div', { class: 'stack' },
               h('p', { class: 'm0', html: 'A process has three parts: the executable <b>program</b>, its <b>data</b>, and its <span class="t">execution context</span> (what the OS needs to pause and resume it). A typical OS stores them like this:' }),
               h('ul', { class: 'small m0', html: '<li>The <span class="t">process list</span> has one entry per process: where the process is in memory, plus its saved context while it is not running (some systems keep part of it with the process instead).</li><li>Each process owns a block of memory holding its program and data.</li><li><b>Process index</b> names the running entry, the <b>PC</b> counts from the start of the block, and the <span class="t">base register</span> and <span class="t">limit register</span> give the block\'s start and size.</li>' }),
-              h('div', { class: 'row', style: { gap: '8px' } }, btn('Run 1 instruction', 'primary', run), btn('Interrupt: switch', 'os', sw), btn('Bad address', 'intr', bad), btn('Reset', 'ghost', reset)),
+              h('div', { class: 'row', style: { gap: '8px' } }, btn('Run 1 instruction', 'primary', run), btn('Interrupt: switch', 'os', sw), btn('Bad address', 'intr', bad), h('button', { class: 'btn sm ghost', type: 'button', onclick: reset }, 'Reset')),
               h('div', { class: 'callout tip m0', 'data-label': 'Try this', html: 'Run A three times, switch, run B twice, switch back. A resumes at PC 3 with R1 = 15, exactly where it stopped.' }),
               h('div', { class: 'callout warn m0', 'data-label': 'Common mistake', html: 'A <b>context switch</b> never copies the program or its data: it saves and reloads only a few register values.' })),
             h('div', { class: 'stack' }, fitWide(ctx, svg, 600), logEl)));
@@ -14585,7 +14723,7 @@ Guide.section({
         render(el, ctx) {
           const { h, s } = ctx;
           const NP = 8, NF = 6;
-          let st, busy = false;
+          let st, busy = false, gen = 0;                   // gen: bumped by Reset so a page-fault handler in progress stops
           const fresh = () => ({ table: [3, 0, null, 5, null, 1, null, null], frames: [1, 5, null, 0, null, 3], order: [1, 5, 0, 3], faults: 0, n: 0, va: null, res: null, hl: {} });
           const svg = s('svg', { viewBox: '0 0 660 460', width: '100%', role: 'img', 'aria-label': 'Processor, MMU with page table, main memory frames and disk' });
           const input = h('input', { class: 'va-in', type: 'number', min: 0, max: 9999, value: '5000', 'aria-label': 'Virtual address', onkeydown: (e) => { if (e.key === 'Enter') go(); } });
@@ -14660,20 +14798,20 @@ Guide.section({
             explain(); draw();
           }
           async function handle() {
-            const { p, off } = st.res; busy = true;
+            const { p, off } = st.res; busy = true; const g = gen, live = () => ctx.alive && g === gen;
             say.className = 'fb bad'; say.innerHTML = `<b>Page fault interrupt.</b> The OS takes over and blocks the process while it reads page ${p} from disk block ${50 + p}.`;
-            draw(); await ctx.sleep(1200); if (!ctx.alive) return;
+            draw(); await ctx.sleep(1200); if (!live()) return;
             let f = st.frames.indexOf(null), note;
             if (f < 0) { const v = st.order.shift(); f = st.table[v]; st.table[v] = null; note = `No frame is free, so the OS evicts page ${v}, the one in memory longest (saved to disk if changed).`; }
             else note = `Frame ${f} is free.`;
             st.frames[f] = p; st.table[p] = f; st.order.push(p); st.hl = { row: p, frame: f };
             say.innerHTML = `${note} The OS copies page ${p} into frame ${f} and updates the page table.`;
-            draw(); await ctx.sleep(1200); if (!ctx.alive) return;
+            draw(); await ctx.sleep(1200); if (!live()) return;
             busy = false; translate(st.va, true);
             say.className = 'fb ok'; say.innerHTML = `The instruction restarts. Now the MMU finds page ${p} in frame ${f}: real address ${f} × 1024 + ${off} = <b>${f * PAGE + off}</b>.`;
           }
           function go(v) { if (busy) return; const va = v != null ? v : Math.round(Number(input.value)); if (!Number.isFinite(va) || va < 0) return; input.value = String(va); translate(va); }
-          function reset() { if (busy) return; st = fresh(); say.className = 'fb'; say.innerHTML = 'Pick an address above. Try the ones that land <b>on disk</b>, then keep going until memory is full.'; brk.innerHTML = '<div class="muted">The page number and offset will appear here.</div>'; draw(); }
+          function reset() { gen++; busy = false; st = fresh(); say.className = 'fb'; say.innerHTML = 'Pick an address above. Try the ones that land <b>on disk</b>, then keep going until memory is full.'; brk.innerHTML = '<div class="muted">The page number and offset will appear here.</div>'; draw(); }
           el.append(h('div', { class: 'split l fill' },
             h('div', { class: 'stack', style: { gap: '10px' } },
               h('p', { class: 'm0', html: '<span class="t">Paging</span> cuts every program into fixed-size <b>pages</b> (here 1,024 bytes) and main memory into same-size <b>frames</b>. A <span class="t">virtual address</span> is a page number plus an offset. On every access the <span class="t">memory management unit (MMU)</span> looks it up in the <span class="t">page table</span>.' }),
@@ -14758,7 +14896,7 @@ Guide.section({
         render(el, ctx) {
           const { h, s } = ctx;
           const CAP = 4;                                   // processes that fit in main memory
-          let st, busy = false;
+          let st, busy = false, gen = 0;                   // gen: bumped by Reset so an event chain already in flight stops
           const fresh = () => ({ run: 'P1', rq: ['P2', 'P3'], dq: ['P4'], pq: [], lt: ['P5', 'P6'], next: 7, done: 0, sw: 0, moved: null, path: null });
           const inMem = () => (st.run ? 1 : 0) + st.rq.length + st.dq.length + st.pq.length;
           const svg = s('svg', { viewBox: '0 0 660 322', width: '100%', role: 'img', 'aria-label': 'Long-term, short-term and I/O queues feeding the processor' });
@@ -14795,8 +14933,8 @@ Guide.section({
           }
           const btns = [];
           const btn = (label, cls, fn) => { const b = h('button', { class: 'btn sm ' + cls, type: 'button', onclick: () => { if (!busy) run(fn); } }, label); btns.push(b); return b; };
-          async function run(fn) { busy = true; btns.forEach((b) => (b.disabled = true)); await fn(); if (!ctx.alive) return; busy = false; btns.forEach((b) => (b.disabled = false)); }
-          const beat = async (hi, path, moved, html) => { lit(hi); st.path = path; st.moved = moved; say.className = 'fb'; say.innerHTML = html; draw(); await ctx.sleep(1000); return ctx.alive; };
+          async function run(fn) { const g = gen; busy = true; btns.forEach((b) => (b.disabled = true)); await fn(); if (!ctx.alive || g !== gen) return; busy = false; btns.forEach((b) => (b.disabled = false)); }
+          const beat = async (hi, path, moved, html) => { const g = gen; lit(hi); st.path = path; st.moved = moved; say.className = 'fb'; say.innerHTML = html; draw(); await ctx.sleep(1000); return ctx.alive && g === gen; };
           async function dispatch() {
             if (st.run) return true;
             if (!st.rq.length) return beat(3, null, null, 'The short-term queue is empty, so the <b>processor sits idle</b> until an interrupt brings a process back.');
@@ -14831,7 +14969,7 @@ Guide.section({
               if (!(await beat(2, null, p, `New job <b>${p}</b> arrives and joins the long-term queue. ${inMem() >= CAP ? 'Memory already holds ' + CAP + ' processes; admitting more would overcommit it, so ' + p + ' must wait.' : 'There is room in memory, so it can be admitted.'}`))) return;
               if (await admit()) await dispatch(); },
           };
-          function reset() { if (busy) return; st = fresh(); lit(-1); say.className = 'fb'; say.innerHTML = 'P1 is running. Fire an event on the left: every event goes to the OS, which then decides who runs next.'; draw(); }
+          function reset() { gen++; busy = false; btns.forEach((b) => (b.disabled = false)); st = fresh(); lit(-1); say.className = 'fb'; say.innerHTML = 'P1 is running. Fire an event on the left: every event goes to the OS, which then decides who runs next.'; draw(); }
           const group = (label, ...b) => h('div', { class: 'ctl' }, h('h4', {}, label), h('div', { class: 'row', style: { gap: '6px' } }, b));
           el.append(h('div', { class: 'split l fill' },
             h('div', { class: 'stack', style: { gap: '9px' } },
@@ -15014,11 +15152,12 @@ real   = frame × page size + offset</pre>
   });
 })();
 
+if (Guide.sections['2.3']) Guide.sections['2.3'].layoutAware = true;
 </script>
 <script>
 /* ======================= section 2.4 ======================= */
 /* Section 2.4 — Developments Leading to Modern Operating Systems
-   Original teaching material. Built step by step (see AUTHORING.txt). */
+   Original teaching material. Built step by step. */
 Guide.section({
   id: '2.4',
   title: 'Developments Leading to Modern Operating Systems',
@@ -15032,7 +15171,7 @@ Guide.section({
     'Explain what a distributed operating system and object-oriented design add to an operating system.',
   ],
   terms: [
-    ['Monolithic kernel', 'A kernel that holds almost the whole operating system (scheduling, file systems, networking, device drivers, memory management and more) as one large program that runs as a single process in one shared address space.'],
+    ['Monolithic kernel', 'A kernel design in which almost the whole operating system (scheduling, file systems, networking, device drivers, memory management and more) runs together in kernel mode in one shared kernel address space, so its parts call one another directly instead of sending messages. The word describes how the kernel is built, not a single process: kernel code runs on behalf of whichever process made a system call, and in kernel threads and interrupt handlers.'],
     ['Microkernel', 'A small kernel that keeps only the essential core functions (address spaces, interprocess communication and basic scheduling) and leaves every other OS service to server processes that run in user mode.'],
     ['Address space', 'The range of memory addresses a process is allowed to use. The hardware, set up by the kernel, keeps each process inside its own address space, so one process cannot read or damage another\'s memory.'],
     ['Interprocess communication (IPC)', 'Any mechanism that lets separate processes exchange data; in a microkernel it is the kernel delivering messages from one process to another.'],
@@ -15344,7 +15483,7 @@ Guide.section({
           ];
           if (mode === 'mono') {
             k.push(s('rect', { x: 12, y: 146, width: 616, height: 88, rx: 12, class: 's-os', 'stroke-width': 2.5 }));
-            k.push(s('text', { x: 618, y: 227, 'text-anchor': 'end', 'font-size': 12.5, style: 'fill:var(--os)', 'font-weight': 700 }, 'one big program · one address space'));
+            k.push(s('text', { x: 618, y: 227, 'text-anchor': 'end', 'font-size': 12.5, style: 'fill:var(--os)', 'font-weight': 700 }, 'kernel mode · one shared address space'));
             MONO_TILES.forEach((t, j) => k.push(tile(monoTile(j), t, lit.has('t' + j))));
             k.push(box(BOX.app, lit.has('app')), box(BOX.app2, false, true));
           } else {
@@ -15364,7 +15503,7 @@ Guide.section({
         el.append(h('div', { class: 'split l fill' },
           h('div', { class: 'stack', style: { gap: '8px' } },
             h('h3', { class: 'm0', html: '<span class="t">Monolithic kernel</span>' }),
-            h('p', { class: 'small m0', html: 'Almost the whole OS lives inside the <span class="t">kernel</span>: scheduling, the file system, networking, device drivers, memory management and more. It is <b>one large program</b> that runs as a single process in <b>one <span class="t">address space</span></b>, so any part can call any other part directly.' }),
+            h('p', { class: 'small m0', html: 'Almost the whole OS lives inside the <span class="t">kernel</span>: scheduling, the file system, networking, device drivers, memory management and more. All of it runs in kernel mode in <b>one shared <span class="t">address space</span></b>, so any part can call any other part directly, with no messages. (That is a structure, not one process: kernel code runs for whichever process made a system call.)' }),
             h('h3', { class: 'm0', style: { marginTop: '4px' }, html: '<span class="t">Microkernel</span>' }),
             h('p', { class: 'small m0', html: 'Only the essential core stays in the kernel: managing <b>address spaces</b>, <span class="t">interprocess communication (IPC)</span> and <b>basic scheduling</b>. Every other service runs as a separate <span class="t" data-t="server process">server process</span> in <span class="t">user mode</span>. Servers and applications cooperate by <b>sending messages</b>, and the microkernel delivers each one.' }),
             h('div', { class: 'callout warn m0', 'data-label': 'Common mistake', html: 'A microkernel system does <b>not</b> offer fewer services. The same services exist; they have moved <b>out of the kernel</b> into user-mode processes.' }),
@@ -15452,7 +15591,7 @@ Guide.section({
           presets.set(d);
           if (d === 'micro') found.add('simple');
           kind.textContent = d === 'mono' ? 'Monolithic kernel' : d === 'micro' ? 'Microkernel' : 'Mixed design';
-          kindSub.innerHTML = d === 'mono' ? 'Every service runs in kernel mode inside one program. Direct calls are fast, but all of this code is trusted completely.'
+          kindSub.innerHTML = d === 'mono' ? 'Every service runs in kernel mode in one shared kernel address space. Direct calls are fast, but all of this code is trusted completely.'
             : d === 'micro' ? 'Only IPC, address spaces and basic scheduling remain in kernel mode. Everything else is an ordinary process that talks by messages.'
             : 'Some services moved out, some stayed in. Many real systems land somewhere in between.';
           meter.firstChild.style.width = (nIn() / SVC.length) * 100 + '%';
@@ -16015,7 +16154,7 @@ Guide.section({
       kind: 'check',
       quiz: [
         { q: 'Which functions does a <b>microkernel</b> keep inside the kernel?',
-          choices: ['Address-space management, interprocess communication (IPC) and basic scheduling', 'File systems, device drivers and networking', 'Every OS service, compiled into one large program with one address space', 'None: every OS service runs in user mode'],
+          choices: ['Address-space management, interprocess communication (IPC) and basic scheduling', 'File systems, device drivers and networking', 'Every OS service, running together in kernel mode in one shared address space', 'None: every OS service runs in user mode'],
           answer: 0,
           feedback: [null, 'Those are exactly the services a microkernel moves out of the kernel into user-mode server processes.', 'That describes a monolithic kernel, the opposite design.', 'Something privileged must still manage address spaces, deliver messages and switch the processor between processes.'],
           why: 'A microkernel keeps only the essential core (address spaces, IPC and basic scheduling). Everything else runs as server processes in user mode that communicate by messages.' },
@@ -16077,7 +16216,7 @@ Guide.section({
 <p>Five developments answered these forces: <b>microkernel architecture</b>, <b>multithreading</b>, <b>symmetric multiprocessing (SMP)</b>, <b>distributed operating systems</b> and <b>object-oriented design</b>.</p>
 
 <h3>Monolithic kernel vs microkernel</h3>
-<p>A <b>monolithic kernel</b> holds almost the whole OS: scheduling, file systems, networking, device drivers, memory management and more. It is one large program that runs as a single process in one address space, so any part can call any other part directly, like a function call.</p>
+<p>A <b>monolithic kernel</b> holds almost the whole OS: scheduling, file systems, networking, device drivers, memory management and more. All of these services run together in kernel mode in one shared kernel address space, so any part can call any other part directly, like a function call, with no messages. "Monolithic" describes this structure, not a single process: the same kernel code runs on behalf of whichever process made a system call, as well as in kernel threads and interrupt handlers. In a microkernel, by contrast, most services are separate user-mode server processes that exchange messages.</p>
 <p>A <b>microkernel</b> keeps only the essential core in the kernel: <b>address spaces</b> (which memory each process may use), <b>interprocess communication (IPC)</b> and <b>basic scheduling</b>. Every other service (file system, device drivers, networking, the virtual-memory policy) runs as an ordinary <b>server process in user mode</b>. Applications and servers cooperate by sending <b>messages</b>, and the microkernel delivers each one. The OS offers the same services; they have simply moved out of the kernel.</p>
 <p><b>One file read.</b> Monolithic: one system call into the kernel, where the file system calls the driver directly (1 trip, 0 messages). Microkernel: application → file server → disk-driver process → file server → application, each hop a message through the kernel (4 messages, 4 trips). That message passing is the classic performance price of a microkernel.</p>
 <h4>Benefits of a microkernel</h4>
@@ -16130,11 +16269,12 @@ Guide.section({
 `,
 });
 
+if (Guide.sections['2.4']) Guide.sections['2.4'].layoutAware = true;
 </script>
 <script>
 /* ======================= section 2.5 ======================= */
 /* Section 2.5 — Fault Tolerance
-   Original teaching material. Built step by step (see AUTHORING.txt). */
+   Original teaching material. Built step by step. */
 Guide.section({
   id: '2.5',
   title: 'Fault Tolerance',
@@ -17399,11 +17539,12 @@ Guide.section({
     </ul>`,
 });
 
+if (Guide.sections['2.5']) Guide.sections['2.5'].layoutAware = true;
 </script>
 <script>
 /* ======================= section 2.6 ======================= */
 /* Section 2.6 — OS Design Considerations for Multiprocessor and Multicore
-   Original teaching material, built step by step (see AUTHORING.txt).
+   Original teaching material, built step by step.
    Helpers live in this IIFE so nothing leaks into the global scope. */
 (() => {
   /* ------------------------------------------------------------------ shared helpers */
@@ -18463,11 +18604,12 @@ run(next);            // run the chosen process</pre>
   });
 })();
 
+if (Guide.sections['2.6']) Guide.sections['2.6'].layoutAware = true;
 </script>
 <script>
 /* ======================= section 2.7 ======================= */
 /* Section 2.7 — Microsoft Windows Overview
-   Original teaching material. Built step by step (see AUTHORING.txt). */
+   Original teaching material. Built step by step. */
 Guide.section({
   id: '2.7',
   title: 'Microsoft Windows Overview',
@@ -19490,11 +19632,12 @@ Guide.section({
 <p><b>Common mistakes:</b> the HAL is not a device driver; the kernel is not the executive; Windows is not a pure microkernel.</p>`,
 });
 
+if (Guide.sections['2.7']) Guide.sections['2.7'].layoutAware = true;
 </script>
 <script>
 /* ======================= section 2.8 ======================= */
 /* Section 2.8 Traditional Unix Systems
-   Original teaching material. Built step by step (see AUTHORING.txt).
+   Original teaching material. Built step by step.
    Helpers live in this IIFE so nothing leaks into the global scope. */
 (() => {
   /* ------------------------------------------------------------------ shared helper
@@ -20617,11 +20760,12 @@ n = read(fd, buf, 512); // ask for the next 512 bytes`, { lang: 'c', fontSize: c
   });
 })();
 
+if (Guide.sections['2.8']) Guide.sections['2.8'].layoutAware = true;
 </script>
 <script>
 /* ======================= section 2.9 ======================= */
 /* Section 2.9 — Modern Unix Systems
-   Original teaching material. Built step by step (see AUTHORING.txt). */
+   Original teaching material. Built step by step. */
 Guide.section({
   id: '2.9',
   title: 'Modern Unix Systems',
@@ -21601,11 +21745,12 @@ Guide.section({
 <p><b>Preemption.</b> T1 runs 1 user tick, a 7-tick system call, then 4 user ticks; urgent R wakes at tick 2. No preemption: R waits 6 ticks. Preemption points after 3 kernel ticks (SVR4): 2 ticks. Fully preemptable (Solaris): 0. T1 always finishes at tick 14: preemption changes the order of work, not its amount (apart from a little switching cost). Without preemption, wait = call length − time already spent (8 − 3 = 5).</p>`,
 });
 
+if (Guide.sections['2.9']) Guide.sections['2.9'].layoutAware = true;
 </script>
 <script>
 /* ======================= section 2.10 ======================= */
 /* Section 2.10 — Linux
-   Original teaching material. Built step by step (see AUTHORING.txt). */
+   Original teaching material. Built step by step. */
 Guide.section({
   id: '2.10',
   title: 'Linux',
@@ -22913,11 +23058,12 @@ Guide.section({
     </ul>`,
 });
 
+if (Guide.sections['2.10']) Guide.sections['2.10'].layoutAware = true;
 </script>
 <script>
 /* ======================= section 2.11 ======================= */
 /* Section 2.11 — Android
-   Original teaching material. Built step by step (see AUTHORING.txt). */
+   Original teaching material. Built step by step. */
 Guide.section({
   id: '2.11',
   title: 'Android',
@@ -24036,6 +24182,7 @@ Guide.section({
     <p><b>Worked example:</b> asleep a phone uses 1% of its battery per hour; awake under a partial wakelock, 8% per hour. A wakelock left held for 6 hours overnight costs 6 × 8 = 48 points instead of 6 × 1 = 6, an extra <b>42 percentage points</b>.</p>`,
 });
 
+if (Guide.sections['2.11']) Guide.sections['2.11'].layoutAware = true;
 </script>
 <script>
 /* ======================= section 3.1 ======================= */
@@ -25177,6 +25324,7 @@ Guide.section({
   });
 })();
 
+if (Guide.sections['3.1']) Guide.sections['3.1'].layoutAware = true;
 </script>
 <script>
 /* ======================= section 3.2 ======================= */
@@ -26738,6 +26886,7 @@ Guide.section({
   });
 })();
 
+if (Guide.sections['3.2']) Guide.sections['3.2'].layoutAware = true;
 </script>
 <script>
 /* ======================= section 3.3 ======================= */
@@ -27764,6 +27913,7 @@ Guide.section({
   });
 })();
 
+if (Guide.sections['3.3']) Guide.sections['3.3'].layoutAware = true;
 </script>
 <script>
 /* ======================= section 3.4 ======================= */
@@ -28997,6 +29147,7 @@ Guide.section({
   });
 })();
 
+if (Guide.sections['3.4']) Guide.sections['3.4'].layoutAware = true;
 </script>
 <script>
 /* ======================= section 3.5 ======================= */
@@ -30175,6 +30326,7 @@ Guide.section({
   });
 })();
 
+if (Guide.sections['3.5']) Guide.sections['3.5'].layoutAware = true;
 </script>
 <script>
 /* ======================= section 3.6 ======================= */
@@ -32508,6 +32660,7 @@ count = r;     // STORE: write r back to count`, { lang: 'c', nums: true, fontSi
 <p>Threads of a process share its address space and resources, so their activities must be coordinated or they can interfere and corrupt shared data. <code>count = count + 1</code> is three machine steps: LOAD (copy count into a private register), ADD, STORE (write it back). If T1 and T2 both LOAD 10 before either STOREs, both store 11 and one increment is lost: a <b>lost update</b>, a kind of race condition. If one thread stores before the other loads, count ends at 12. It can never end at 10 or 13. A lock that lets only one thread at a time run the three steps always gives 12; Chapter 5 builds such tools.</p>`,
 });
 
+if (Guide.sections['4.1']) Guide.sections['4.1'].layoutAware = true;
 </script>
 <script>
 /* ======================= section 4.2 ======================= */
@@ -33675,6 +33828,7 @@ count = r;     // STORE: write r back to count`, { lang: 'c', nums: true, fontSi
   });
 })();
 
+if (Guide.sections['4.2']) Guide.sections['4.2'].layoutAware = true;
 </script>
 <script>
 /* ======================= section 4.3 ======================= */
@@ -34773,6 +34927,7 @@ Guide.section({
     <p>Goals: avoid locking, share data that is mostly read, keep every thread busy (workers pull the next task the moment they are free), and give the graphics API one owner. In the step-through model, the 12 ms of rendering work that one core needs (the same Rendering block as the four-core lab) finishes in about 3.3 ms on four cores, close to the ideal 12 ÷ 4 = 3 ms, with the cores about 91% busy instead of 25%.</p>`,
 });
 
+if (Guide.sections['4.3']) Guide.sections['4.3'].layoutAware = true;
 </script>
 <script>
 /* ======================= section 4.4 ======================= */
@@ -35873,6 +36028,7 @@ Guide.section({
     <p>Each <b>environment subsystem</b> (Win32 today; older Windows also had POSIX) is responsible for the process and thread features of its own personality. The <b>executive</b> provides generic services to create process and thread objects and returns <b>handles</b>; the subsystem <b>interprets</b> those handles by its own rules. For CreateProcess, the Win32 subsystem has the executive create the process object and, because every Win32 process starts with one thread, its first thread; it then records the process and gives the program handles and IDs. The subsystem names the <b>calling program</b> as parent, so the new process inherits the caller's access token, quota limits, base priority and default processor affinity (not the subsystem server's). For fork, a POSIX subsystem uses the same services but copies the parent's address space and keeps the parent-child link itself: the executive records who created a process but enforces no hierarchy.</p>`,
 });
 
+if (Guide.sections['4.4']) Guide.sections['4.4'].layoutAware = true;
 </script>
 <script>
 /* ======================= section 4.5 ======================= */
@@ -36782,7 +36938,7 @@ Guide.section({
    Section 4.6  Linux Process and Thread Management
    Linux tasks and task_struct, the five Linux task states, threads as
    tasks that share (clone() and its flags), namespaces and cgroups.
-   Original teaching material, built step by step (see AUTHORING.txt).
+   Original teaching material, built step by step.
    ===================================================================== */
 (() => {
   /* ---------- shared helpers (scoped to this file) ---------- */
@@ -36970,9 +37126,13 @@ Guide.section({
     if (F.has('CLONE_SIGHAND') && !F.has('CLONE_VM')) return ['CLONE_SIGHAND needs CLONE_VM.', 'A signal handler is a function at some address in memory. Sharing the handler table only makes sense if both tasks see the same memory.'];
     if (F.has('CLONE_THREAD') && !F.has('CLONE_SIGHAND')) return ['CLONE_THREAD needs CLONE_SIGHAND.', 'Signals can be sent to a whole thread group, so every task in the group must agree on one table of handlers.'];
     if (F.has('CLONE_THREAD') && F.has('CLONE_NEWPID')) return ['CLONE_THREAD cannot be combined with CLONE_NEWPID.', 'A new PID namespace would give the new task a different set of process IDs from the rest of its group. But the threads of a group share one queue of waiting signals, and each queued signal records its sender\'s PID as one namespace numbers it, so every thread must stay in the same PID namespace.'];
-    if (F.has('CLONE_PARENT') && F.has('CLONE_NEWPID')) return ['CLONE_PARENT cannot be combined with CLONE_NEWPID.', 'CLONE_NEWPID makes the new task PID 1, the "init", of a fresh namespace, and the clone() manual says that task must be the caller\'s own child, not a sibling handed to the caller\'s parent. That way the caller, which set the namespace up, is the one told when it ends. <span class="muted">(Kernels since 3.13 quietly accept this pair, but the manual still lists it as EINVAL, so portable code avoids it.)</span>', true];
     return null;
   }
+  /* CLONE_PARENT + CLONE_NEWPID: current kernels (since 3.13) accept it, while the clone() manual still
+     lists it as EINVAL and older kernels refused it. The lab models today's kernels and adds a note. */
+  const cfNote = (F) => (F.has('CLONE_PARENT') && F.has('CLONE_NEWPID')
+    ? 'Works on kernels since 3.13. <span class="muted">The manual still says EINVAL (see the code).</span>'
+    : '');
   function cfVerdict(F) {
     const main = CF_MAIN.filter((m) => F.has(m.f)).length;
     if (main === 0) return ['proc', 'A new process', F.size ? 'No sharing flag is on, so memory, files, directories and handlers are all still copied; the extras only adjust details.' : 'Nothing is shared: exactly what fork() asks for. fork() is clone() with no sharing flags.'];
@@ -37646,6 +37806,7 @@ Guide.section({
             L.push(pad('           flags, arg);', '...on its own new stack'));
             const err = cfError(F);
             if (err) L.push('// result: -1, errno = EINVAL, because', '// ' + err[0]);
+            else if (F.has('CLONE_PARENT') && F.has('CLONE_NEWPID')) L.push('// portability: the clone() manual lists CLONE_PARENT with', '// CLONE_NEWPID as EINVAL and kernels before 3.13 refused it;', '// current kernels accept it (PID 1 of the new namespace', '// becomes a child of the caller\'s parent), but portable', '// code avoids the pair.');
             else L.push('// result: the new task\'s ID (701) in the caller');
             codeHost.replaceChildren(h('div', { class: 'stack', style: { gap: '10px' } }, ctx.ui.code(L.join('\n'), { lang: 'c' }),
               h('p', { class: 'small muted m0', html: 'The C library\'s fork() and pthread_create() boil down to calls like this one. Real calls also pass pointers for the new thread\'s ID and its storage area, and fork() adds SIGCHLD to the flags: the signal the parent receives when the child ends. Those are left out here. Try the presets and watch the flag list change.' })));
@@ -37655,13 +37816,14 @@ Guide.section({
             extraBtns.forEach((b, i) => b.classList.toggle('on', F.has(CF_EXTRA[i].f)));
             extraMsg.innerHTML = extraInfo ? `<b class="mono">${extraInfo.f}</b>: ${extraInfo.d}` : 'Reminder: a <span class="t" data-t="Thread group">thread group</span> is the set of tasks that share one PID, the TGID. Click an extra flag to see what it does.';
             const err = cfError(F);
-            const [c, title, txt] = err ? ['bad', 'No task is created', (err[2] ? 'The clone() manual forbids this mix of flags (EINVAL).' : 'The kernel rejects this mix of flags (EINVAL).') + ` The panel ${ctx.narrow ? 'below' : 'on the right'} says why.`] : cfVerdict(F);
+            const [c, title, txt0] = err ? ['bad', 'No task is created', `The kernel rejects this mix of flags (EINVAL). The panel ${ctx.narrow ? 'below' : 'on the right'} says why.`] : cfVerdict(F);
+            const txt = err || !cfNote(F) ? txt0 : cfNote(F);
             verdict.style.setProperty('--c', COLS[c] || 'var(--bad)');
             verdict.replaceChildren(h('div', { class: 'lbl' }, 'The result behaves like'), h('h3', {}, title), h('p', { class: 'small m0', html: txt }));
             if (err) {
               holder.replaceChildren(h('div', { class: 'cf-err stack', style: { gap: '8px' } }, h('h3', { class: 'm0' }, 'clone() fails: errno = EINVAL'),
                 h('p', { class: 'p15 m0', html: `<b>${err[0]}</b> ${err[1]}` }),
-                h('p', { class: 'small m0' }, (err[2] ? 'Treat it as a failed call: no task is made. ' : 'The kernel checks the flags before it builds anything, so no task is made. ') + 'Switch the clashing flag off (or the missing one on), or pick a preset.')));
+                h('p', { class: 'small m0' }, 'The kernel checks the flags before it builds anything, so no task is made. Switch the clashing flag off (or the missing one on), or pick a preset.')));
             } else { const NR = drawSvg(); holder.replaceChildren(ctx.narrow ? narrowView(NR) : svg); }
             expBtns.forEach((b) => { b.disabled = !!err; });
             expMsg.innerHTML = err ? 'No task exists, so there is nothing to experiment with.' : lastExp ? '<b>' + EXPS.find((e) => e[0] === lastExp)[1] + '.</b> ' + EXP_MSG[lastExp](F.has(EXP_FLAG[lastExp])) : 'Now let the child change something and see whether the parent notices.';
@@ -38025,7 +38187,7 @@ Guide.section({
         <tr><td>CLONE_VFORK</td><td>Caller sleeps until the child calls exec() or exits; with CLONE_VM the child borrows the parent's memory, no copying (vfork(), posix_spawn()).</td></tr>
       </table>
       <p>fork() = no sharing flags (plus SIGCHLD, the signal the parent gets when the child ends); vfork() = CLONE_VM + CLONE_VFORK; pthread_create() = CLONE_VM, FS, FILES, SIGHAND, THREAD, SYSVSEM, SETTLS. Without CLONE_VM a child's write changes only its own copy; with it, both tasks use the same memory, so the parent can read the new value (reliably, and in order, only with synchronization such as a lock or an atomic operation; section 5.1).</p>
-      <p><b>Invalid combinations (errno = EINVAL, no task is made).</b> For the flags above: CLONE_SIGHAND without CLONE_VM (handlers are code addresses, so sharing them needs shared memory); CLONE_THREAD without CLONE_SIGHAND (a thread group shares one set of handlers); CLONE_THREAD with CLONE_NEWPID (the threads of a group share one queue of waiting signals, so they must share one PID numbering); and CLONE_PARENT with CLONE_NEWPID (the first task of a new PID namespace stays the caller's own child; the manual lists this as EINVAL although kernels since 3.13 accept it, so portable code avoids it). The manual also forbids CLONE_FS with CLONE_NEWNS (a new mount namespace needs its own root and current directory), CLONE_SYSVSEM with CLONE_NEWIPC (the shared undo entries would refer to semaphores the new IPC namespace cannot reach), and CLONE_NEWUSER with CLONE_THREAD or CLONE_FS.</p>
+      <p><b>Invalid combinations (errno = EINVAL, no task is made).</b> For the flags above: CLONE_SIGHAND without CLONE_VM (handlers are code addresses, so sharing them needs shared memory); CLONE_THREAD without CLONE_SIGHAND (a thread group shares one set of handlers); and CLONE_THREAD with CLONE_NEWPID (the threads of a group share one queue of waiting signals, so they must share one PID numbering). <b>A documentation discrepancy:</b> the clone() manual also lists CLONE_PARENT with CLONE_NEWPID as EINVAL, and kernels before 3.13 refused it, but current kernels accept the pair (the new namespace's PID 1 then becomes a child of the caller's parent); the lab follows current kernels and shows a portability note, because portable code still avoids the pair. The manual also forbids CLONE_FS with CLONE_NEWNS (a new mount namespace needs its own root and current directory), CLONE_SYSVSEM with CLONE_NEWIPC (the shared undo entries would refer to semaphores the new IPC namespace cannot reach), and CLONE_NEWUSER with CLONE_THREAD or CLONE_FS.</p>
 
       <h3>6. Namespaces</h3>
       <p>A <b>namespace</b> gives a process, or processes sharing it, a different view of the system from other processes; namespaces are the basis of containers. The six classic ones (newer kernels add cgroup and time namespaces):</p>
@@ -38048,6 +38210,7 @@ Guide.section({
   });
 })();
 
+if (Guide.sections['4.6']) Guide.sections['4.6'].layoutAware = true;
 </script>
 <script>
 /* ======================= section 4.7 ======================= */
@@ -39251,6 +39414,7 @@ Guide.section({
     <p><b>Worked example.</b> 250 MB free; a new app needs 700 MB. Kill Weather (empty, used 3 h ago, 90 MB): 340 MB free. Kill Calculator (empty, 1 h, 60 MB): 400 MB. No empties left, so kill the oldest background app, Game (2 h, 600 MB): 1,000 MB, enough. Every other process survives.</p>`,
 });
 
+if (Guide.sections['4.7']) Guide.sections['4.7'].layoutAware = true;
 </script>
 <script>
 /* ======================= section 4.8 ======================= */
@@ -39259,7 +39423,7 @@ Guide.section({
    GCD as an OS-managed thread pool, blocks (closures in C), dispatch
    queues (serial, concurrent, main, global), dispatch sources, and the
    "slow work on a global queue, UI update on the main queue" pattern.
-   Original teaching material, built step by step (see AUTHORING.txt).
+   Original teaching material, built step by step.
    ===================================================================== */
 (() => {
   /* ---------- shared helpers (scoped to this file) ---------- */
@@ -40365,6 +40529,7 @@ greet();                            // prints "x is 5"</pre>
   });
 })();
 
+if (Guide.sections['4.8']) Guide.sections['4.8'].layoutAware = true;
 </script>
 <script>
 /* ======================= section 5.1 ======================= */
@@ -41880,6 +42045,7 @@ level[i] = 0;</pre>
   });
 })();
 
+if (Guide.sections['5.1']) Guide.sections['5.1'].layoutAware = true;
 </script>
 <script>
 /* ======================= section 5.2 ======================= */
@@ -43509,6 +43675,7 @@ void echo() {        // any process may call it
   });
 })();
 
+if (Guide.sections['5.2']) Guide.sections['5.2'].layoutAware = true;
 </script>
 <script>
 /* ======================= section 5.3 ======================= */
@@ -43734,7 +43901,7 @@ reg = count;            // in critical section: read count
 count = reg + 1;        // in critical section: write count+1
 /* (no enable) */       // unprotected: nothing to undo`,
           };
-          let S, code, busy = false;
+          let S, code, busy = false, gen = 0;   // gen: bumped by every reset so an older replay loop stops
           const codeBox = h('div');
           const cpuRun = h('span', { class: 'tok p1' }, 'P1');
           const intChip = h('span', { class: 'chip ok' });
@@ -43753,6 +43920,7 @@ count = reg + 1;        // in critical section: write count+1
           const inside = (pc) => pc === 2 || pc === 3;
 
           function reset(mode) {
+            gen++;
             S = { mode, run: 1, pc: { 1: 0, 2: 0 }, reg: { 1: '–', 2: '–' }, count: 0, done: 0, ints: true, pending: false, violated: false, lost: false };
             code = listing(ctx, SRC[mode], { fontSize: 14 });
             if (mode === 'unprot') code.mark([2, 5], 'dim');
@@ -43825,8 +43993,9 @@ count = reg + 1;        // in critical section: write count+1
           async function replay() {
             const mode = S.mode;
             reset(mode); busy = true;
+            const g = gen;
             const seq = mode === 'unprot' ? ['run', 'run', 'timer', 'run', 'run', 'run', 'timer', 'run'] : ['run', 'run', 'run', 'timer', 'run', 'run', 'run', 'run'];
-            for (const k of seq) { await ctx.sleep(750); if (!ctx.alive || !busy || S.mode !== mode) return; act(k); }
+            for (const k of seq) { await ctx.sleep(750); if (!ctx.alive || g !== gen) return; act(k); }
             busy = false;
             if (mode === 'prot') paint(['ok', `<b>Replay over: no harm done.</b> The timer fired while ${PN(1)} was inside its critical section, but it was held until ${PN(1)} switched interrupts back on. count = ${S.count}, exactly the number of finished increments. Now try <b>Unprotected</b>.`]);
           }
@@ -43991,7 +44160,7 @@ bolt = 0;                                      // unlock: put the 0 back
               next: ['One instruction: read bolt, and if it is 0 write 1, all at once. Returned 1? Test again.', 'Use the shared resource, then leave.', 'Write 0 into bolt: the lock is free again.', 'Other work. Then it wants the lock again.'],
             },
           };
-          let mode = 'two', S, P, code, busy = false;
+          let mode = 'two', S, P, code, busy = false, gen = 0;   // gen: bumped by every reset so an older replay loop stops
           const codeBox = h('div');
           const cBolt = cell(ctx, 'bolt');
           const room = h('div', { class: 'room', style: { minWidth: '0' } });
@@ -44006,6 +44175,7 @@ bolt = 0;                                      // unlock: put the 0 back
             return { st, nx, card };
           });
           function reset(m) {
+            gen++;
             mode = m; P = PROGS[m];
             S = { pc: { 1: 0, 2: 0 }, bolt: 0, spins: { 1: 0, 2: 0 }, spinNow: { 1: false, 2: false }, overlaps: 0, both: false };
             code = listing(ctx, P.src, { fontSize: 13 });
@@ -44059,7 +44229,8 @@ bolt = 0;                                      // unlock: put the 0 back
           async function replay() {
             const m = mode;
             reset(m); busy = true;
-            for (const p of [1, 2, 1, 2, 1, 2]) { await ctx.sleep(800); if (!ctx.alive || !busy || mode !== m) return; stepP(p); }
+            const g = gen;
+            for (const p of [1, 2, 1, 2, 1, 2]) { await ctx.sleep(800); if (!ctx.alive || g !== gen) return; stepP(p); }
             busy = false;
           }
           const seg = ctx.ui.seg([{ value: 'two', label: 'Two steps: test, then set' }, { value: 'cas', label: 'One atomic instruction' }], 'two', (m) => { busy = false; reset(m); });
@@ -44228,7 +44399,7 @@ void P(int i) {                // every process runs this code
           /* ---- the machine: bolt in memory, one key register per process ---- */
           const BX = 235, BY = 56, KX = [80, 235, 390], KY = 196;
           const svg = s('svg', { viewBox: '0 0 470 236', width: '100%', role: 'img', 'aria-label': 'bolt in memory and the three private keys' });
-          let S, busy = false;
+          let S, busy = false, gen = 0;   // gen: bumped by Reset so a swap already in flight is ignored
           const say = verdict(ctx);
           const inv = h('div', { class: 'card white tight center mono', style: { fontSize: '14.5px', whiteSpace: ctx.narrow ? 'normal' : 'nowrap' } });
           const meaning = h('div', { class: 'small center', style: { minHeight: '22px' } });
@@ -44272,6 +44443,7 @@ void P(int i) {                // every process runs this code
             if (v) say.say(v[0], v[1]);
           }
           function reset() {
+            gen++;
             S = { bolt: 0, key: [1, 1, 1], st: ['rem', 'rem', 'rem'], broken: false };
             busy = false;
             paint(['info', '<b>You are the scheduler.</b> Step any process. A waiting process swaps its key with bolt and checks whether it pulled out the 0. Watch the sum above: no order of steps can change it.']);
@@ -44281,9 +44453,10 @@ void P(int i) {                // every process runs this code
             const tb = svg.querySelector('[data-slot="b"]'), tk = svg.querySelector('[data-slot="k' + p + '"]');
             const dx = KX[p - 1] - BX, dy = KY - BY;
             [tb, tk].forEach((t) => (t.style.transition = 'transform .5s ease'));
-            ctx.raf(() => { tb.style.transform = `translate(${dx}px, ${dy}px)`; tk.style.transform = `translate(${-dx}px, ${-dy}px)`; return false; });
+            const g = gen;
+            ctx.raf(() => { if (g === gen) { tb.style.transform = `translate(${dx}px, ${dy}px)`; tk.style.transform = `translate(${-dx}px, ${-dy}px)`; } return false; });
             busy = true;
-            ctx.after(560, () => { busy = false; done(); });
+            ctx.after(560, () => { if (g !== gen) return; busy = false; done(); });
           }
           function stepP(p) {
             const k = p - 1, st = S.st[k];
@@ -44816,6 +44989,7 @@ void P(int i) {
   });
 })();
 
+if (Guide.sections['5.3']) Guide.sections['5.3'].layoutAware = true;
 </script>
 <script>
 /* ======================= section 5.4 ======================= */
@@ -45792,7 +45966,8 @@ void consumer() {              // the consumer process
             C: [['wait n', 'semWait(n);   // need an item'], ['wait s', 'semWait(s);   // lock the buffer'], ['take', 'take();       // item from b[out]'], ['signal s', 'semSignal(s); // unlock the buffer'], ['signal e', 'semSignal(e); // +1 free slot'], ['consume', 'consume();    // use the item']],
             Cbug: [['wait s', 'semWait(s);   // lock first (bug!)'], ['wait n', 'semWait(n);   // then need an item'], ['take', 'take();       // item from b[out]'], ['signal s', 'semSignal(s); // unlock the buffer'], ['signal e', 'semSignal(e); // +1 free slot'], ['consume', 'consume();    // use the item']],
           };
-          let bug = false, running = true, speed = { P: 4, C: 2 }, st, turn = 0, lastMsg = '';
+          // the factory starts stopped; Reset and the mode switch return it to that stopped state
+          let bug = false, running = false, started = false, speed = { P: 4, C: 2 }, st, turn = 0, lastMsg = '';
           const svg = s('svg', { viewBox: ctx.narrow ? '0 0 360 336' : '0 0 480 400', width: '100%', style: { maxHeight: '100%' } });
           const narr = h('div', { class: 'narr', style: { minHeight: '66px' } });
           const startInfo = h('span', { class: 'small muted' });
@@ -45802,6 +45977,7 @@ void consumer() {              // the consumer process
             st = { sem: { s: { v: 1, q: [] }, n: { v: prefill, q: [] }, e: { v: SIZE - prefill, q: [] } }, buf: Array(SIZE).fill(null), inP: prefill, outP: 0, made: prefill, used: 0, dead: false,
               P: { pc: 0, left: null, blocked: null, item: null }, C: { pc: 0, left: null, blocked: null, item: null } };
             for (let k = 0; k < prefill; k++) st.buf[k] = k + 1;
+            turn = 0; started = false;
             startInfo.innerHTML = `circular <span class="t">bounded buffer</span>, ${SIZE} slots · start: s = 1, n = ${prefill}, e = ${SIZE - prefill}`;
             // the side notes must describe the same starting values as the header above
             if (side.P) side.P.note.innerHTML = noteHTML('P', prefill);
@@ -45874,11 +46050,13 @@ void consumer() {              // the consumer process
               sd.code.clear();
               sd.code.mark(at(who) + 1, p.blocked ? 'bad' : 'cur');
               sd.state.className = 'chip ' + (p.blocked ? (st.dead ? 'bad' : 'warn') : 'ok');
-              sd.state.textContent = p.blocked ? `blocked on ${p.blocked}` : 'running';
+              sd.state.textContent = p.blocked ? `blocked on ${p.blocked}` : running ? 'running' : 'ready';
               sd.count.textContent = who === 'P' ? `items made: ${st.made}` : `items consumed: ${st.used}`;
             });
             let msg, tone = '';
-            if (st.dead) { msg = '<b><span class="t">Deadlock</span>.</b> The consumer locked the buffer (s) and then went to sleep on n because the buffer was empty, <b>still holding s</b>. The producer needs s to add the very item that would wake the consumer. Each waits for the other forever. Press Reset or switch back to the correct order.'; tone = 'bad'; }
+            if (!started) msg = bug ? 'The consumer now locks s <b>before</b> waiting on n. The buffer starts with 3 items and the consumer is set faster than the producer, so the buffer will drain. Press <b>Run</b> and watch the moment the buffer runs empty.'
+              : `The factory is stopped: an empty buffer with s = 1, n = 0 and e = ${SIZE}. Press <b>Run</b> to start the producer and the consumer, then try making one side much faster than the other.`;
+            else if (st.dead) { msg = '<b><span class="t">Deadlock</span>.</b> The consumer locked the buffer (s) and then went to sleep on n because the buffer was empty, <b>still holding s</b>. The producer needs s to add the very item that would wake the consumer. Each waits for the other forever. Press Reset or switch back to the correct order.'; tone = 'bad'; }
             else if (st.P.blocked === 'e') msg = `<b>Buffer full.</b> The producer called semWait(e) with no free slot announced, so e went to ${S.e.v} and it sleeps until the consumer’s semSignal(e) hands it a slot.${full < SIZE ? ' (A slot the consumer is emptying right now counts only once it calls semSignal(e).)' : ''}`;
             else if (bug && st.C.blocked === 'n') { msg = `<b>Danger.</b> The buffer ran empty, so the consumer’s semWait(n) took n to ${S.n.v} and it fell asleep. But in this order it had <b>already locked s</b>, and it still holds it (s = ${S.s.v}). The producer needs s to add the item that would wake it…`; tone = 'bad'; }
             else if (st.C.blocked === 'n') msg = `<b>Buffer empty.</b> The consumer called semWait(n) with no item announced, so n went to ${S.n.v} and it sleeps until the producer’s semSignal(n). It holds nothing while it sleeps, so the producer can still get in.${full ? ' (An item the producer has just appended counts only once it calls semSignal(n).)' : ''}`;
@@ -45910,17 +46088,20 @@ void consumer() {              // the consumer process
           fresh();
           const left = panel('P'), right = panel('C');
           function rebuildConsumer() { const old = side.C; const nc = ctx.ui.code(prog('C').map((x) => x[1]).join('\n'), { lang: 'c', fontSize: 13.5, nums: false }); old.code.replaceWith(nc); old.code = nc; }
-          const pauseBtn = h('button', { class: 'btn sm', type: 'button', onclick: () => { running = !running; pauseBtn.textContent = running ? 'Pause' : 'Run'; } }, 'Pause');
+          const pauseBtn = h('button', { class: 'btn sm primary', type: 'button', onclick: () => { setRunning(!running); if (running) started = true; draw(); } }, 'Run');
+          function setRunning(v) { running = v; pauseBtn.textContent = v ? 'Pause' : 'Run'; pauseBtn.classList.toggle('primary', !v); }
+          // Reset (and a mode switch) stop the ticker's work and load a fresh, stopped factory
+          function restart() { setRunning(false); fresh(bug ? 3 : 0); draw(); }
           const bugSeg = ctx.ui.seg([{ value: false, label: 'Correct order' }, { value: true, label: 'Swapped semWaits (bug)' }], false, (v) => {
             bug = v; rebuildConsumer();
             // the bug hides while items remain: start with 3 items and a consumer faster than the producer so the buffer drains
             if (v) { side.P.slider.set(2, true); side.C.slider.set(5, true); }
-            fresh(v ? 3 : 0); draw();
+            restart();
           });
           el.append(h('div', { class: 'stack fill', style: { gap: '10px' } },
             h('div', { class: 'row', style: { justifyContent: 'space-between' } },
               h('div', { class: 'row gap-s' }, h('span', { class: 'small b' }, 'Consumer code:'), bugSeg),
-              h('div', { class: 'row gap-s' }, startInfo, pauseBtn, h('button', { class: 'btn sm', type: 'button', onclick: () => { fresh(bug ? 3 : 0); draw(); } }, 'Reset'))),
+              h('div', { class: 'row gap-s' }, startInfo, pauseBtn, h('button', { class: 'btn sm', type: 'button', onclick: restart }, 'Reset'))),
             h('div', { class: 'grow mw0', style: { display: 'grid', gridTemplateColumns: ctx.narrow ? '1fr' : 'minmax(0, 330px) minmax(0, 1fr) minmax(0, 330px)', gap: '16px', minHeight: 0 } },
               left, h('div', { class: 'card white tight', style: { display: 'grid', placeItems: 'center', minHeight: 0 } }, svg), right),
             narr));
@@ -46211,6 +46392,7 @@ consumer: semWait(n); semWait(s); take(); semSignal(s); semSignal(e); consume();
   });
 })();
 
+if (Guide.sections['5.4']) Guide.sections['5.4'].layoutAware = true;
 </script>
 <script>
 /* ======================= section 5.5 ======================= */
@@ -46600,8 +46782,9 @@ consumer: semWait(n); semWait(s); take(); semSignal(s); semSignal(e); consume();
           const L = side('Monitor: condition <code>c</code>', 'cwait(c) · csignal(c)');
           const R = side('Semaphore <code>s</code> (starts at 0)', 'semWait(s) · semSignal(s)');
           const say = h('div', { class: 'card' });
-          let mon, sem, n, lostFlash;
+          let mon, sem, n, lostFlash, gen = 0;   // gen: bumped to cancel a replay step still waiting to run
           function reset() {
+            gen++;
             mon = { q: [], run: [] }; sem = { count: 0, q: [], run: [] }; n = 0; lostFlash = false;
             L.log.innerHTML = ''; R.log.innerHTML = '';
             say.innerHTML = '<b>Ready.</b> Each button does the same thing to both worlds at once. Press <b>Someone signals</b> while nobody is waiting, then <b>A process waits</b>, and compare.';
@@ -46649,9 +46832,10 @@ consumer: semWait(n); semWait(s); take(); semSignal(s); semSignal(e); consume();
             else say.innerHTML = `The monitor wakes <b>${mRes}</b>, still suspended on c. In the semaphore world ${mRes} never blocked, so this signal is saved instead (count ${sem.count}).`;
             paint();
           }
-          const btnW = h('button', { class: 'btn proc', type: 'button', onclick: doWait }, 'A process waits');
-          const btnS = h('button', { class: 'btn intr', type: 'button', onclick: doSignal }, 'Someone signals');
-          const demo = h('button', { class: 'btn sm', type: 'button', onclick: () => { reset(); doSignal(); ctx.after(900, doWait); } }, 'Replay: signal, then wait');
+          // a manual press takes over from a replay in progress, so its pending step is cancelled
+          const btnW = h('button', { class: 'btn proc', type: 'button', onclick: () => { gen++; doWait(); } }, 'A process waits');
+          const btnS = h('button', { class: 'btn intr', type: 'button', onclick: () => { gen++; doSignal(); } }, 'Someone signals');
+          const demo = h('button', { class: 'btn sm', type: 'button', onclick: () => { reset(); doSignal(); const g = gen; ctx.after(900, () => { if (g === gen) doWait(); }); } }, 'Replay: signal, then wait');
           reset();
           el.append(h('div', { class: 'stack fill' },
             h('p', { class: 'm0', html: 'A <span class="t">condition variable</span> is a named waiting line inside the monitor. <code>cwait(c)</code> suspends the caller on <code>c</code> <b>and releases the monitor</b> so another process may enter; <code>csignal(c)</code> resumes one process waiting on <code>c</code>. How does that differ from a semaphore?' }),
@@ -47418,6 +47602,7 @@ while (count == N) cwait(notfull);    /* producer */</pre>
   });
 })();
 
+if (Guide.sections['5.5']) Guide.sections['5.5'].layoutAware = true;
 </script>
 <script>
 /* ======================= section 5.6 ======================= */
@@ -48912,6 +49097,7 @@ consumer: while (true) {      // loop forever
   });
 })();
 
+if (Guide.sections['5.6']) Guide.sections['5.6'].layoutAware = true;
 </script>
 <script>
 /* ======================= section 5.7 ======================= */
@@ -50036,7 +50222,9 @@ ${listing(CODE.wp.W, true)}</pre>
   });
 })();
 
+if (Guide.sections['5.7']) Guide.sections['5.7'].layoutAware = true;
 </script>
+<script>Guide.chapters.forEach((c) => { c.layoutAware = true; });</script>
 <script>
 Guide.start();
 </script>

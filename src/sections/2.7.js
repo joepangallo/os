@@ -1,5 +1,5 @@
 /* Section 2.7 — Microsoft Windows Overview
-   Original teaching material. Built step by step (see AUTHORING.txt). */
+   Original teaching material. Built step by step. */
 Guide.section({
   id: '2.7',
   title: 'Microsoft Windows Overview',

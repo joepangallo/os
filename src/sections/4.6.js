@@ -2,7 +2,7 @@
    Section 4.6  Linux Process and Thread Management
    Linux tasks and task_struct, the five Linux task states, threads as
    tasks that share (clone() and its flags), namespaces and cgroups.
-   Original teaching material, built step by step (see AUTHORING.txt).
+   Original teaching material, built step by step.
    ===================================================================== */
 (() => {
   /* ---------- shared helpers (scoped to this file) ---------- */
@@ -190,9 +190,13 @@
     if (F.has('CLONE_SIGHAND') && !F.has('CLONE_VM')) return ['CLONE_SIGHAND needs CLONE_VM.', 'A signal handler is a function at some address in memory. Sharing the handler table only makes sense if both tasks see the same memory.'];
     if (F.has('CLONE_THREAD') && !F.has('CLONE_SIGHAND')) return ['CLONE_THREAD needs CLONE_SIGHAND.', 'Signals can be sent to a whole thread group, so every task in the group must agree on one table of handlers.'];
     if (F.has('CLONE_THREAD') && F.has('CLONE_NEWPID')) return ['CLONE_THREAD cannot be combined with CLONE_NEWPID.', 'A new PID namespace would give the new task a different set of process IDs from the rest of its group. But the threads of a group share one queue of waiting signals, and each queued signal records its sender\'s PID as one namespace numbers it, so every thread must stay in the same PID namespace.'];
-    if (F.has('CLONE_PARENT') && F.has('CLONE_NEWPID')) return ['CLONE_PARENT cannot be combined with CLONE_NEWPID.', 'CLONE_NEWPID makes the new task PID 1, the "init", of a fresh namespace, and the clone() manual says that task must be the caller\'s own child, not a sibling handed to the caller\'s parent. That way the caller, which set the namespace up, is the one told when it ends. <span class="muted">(Kernels since 3.13 quietly accept this pair, but the manual still lists it as EINVAL, so portable code avoids it.)</span>', true];
     return null;
   }
+  /* CLONE_PARENT + CLONE_NEWPID: current kernels (since 3.13) accept it, while the clone() manual still
+     lists it as EINVAL and older kernels refused it. The lab models today's kernels and adds a note. */
+  const cfNote = (F) => (F.has('CLONE_PARENT') && F.has('CLONE_NEWPID')
+    ? 'Works on kernels since 3.13. <span class="muted">The manual still says EINVAL (see the code).</span>'
+    : '');
   function cfVerdict(F) {
     const main = CF_MAIN.filter((m) => F.has(m.f)).length;
     if (main === 0) return ['proc', 'A new process', F.size ? 'No sharing flag is on, so memory, files, directories and handlers are all still copied; the extras only adjust details.' : 'Nothing is shared: exactly what fork() asks for. fork() is clone() with no sharing flags.'];
@@ -866,6 +870,7 @@
             L.push(pad('           flags, arg);', '...on its own new stack'));
             const err = cfError(F);
             if (err) L.push('// result: -1, errno = EINVAL, because', '// ' + err[0]);
+            else if (F.has('CLONE_PARENT') && F.has('CLONE_NEWPID')) L.push('// portability: the clone() manual lists CLONE_PARENT with', '// CLONE_NEWPID as EINVAL and kernels before 3.13 refused it;', '// current kernels accept it (PID 1 of the new namespace', '// becomes a child of the caller\'s parent), but portable', '// code avoids the pair.');
             else L.push('// result: the new task\'s ID (701) in the caller');
             codeHost.replaceChildren(h('div', { class: 'stack', style: { gap: '10px' } }, ctx.ui.code(L.join('\n'), { lang: 'c' }),
               h('p', { class: 'small muted m0', html: 'The C library\'s fork() and pthread_create() boil down to calls like this one. Real calls also pass pointers for the new thread\'s ID and its storage area, and fork() adds SIGCHLD to the flags: the signal the parent receives when the child ends. Those are left out here. Try the presets and watch the flag list change.' })));
@@ -875,13 +880,14 @@
             extraBtns.forEach((b, i) => b.classList.toggle('on', F.has(CF_EXTRA[i].f)));
             extraMsg.innerHTML = extraInfo ? `<b class="mono">${extraInfo.f}</b>: ${extraInfo.d}` : 'Reminder: a <span class="t" data-t="Thread group">thread group</span> is the set of tasks that share one PID, the TGID. Click an extra flag to see what it does.';
             const err = cfError(F);
-            const [c, title, txt] = err ? ['bad', 'No task is created', (err[2] ? 'The clone() manual forbids this mix of flags (EINVAL).' : 'The kernel rejects this mix of flags (EINVAL).') + ` The panel ${ctx.narrow ? 'below' : 'on the right'} says why.`] : cfVerdict(F);
+            const [c, title, txt0] = err ? ['bad', 'No task is created', `The kernel rejects this mix of flags (EINVAL). The panel ${ctx.narrow ? 'below' : 'on the right'} says why.`] : cfVerdict(F);
+            const txt = err || !cfNote(F) ? txt0 : cfNote(F);
             verdict.style.setProperty('--c', COLS[c] || 'var(--bad)');
             verdict.replaceChildren(h('div', { class: 'lbl' }, 'The result behaves like'), h('h3', {}, title), h('p', { class: 'small m0', html: txt }));
             if (err) {
               holder.replaceChildren(h('div', { class: 'cf-err stack', style: { gap: '8px' } }, h('h3', { class: 'm0' }, 'clone() fails: errno = EINVAL'),
                 h('p', { class: 'p15 m0', html: `<b>${err[0]}</b> ${err[1]}` }),
-                h('p', { class: 'small m0' }, (err[2] ? 'Treat it as a failed call: no task is made. ' : 'The kernel checks the flags before it builds anything, so no task is made. ') + 'Switch the clashing flag off (or the missing one on), or pick a preset.')));
+                h('p', { class: 'small m0' }, 'The kernel checks the flags before it builds anything, so no task is made. Switch the clashing flag off (or the missing one on), or pick a preset.')));
             } else { const NR = drawSvg(); holder.replaceChildren(ctx.narrow ? narrowView(NR) : svg); }
             expBtns.forEach((b) => { b.disabled = !!err; });
             expMsg.innerHTML = err ? 'No task exists, so there is nothing to experiment with.' : lastExp ? '<b>' + EXPS.find((e) => e[0] === lastExp)[1] + '.</b> ' + EXP_MSG[lastExp](F.has(EXP_FLAG[lastExp])) : 'Now let the child change something and see whether the parent notices.';
@@ -1245,7 +1251,7 @@
         <tr><td>CLONE_VFORK</td><td>Caller sleeps until the child calls exec() or exits; with CLONE_VM the child borrows the parent's memory, no copying (vfork(), posix_spawn()).</td></tr>
       </table>
       <p>fork() = no sharing flags (plus SIGCHLD, the signal the parent gets when the child ends); vfork() = CLONE_VM + CLONE_VFORK; pthread_create() = CLONE_VM, FS, FILES, SIGHAND, THREAD, SYSVSEM, SETTLS. Without CLONE_VM a child's write changes only its own copy; with it, both tasks use the same memory, so the parent can read the new value (reliably, and in order, only with synchronization such as a lock or an atomic operation; section 5.1).</p>
-      <p><b>Invalid combinations (errno = EINVAL, no task is made).</b> For the flags above: CLONE_SIGHAND without CLONE_VM (handlers are code addresses, so sharing them needs shared memory); CLONE_THREAD without CLONE_SIGHAND (a thread group shares one set of handlers); CLONE_THREAD with CLONE_NEWPID (the threads of a group share one queue of waiting signals, so they must share one PID numbering); and CLONE_PARENT with CLONE_NEWPID (the first task of a new PID namespace stays the caller's own child; the manual lists this as EINVAL although kernels since 3.13 accept it, so portable code avoids it). The manual also forbids CLONE_FS with CLONE_NEWNS (a new mount namespace needs its own root and current directory), CLONE_SYSVSEM with CLONE_NEWIPC (the shared undo entries would refer to semaphores the new IPC namespace cannot reach), and CLONE_NEWUSER with CLONE_THREAD or CLONE_FS.</p>
+      <p><b>Invalid combinations (errno = EINVAL, no task is made).</b> For the flags above: CLONE_SIGHAND without CLONE_VM (handlers are code addresses, so sharing them needs shared memory); CLONE_THREAD without CLONE_SIGHAND (a thread group shares one set of handlers); and CLONE_THREAD with CLONE_NEWPID (the threads of a group share one queue of waiting signals, so they must share one PID numbering). <b>A documentation discrepancy:</b> the clone() manual also lists CLONE_PARENT with CLONE_NEWPID as EINVAL, and kernels before 3.13 refused it, but current kernels accept the pair (the new namespace's PID 1 then becomes a child of the caller's parent); the lab follows current kernels and shows a portability note, because portable code still avoids the pair. The manual also forbids CLONE_FS with CLONE_NEWNS (a new mount namespace needs its own root and current directory), CLONE_SYSVSEM with CLONE_NEWIPC (the shared undo entries would refer to semaphores the new IPC namespace cannot reach), and CLONE_NEWUSER with CLONE_THREAD or CLONE_FS.</p>
 
       <h3>6. Namespaces</h3>
       <p>A <b>namespace</b> gives a process, or processes sharing it, a different view of the system from other processes; namespaces are the basis of containers. The six classic ones (newer kernels add cgroup and time namespaces):</p>

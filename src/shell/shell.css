@@ -601,3 +601,8 @@ button.toc-sec:focus-visible, button.toc-ch-head:focus-visible { outline: 3px so
 body.print .print-bar { display: flex; gap: 10px; justify-content: center; padding: 14px; position: sticky; top: 0; background: #fff; border-bottom: 1px solid #dde2ec; z-index: 5; }
 @media print { body.print .print-bar { display: none !important; } }
 body.narrow table.tbl { display: block; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+.quiz-pill.fixed { background: var(--warn); border-color: var(--warn); color: #fff; opacity: .8; }
+.route-top { display: none; }
+body.narrow .route-top { display: block; }
+body.narrow .route-bottom { display: none; }

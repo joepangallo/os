@@ -34,6 +34,10 @@
     return a;
   }
   const hashStr = (s) => { let x = 2166136261; for (let i = 0; i < s.length; i++) { x ^= s.charCodeAt(i); x = Math.imul(x, 16777619); } return x >>> 0; };
+  // fingerprint of a whole question (prompt, choices, answer, type, pairs...): any edit invalidates saved attempts
+  const qfp = (q) => hashStr(JSON.stringify(q, (k, v) => (typeof v === 'function' || k === 'source' || k === 'qid' ? undefined : v))).toString(36);
+  const quizIds = (questions) => questions.map((q, i) => i + ':' + qfp(q));
+  const quizFp = (questions) => hashStr(quizIds(questions).join('|')).toString(36);
   const fmt = (v, d = 2) => (Math.round(v * 10 ** d) / 10 ** d).toLocaleString('en-US', { maximumFractionDigits: d });
   Guide.util = { clamp, esc, range, shuffle, seeded: mulberry32, hash: hashStr, fmt, sleep: (ms) => new Promise((r) => setTimeout(r, ms)) };
 
@@ -110,9 +114,39 @@
   const iconBtn = (name, label, onclick, cls = 'tb-btn') => h('button', { class: cls, title: label, 'aria-label': label, onclick, html: ICON[name] });
 
   /* ------------------------------------------------------------ persistence */
+  const BAD_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+  const dict = () => Object.create(null);
+  const isObj = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
+  const okKey = (k, max = 64) => typeof k === 'string' && k.length > 0 && k.length <= max && !BAD_KEYS.has(k);
+  const okInt = (v, lo = 0, hi = 100000) => Number.isInteger(v) && v >= lo && v <= hi;
+  /* Saved progress is untrusted input: rebuild it field by field from an allowlist into fresh
+     null-prototype objects, dropping anything malformed, instead of merging the parsed JSON. */
+  function parseStore(raw) {
+    const out = { visited: dict(), quiz: dict(), known: dict(), chLast: dict(), qstate: dict(), qdraw: dict(), last: null, theme: null, route: 'full' };
+    let src = null;
+    try { src = JSON.parse(raw, (k, v) => (BAD_KEYS.has(k) ? undefined : v)); } catch (e) { return out; }
+    if (!isObj(src)) return out;
+    if (isObj(src.visited)) for (const k of Object.keys(src.visited)) if (okKey(k) && src.visited[k]) out.visited[k] = 1;
+    if (isObj(src.known)) for (const k of Object.keys(src.known)) if (okKey(k, 200)) out.known[k] = src.known[k] ? 1 : 0;
+    if (isObj(src.quiz)) for (const k of Object.keys(src.quiz)) {
+      const r = src.quiz[k];
+      if (okKey(k) && isObj(r) && okInt(r.best) && okInt(r.total) && r.best <= r.total) out.quiz[k] = { best: r.best, total: r.total, last: okInt(r.last) ? r.last : 0, learned: okInt(r.learned) && r.learned <= r.total ? r.learned : 0, fp: typeof r.fp === 'string' ? r.fp.slice(0, 32) : '' };
+    }
+    if (isObj(src.chLast)) for (const k of Object.keys(src.chLast)) if (/^\d{1,2}$/.test(k) && okKey(src.chLast[k])) out.chLast[k] = src.chLast[k];
+    if (isObj(src.qdraw)) for (const k of Object.keys(src.qdraw)) {
+      const a = src.qdraw[k];
+      if (okKey(k) && Array.isArray(a) && a.length <= 200 && a.every((x) => okKey(x, 96))) out.qdraw[k] = a.slice();
+    }
+    if (isObj(src.qstate)) for (const k of Object.keys(src.qstate)) if (okKey(k) && isObj(src.qstate[k])) out.qstate[k] = src.qstate[k]; // deep-validated when a quiz restores it
+    if (okKey(src.last)) out.last = src.last;
+    if (src.theme === 'dark' || src.theme === 'light') out.theme = src.theme;
+    if (src.route === 'core') out.route = 'core';
+    return out;
+  }
+  Guide._parseStore = parseStore;
   const store = (() => {
-    const data = { visited: {}, quiz: {}, last: null, theme: null, known: {} };
-    try { const raw = localStorage.getItem(STORE_KEY); if (raw) Object.assign(data, JSON.parse(raw)); } catch (e) { /* storage blocked */ }
+    let data = parseStore('null');
+    try { const raw = localStorage.getItem(STORE_KEY); if (raw) data = parseStore(raw); } catch (e) { /* storage blocked */ }
     let t = null;
     const save = () => { clearTimeout(t); t = setTimeout(() => { try { localStorage.setItem(STORE_KEY, JSON.stringify(data)); } catch (e) { /* ignore */ } }, 120); };
     return { data, save };
@@ -419,7 +453,7 @@
     return i;
   }
   function step(d) { go(neighbor(d)); }
-  function setRoute(r) { store.data.route = r; store.save(); updateChrome(); }
+  function setRoute(r) { store.data.route = r; store.save(); const sl = slides[cur]; if (sl && (sl.type === 'home' || sl.type === 'chapter')) go(cur, { keepFocus: true }); else updateChrome(); }
   function sectionJump(d) {
     const sl = slides[cur];
     let i = cur + d;
@@ -458,7 +492,7 @@
     fitT = setTimeout(() => {
       if (fit() && cur >= 0) {
         const sl = slides[cur];
-        const layoutAware = sl.type === 'home' || sl.type === 'chapter' || (sl.type === 'step' && /narrow/.test(String(sl.step.render || '') + String(sl.step.html || '')));
+        const layoutAware = sl.type === 'home' || sl.type === 'chapter' || (sl.type === 'step' && (sl.sec.layoutAware || (sl.sec.pseudo && sl.ch && sl.ch.layoutAware) || /narrow/.test(String(sl.step.render || '') + String(sl.step.html || ''))));
         if (layoutAware) go(cur, { keepFocus: true }); // quizzes restore from saved state; other slides just reflow with CSS
       } else checkOverflow();
     }, 60);
@@ -543,21 +577,23 @@
   }
 
   /* ------------------------------------------------------------ home */
+  const onRoute = (x) => x.type === 'step' && (!coreRoute() || isCore(x));
   function progressOfChapter(n) {
-    const keys = slides.filter((x) => x.ch && x.ch.num === n && x.type === 'step').map((x) => x.key);
+    const keys = slides.filter((x) => x.ch && x.ch.num === n && onRoute(x)).map((x) => x.key);
     if (!keys.length) return 0;
     return keys.filter((k) => store.data.visited[k]).length / keys.length;
   }
   // quiz mastery: best first-try score saved for each section's check step
   function secMastery(sec) {
     let best = 0, total = 0, seen = false;
-    sec.steps.forEach((st, i) => { if (!st.quiz) return; const rec = store.data.quiz[sec.id + '/' + (i + 1)]; total += st.quiz.length; if (rec) { seen = true; best += rec.best || 0; } });
-    return seen && total ? { best, total, pct: best / total } : null;
+    let learned = 0;
+    sec.steps.forEach((st, i) => { if (!st.quiz) return; const rec = store.data.quiz[sec.id + '/' + (i + 1)]; total += st.quiz.length; if (rec && rec.fp === quizFp(st.quiz)) { seen = true; best += rec.best || 0; learned += Math.max(rec.learned || 0, rec.best || 0); } });
+    return seen && total ? { best, total, learned, pct: best / total } : null;
   }
   function masteryChip(m) {
     if (!m) return null;
     const cls = m.pct >= 0.8 ? 'ok' : m.pct >= 0.5 ? 'warn' : 'bad';
-    return h('span', { class: 'chip ' + cls, title: `Best quiz score: ${m.best} of ${m.total} right on the first try` }, `quiz ${m.best}/${m.total}`);
+    return h('span', { class: 'chip ' + cls, title: `First try: best ${m.best} of ${m.total} right on a first attempt${m.learned != null ? ` · learned: ${m.learned} of ${m.total} answered correctly after retries` : ''}` }, `quiz ${m.best}/${m.total}`);
   }
   function chapterMastery(n) {
     const ms = sectionsOf(n).map(secMastery).filter(Boolean);
@@ -583,6 +619,8 @@
     const secCount = Object.keys(Guide.sections).length;
     const stepKeys = slides.filter((x) => x.type === 'step').map((x) => x.key);
     const overall = stepKeys.length ? stepKeys.filter((k) => store.data.visited[k]).length / stepKeys.length : 0;
+    const coreKeys = slides.filter((x) => x.type === 'step' && isCore(x)).map((x) => x.key);
+    const routeDone = coreKeys.length ? coreKeys.filter((k) => store.data.visited[k]).length / coreKeys.length : 0;
     const lastIdx = store.data.last && store.data.last !== 'home' ? slideIndex(store.data.last) : -1;
     const firstStep = slides.findIndex((x) => x.type === 'chapter');
     const resume = lastIdx > 0 ? lastIdx : firstStep;
@@ -595,7 +633,10 @@
         h('p', {}, 'An interactive companion to Chapters 1–5 of ', h('i', {}, 'Operating Systems: Internals and Design Principles'), '. Every section explains one idea in plain language, lets you run it yourself, then checks your understanding.')),
       h('div', { class: 'stack home-go', style: { alignItems: 'flex-end', gap: '8px', flex: 'none' } },
         resumeSl ? h('button', { class: 'btn primary lg', onclick: () => go(resume) }, lastIdx > 0 ? `Continue: ${slideLabel(resumeSl)}` : 'Start with Chapter 1', h('span', { html: ICON.right, style: { width: '18px', display: 'inline-flex' } })) : null,
-        h('div', { class: 'small muted' }, `Your progress: ${Math.round(overall * 100)}% of steps visited`))));
+        h('div', { class: 'small muted' }, coreRoute()
+          ? `Core path: ${Math.round(routeDone * 100)}% done · all steps: ${Math.round(overall * 100)}%`
+          : `Your progress: ${Math.round(overall * 100)}% of steps visited`),
+        h('div', { class: 'route-top' }, routeSeg()))));
     const cards = h('div', { class: 'chcards' });
     for (const c of sortedChapters()) {
       const secs = sectionsOf(c.num);
@@ -605,7 +646,7 @@
         h('div', { class: 'tt' }, c.title),
         h('ul', {}, secs.map((x) => h('li', { style: { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } }, `${x.id} ${x.short || x.title}`))),
         h('div', { style: { marginTop: 'auto' } }, h('div', { class: 'meter' }, h('i', { style: { width: pct * 100 + '%' } })),
-          h('div', { class: 'xs muted', style: { marginTop: '3px' } }, `${Math.round(pct * 100)}% visited`, (() => { const m = chapterMastery(c.num); return m ? ` · quizzes ${m.tried}/${m.of}, ${Math.round(m.pct * 100)}% right` : ''; })()))));
+          h('div', { class: 'xs muted', style: { marginTop: '3px' } }, `${Math.round(pct * 100)}% ${coreRoute() ? 'of core path' : 'visited'}`, (() => { const m = chapterMastery(c.num); return m ? ` · quizzes ${m.tried}/${m.of}, ${Math.round(m.pct * 100)}% right` : ''; })()))));
     }
     cards.style.flex = '1'; cards.style.minHeight = '0';
     wrap.append(cards);
@@ -621,7 +662,7 @@
       h('div', { class: 'card tight' }, h('h4', {}, 'Colour language used in every diagram'), legend()),
       h('div', { class: 'card tight' }, h('h4', {}, 'Getting around'),
         h('div', { class: 'small', html: '<kbd>←</kbd> <kbd>→</kbd> step · <kbd>T</kbd> contents · <kbd>G</kbd> glossary · <kbd>?</kbd> all shortcuts. Dotted words like <span class="t" data-t="operating system">operating system</span> show a definition.' }),
-        h('div', { class: 'row gap-s', style: { marginTop: '6px' } }, routeSeg(), h('button', { class: 'btn sm', type: 'button', onclick: openPrint }, 'Printable guide')))));
+        h('div', { class: 'row gap-s', style: { marginTop: '6px' } }, h('div', { class: 'route-bottom' }, routeSeg()), h('button', { class: 'btn sm', type: 'button', onclick: openPrint }, 'Printable guide')))));
     body.append(wrap);
   }
   function legend() {
@@ -720,7 +761,7 @@
   /* ------------------------------------------------------------ chapter / final quizzes */
   function poolFor(secs) {
     const pool = [];
-    for (const sec of secs) sec.steps.forEach((st, si) => (st.quiz || []).forEach((q, qi) => pool.push(Object.assign({}, q, { source: sec.id, qid: `${sec.id}:${si}:${qi}` }))));
+    for (const sec of secs) sec.steps.forEach((st, si) => (st.quiz || []).forEach((q, qi) => pool.push(Object.assign({}, q, { source: sec.id, qid: `${sec.id}:${si}:${qi}:${qfp(q)}` }))));
     return pool;
   }
   function sampledQuiz(body, ctx, secs, n, key, blurb) {
@@ -972,12 +1013,36 @@
     let cur = 0;
     let order = range(qs.length);
     // restore a saved attempt (answers, tries, current question) so leaving the step or rotating the device keeps the work
-    const ids = o.ids || qs.map((q, i) => i + ':' + hashStr(String(q.q)));
+    const ids = o.ids || quizIds(questions);
     let startPos = 0, startSum = false;
     const saved = o.key && store.data.qstate && store.data.qstate[o.key];
-    if (saved && Array.isArray(saved.ids) && saved.ids.join('|') === ids.join('|') && Array.isArray(saved.st) && saved.st.length === qs.length) {
-      st = saved.st; if (Array.isArray(saved.order) && saved.order.length) order = saved.order;
-      startPos = saved.pos || 0; startSum = saved.mode === 'sum';
+    const RES = [null, 'right', 'late', 'wrong', 'fixed'];
+    const idxArr = (a, n) => Array.isArray(a) && a.length <= 64 && a.every((x) => Number.isInteger(x) && x >= 0 && x < n);
+    function cleanQ(q, x) {
+      if (!isObj(x) || !okInt(x.tries, 0, 50) || typeof x.done !== 'boolean' || !RES.includes(x.res === undefined ? null : x.res)) return null;
+      const c = { tries: x.tries, done: x.done, res: x.res || null };
+      if (x.retry === true) c.retry = true;
+      const n = (q.choices || q.items || q.pairs || []).length;
+      if (x.wrong !== undefined) { if (!idxArr(x.wrong, n)) return null; c.wrong = x.wrong.slice(); }
+      if (q.type === 'multi' && x.sel !== undefined) { if (!idxArr(x.sel, n)) return null; c.sel = x.sel.slice(); }
+      if (q.type === 'order' && x.arr !== undefined) { if (!idxArr(x.arr, n) || x.arr.length !== n || new Set(x.arr).size !== n) return null; c.arr = x.arr.slice(); }
+      if (q.type === 'match') {
+        const rights = q.pairs.map((p) => p[1]);
+        if (x.opts !== undefined) { if (!Array.isArray(x.opts) || x.opts.length !== rights.length || !x.opts.every((v) => rights.includes(v))) return null; c.opts = x.opts.slice(); }
+        if (x.sel !== undefined) { if (!Array.isArray(x.sel) || x.sel.length !== rights.length || !x.sel.every((v) => v === '' || rights.includes(v))) return null; c.sel = x.sel.slice(); }
+      }
+      if (q.type === 'bucket' && x.sel !== undefined) { if (!Array.isArray(x.sel) || x.sel.length !== q.items.length || !x.sel.every((v) => Number.isInteger(v) && v >= -1 && v < q.buckets.length)) return null; c.sel = x.sel.slice(); }
+      if (q.type === 'num' && x.val !== undefined) { if (typeof x.val !== 'string' || x.val.length > 40) return null; c.val = x.val; }
+      return c;
+    }
+    if (isObj(saved) && Array.isArray(saved.ids) && saved.ids.join('|') === ids.join('|') && Array.isArray(saved.st) && saved.st.length === qs.length) {
+      const cleaned = saved.st.map((x, i) => cleanQ(qs[i], x));
+      const ordOk = idxArr(saved.order, qs.length) && saved.order.length > 0 && new Set(saved.order).size === saved.order.length;
+      if (cleaned.every(Boolean) && ordOk) {
+        st = cleaned; order = saved.order.slice();
+        startPos = okInt(saved.pos, 0, order.length - 1) ? saved.pos : 0;
+        startSum = saved.mode === 'sum';
+      }
     }
     function saveState() {
       if (!o.key) return;
@@ -998,8 +1063,12 @@
     function saveBest() {
       if (!o.key) return;
       const right = st.filter((x) => x.res === 'right').length;
-      const rec = store.data.quiz[o.key] || { best: 0, total: qs.length };
-      rec.best = Math.max(rec.best || 0, right); rec.total = qs.length; rec.last = right;
+      const fp = hashStr(ids.join('|')).toString(36);
+      let rec = store.data.quiz[o.key];
+      if (!rec || rec.fp !== fp || rec.total !== qs.length) rec = { best: 0, total: qs.length, fp };   // questions changed: old best no longer applies
+      const learned = st.filter((x) => x.res === 'right' || x.res === 'late' || x.res === 'fixed').length;
+      rec.best = Math.max(rec.best || 0, right); rec.total = qs.length; rec.last = right; rec.fp = fp;
+      rec.learned = Math.max(rec.learned || 0, learned);
       store.data.quiz[o.key] = rec; store.save();
     }
     function paintTop() {
@@ -1007,7 +1076,8 @@
       order.forEach((qi, k) => pills.append(h('button', { type: 'button', class: 'quiz-pill' + (qi === cur && main.dataset.mode !== 'sum' ? ' on' : '') + (st[qi].res ? ' ' + st[qi].res : ''), title: `Question ${k + 1}`, onclick: () => show(k) }, String(k + 1))));
       const done = order.filter((qi) => st[qi].done).length;
       const right = order.filter((qi) => st[qi].res === 'right').length;
-      score.textContent = `${right} right first try · ${done}/${order.length} answered`;
+      const fixed = order.filter((qi) => st[qi].res === 'fixed').length;
+      score.textContent = `${right} right first try${fixed ? ` · ${fixed} fixed on retry` : ''} · ${done}/${order.length} answered`;
       const allDone = order.every((qi) => st[qi].done);
       const pos = order.indexOf(cur);
       bNext.textContent = allDone ? 'See results ▶' : 'Next question ▶';
@@ -1020,15 +1090,18 @@
     }
     function restart(idxs) {
       order = idxs;
-      idxs.forEach((qi) => (st[qi] = { tries: 0, done: false, res: null }));
+      const retry = idxs.length < qs.length;   // retrying missed questions: a correct answer now counts as "fixed", never as first try
+      idxs.forEach((qi) => (st[qi] = retry ? { tries: 0, done: false, res: null, retry: true } : { tries: 0, done: false, res: null }));
       show(0);
       saveState();
     }
     function summary() {
       main.dataset.mode = 'sum';
       const right = order.filter((qi) => st[qi].res === 'right').length;
-      const missed = order.filter((qi) => st[qi].res !== 'right');
-      const pct = Math.round((right / order.length) * 100);
+      const fixedN = order.filter((qi) => st[qi].res === 'fixed').length;
+      const isRetry = order.some((qi) => st[qi].retry);
+      const missed = order.filter((qi) => st[qi].res !== 'right' && st[qi].res !== 'fixed');
+      const pct = Math.round(((isRetry ? fixedN : right) / order.length) * 100);
       const what = o.source ? 'these sections' : 'this section';
       const msg = pct === 100 ? `Perfect. You have ${what} nailed.` : pct >= 80 ? 'Strong work. Review the explanations for the ones you missed.' : pct >= 50 ? 'Good start. Revisit the steps for the questions you missed, then try again.' : `This is a good time to go back through ${what} and then retry.`;
       const cmpId = (a, b) => { const [a1, a2] = a.split('.').map(Number); const [b1, b2] = b.split('.').map(Number); return a1 - b1 || a2 - b2; };
@@ -1036,7 +1109,8 @@
       main.innerHTML = '';
       main.append(h('div', { class: 'quiz-sum', style: { gridColumn: '1 / -1' } }, h('div', { class: 'stack', style: { alignItems: 'center' } },
         h('div', { class: 'big', style: { fontSize: '64px', color: pct >= 80 ? 'var(--ok)' : pct >= 50 ? 'var(--warn)' : 'var(--bad)' } }, pct + '%'),
-        h('div', { class: 'lead b' }, `${right} of ${order.length} correct on the first try`),
+        h('div', { class: 'lead b' }, isRetry ? `You fixed ${fixedN} of the ${order.length} you had missed` : `${right} of ${order.length} correct on the first try`),
+        isRetry ? h('div', { class: 'small muted' }, 'Retries improve what you have learned, not your first-try score.') : null,
         h('div', { class: 'muted' }, msg),
         o.source && revisit.length ? h('div', { class: 'row small', style: { justifyContent: 'center', gap: '6px' } }, h('span', {}, 'Sections to revisit:'),
           revisit.map((x) => h('button', { class: 'btn sm', type: 'button', title: (Guide.sections[x] || {}).title || '', onclick: () => go(slideIndex(x + '/1')) }, '§' + x))) : null,
@@ -1073,8 +1147,8 @@
       const api = {
         finish(correct) {
           s.done = true;
-          s.res = correct ? (s.tries === 0 ? 'right' : 'late') : 'wrong';
-          const verdict = s.res === 'right' ? '<div class="verdict ok">✓ Correct!</div>' : s.res === 'late' ? '<div class="verdict warn">✓ Correct on the second try</div>' : '<div class="verdict bad">✗ Not this time. The correct answer is shown in green.</div>';
+          s.res = correct ? (s.retry ? 'fixed' : s.tries === 0 ? 'right' : 'late') : 'wrong';
+          const verdict = s.res === 'right' ? '<div class="verdict ok">✓ Correct!</div>' : s.res === 'late' ? '<div class="verdict warn">✓ Correct on the second try</div>' : s.res === 'fixed' ? '<div class="verdict warn">✓ Correct on this retry</div>' : '<div class="verdict bad">✗ Not this time. The correct answer is shown in green.</div>';
           fb.innerHTML = verdict + whyHtml();
           saveBest(); paintTop(); saveState();
         },
@@ -1083,7 +1157,7 @@
           if (s.tries >= q.max) return api.finish(false);
           fb.innerHTML = `<div class="verdict bad">✗ Not quite. Try once more.</div>${extra ? `<div>${extra}</div>` : ''}${q.hint ? `<div class="why"><b>Hint:</b> ${q.hint}</div>` : ''}`;
         },
-        final() { fb.innerHTML = (s.res === 'right' ? '<div class="verdict ok">✓ Correct!</div>' : s.res === 'late' ? '<div class="verdict warn">✓ Correct on the second try</div>' : '<div class="verdict bad">✗ The correct answer is shown in green.</div>') + whyHtml(); },
+        final() { fb.innerHTML = (s.res === 'right' ? '<div class="verdict ok">✓ Correct!</div>' : s.res === 'late' ? '<div class="verdict warn">✓ Correct on the second try</div>' : s.res === 'fixed' ? '<div class="verdict warn">✓ Correct on this retry</div>' : '<div class="verdict bad">✗ The correct answer is shown in green.</div>') + whyHtml(); },
       };
       fb.innerHTML = `<div class="muted">${QIDLE[q.type]}</div>` + (q.hint ? `<div class="why small"><b>Hint:</b> ${q.hint}</div>` : '');
       RENDER[q.type === 'tf' ? 'mc' : q.type](q, s, box, api, left);
@@ -1170,7 +1244,7 @@
             box.append(row);
           });
         }
-        function move(a, b) { if (s.done || b < 0 || b >= s.arr.length) return; const [x] = s.arr.splice(a, 1); s.arr.splice(b, 0, x); paint(false); }
+        function move(a, b) { if (s.done || b < 0 || b >= s.arr.length) return; const [x] = s.arr.splice(a, 1); s.arr.splice(b, 0, x); paint(false); saveState(); }
         const chk = checkBtn(() => {
           if (s.done) return;
           const right = s.arr.filter((v, k) => v === k).length;
@@ -1252,7 +1326,7 @@
           paint();
         } }, 'Check answer');
         inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') chk.click(); });
-        inp.addEventListener('input', () => inp.classList.remove('wrong'));
+        inp.addEventListener('input', () => { inp.classList.remove('wrong'); s.val = inp.value; saveState(); });
         box.append(h('div', { class: 'qnum' }, inp, q.unit ? h('span', { class: 'b', html: q.unit }) : null, chk));
         function paint() {
           if (s.done) { inp.value = String(q.answer); inp.disabled = true; chk.disabled = true; inp.classList.remove('wrong'); inp.classList.add('right'); }
@@ -1268,7 +1342,9 @@
   /* ------------------------------------------------------------ drawers, glossary, notes, help */
   let returnFocus = null;
   function setOverlayState() {
-    [els.toc, els.gloss, els.notes, els.modal].forEach((d) => { const on = d.classList.contains('on'); d.inert = !on; d.setAttribute('aria-hidden', on ? 'false' : 'true'); });
+    let anyOpen = false;
+    [els.toc, els.gloss, els.notes, els.modal].forEach((d) => { const on = d.classList.contains('on'); anyOpen = anyOpen || on; d.inert = !on; d.setAttribute('aria-hidden', on ? 'false' : 'true'); });
+    els.app.inert = anyOpen;   // everything behind an open panel is unreachable, so Tab stays inside the panel
   }
   function openDrawer(which) {
     const prev = document.activeElement;
@@ -1280,7 +1356,8 @@
     if (which === 'notes') { renderNotes(); els.notes.classList.add('on'); setTimeout(() => { const b = els.notes.querySelector('button'); if (b) b.focus(); }, 60); }
     setOverlayState();
   }
-  function closeAll(keepScrim) {
+  function closeAll(keepScrimArg) {
+    const keepScrim = keepScrimArg === true;   // handlers bound as onclick: closeAll receive an Event, which must not keep the backdrop
     const wasOpen = [els.toc, els.gloss, els.notes, els.modal].some((d) => d.classList.contains('on'));
     const focusInside = document.activeElement && document.activeElement.closest && document.activeElement.closest('.drawer, .modal');
     [els.toc, els.gloss, els.notes, els.modal].forEach((d) => d.classList.remove('on'));
@@ -1362,7 +1439,7 @@
       routeSeg(),
       h('div', { class: 'row', style: { marginTop: '12px' } }, h('button', { class: 'btn sm', type: 'button', onclick: () => { closeAll(); openPrint(); } }, 'Printable study guide')),
       h('div', { class: 'row', style: { marginTop: '16px', justifyContent: 'space-between' } },
-        h('button', { class: 'btn sm danger', onclick: () => { store.data.visited = {}; store.data.quiz = {}; store.data.known = {}; store.save(); closeAll(); go(cur); toast('Progress cleared.'); } }, 'Reset my progress'),
+        h('button', { class: 'btn sm danger', onclick: () => { const d = store.data; d.visited = dict(); d.quiz = dict(); d.known = dict(); d.qstate = dict(); d.qdraw = dict(); d.chLast = dict(); d.last = null; store.save(); closeAll(); go(cur); toast('Progress cleared.'); } }, 'Reset my progress'),
         h('button', { class: 'btn primary', onclick: closeAll }, 'Got it'))));
     els.modal.classList.add('on');
     setOverlayState();
@@ -1405,10 +1482,23 @@
     document.addEventListener('keydown', (e) => {
       if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return;
       const t = e.target;
-      if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) { if (e.key === 'Escape') { t.blur(); closeAll(); } return; }
+      if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) && !(e.key === 'Tab' && t.closest && t.closest('.drawer.on, .modal.on'))) { if (e.key === 'Escape') { t.blur(); closeAll(); } return; }
       const k = e.key;
-      const inPanel = t && t.closest && t.closest('.drawer.on, .modal.on');
-      if (inPanel) { if (k === 'Escape') { e.preventDefault(); closeAll(); } return; }
+      const openPanel = [els.toc, els.gloss, els.notes, els.modal].find((d) => d.classList.contains('on'));
+      if (openPanel && k === 'Tab') {   // keep focus cycling inside the open panel
+        const f = [...openPanel.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')].filter((x) => !x.disabled && x.getClientRects().length);
+        if (!f.length) { e.preventDefault(); return; }
+        const first = f[0], last = f[f.length - 1], a = document.activeElement;
+        if (!openPanel.contains(a)) { e.preventDefault(); first.focus(); }
+        else if (e.shiftKey && a === first) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && a === last) { e.preventDefault(); first.focus(); }
+        return;
+      }
+      if (openPanel) {   // while a panel is open only Escape (or the panel's own key) acts; slides never move behind it
+        const own = { t: els.toc, g: els.gloss, n: els.notes, '?': els.modal }[k.toLowerCase()];
+        if (k === 'Escape' || own === openPanel) { e.preventDefault(); closeAll(); }
+        return;
+      }
       const arrows = k === 'ArrowRight' || k === 'ArrowLeft' || k === 'ArrowUp' || k === 'ArrowDown' || k === 'Home' || k === 'End';
       if (arrows && t && t.closest && t.closest('[role="tablist"], .seg, [role="radiogroup"], [role="listbox"], [role="slider"], [role="menu"], [data-keys]')) return;
       if (k === 'ArrowRight' || k === 'PageDown') { e.preventDefault(); step(1); }
@@ -1444,7 +1534,7 @@
     }
     window.addEventListener('resize', onResize);
     if (window.ResizeObserver) new ResizeObserver(onResize).observe(els.stage);
-    window.addEventListener('hashchange', () => { const i = slideIndex(location.hash.slice(1)); if (i >= 0 && i !== cur) go(i); });
+    window.addEventListener('hashchange', () => { const i = slideIndex(keyFromHash()); if (i >= 0 && i !== cur) go(i); });
   }
 
   /* ------------------------------------------------------------ print (PDF study guide) */
@@ -1509,6 +1599,11 @@
     document.title = 'Operating Systems Chapters 1-5 Study Guide';
   }
 
+  function keyFromHash() {
+    const raw = String(location.hash || '').slice(1, 80);
+    try { return decodeURIComponent(raw); } catch (e) { return ''; }   // malformed fragment such as #% → home
+  }
+
   /* ------------------------------------------------------------ start */
   Guide.start = function () {
     buildGlossary();
@@ -1519,7 +1614,7 @@
     applyTheme();
     bindGlobal();
     fit();
-    const initial = slideIndex(decodeURIComponent(location.hash.slice(1)));
+    const initial = slideIndex(keyFromHash());
     go(initial >= 0 ? initial : 0);
     if (registerErrors.length) console.error('[guide] registration errors:\n' + registerErrors.join('\n'));
   };
@@ -1537,6 +1632,7 @@
     slides: () => slides.map((x, i) => ({ i, key: x.key, type: x.type, sec: x.sec ? x.sec.id : null, step: x.i ?? null, title: x.step ? x.step.title : x.title, kind: x.step ? x.step.kind || null : null, hasQuiz: !!(x.step && x.step.quiz) })),
     go: (key) => { const i = slideIndex(key); if (i < 0) return false; go(i); return true; },
     current: () => slides[cur] && slides[cur].key,
+    quizIds: (questions) => quizIds(questions),
     errors: () => renderErrors.slice(),
     registerErrors: () => registerErrors.slice(),
     metrics() {

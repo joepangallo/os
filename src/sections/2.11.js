@@ -1,5 +1,5 @@
 /* Section 2.11 — Android
-   Original teaching material. Built step by step (see AUTHORING.txt). */
+   Original teaching material. Built step by step. */
 Guide.section({
   id: '2.11',
   title: 'Android',

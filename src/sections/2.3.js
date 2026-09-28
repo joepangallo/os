@@ -2,8 +2,7 @@
    Section 2.3 — Major Achievements
    The four big ideas every modern OS is built on: the process, memory
    management, information protection and security, and scheduling and
-   resource management. Original teaching material, built step by step
-   (see AUTHORING.txt). Shared helpers live in the IIFE so nothing leaks
+   resource management. Original teaching material, built step by step. Shared helpers live in the IIFE so nothing leaks
    into the global scope.
    ===================================================================== */
 (() => {
@@ -429,7 +428,7 @@
         render(el, ctx) {
           const { h, s } = ctx;
           const CODE = [['+5', '+5', '+5', '+5', '+5', 'jmp 0'], ['+100', '+100', '+100', '+100', '+100', 'jmp 0']];
-          let st, busy = false;
+          let st, busy = false, gen = 0;                   // gen: bumped by Reset so a switch in progress stops
           const fresh = () => ({ regs: { idx: 0, pc: 0, base: 2000, limit: 600, r1: 0 }, hl: [], check: null, badBlock: false,
             rows: [{ n: 'A', base: 2000, limit: 600, pc: 0, r1: 0, inc: 5, state: 'running' }, { n: 'B', base: 4000, limit: 400, pc: 0, r1: 0, inc: 100, state: 'ready' }] });
           const svg = s('svg', { viewBox: '0 0 660 400', width: '100%', role: 'img', 'aria-label': 'Processor registers and main memory with the process list' });
@@ -488,17 +487,17 @@
             draw();
           }
           async function sw() {
-            setBusy(true);
+            setBusy(true); const g = gen, live = () => ctx.alive && g === gen;
             const r = st.regs, cur = r.idx, nx = 1 - cur, a = st.rows[cur], b = st.rows[nx];
             st.check = null; st.badBlock = false;
             a.pc = r.pc; a.r1 = r.r1; a.state = 'ready'; st.hl = ['regs', 'row' + cur]; draw();
             log(`<span style="color:var(--intr)"><b>Interrupt.</b></span> OS saves ${a.n}'s context (PC ${a.pc}, R1 ${a.r1}) in entry ${cur}.`);
-            await ctx.sleep(900); if (!ctx.alive) return;
+            await ctx.sleep(900); if (!live()) return;
             st.hl = ['row' + nx]; draw(); log(`OS picks the next process: ${b.n} (entry ${nx}).`);
-            await ctx.sleep(900); if (!ctx.alive) return;
+            await ctx.sleep(900); if (!live()) return;
             Object.assign(r, { idx: nx, pc: b.pc, base: b.base, limit: b.limit, r1: b.r1 }); b.state = 'running'; st.hl = ['regs', 'row' + nx]; draw();
             log(`OS loads ${b.n}'s context: index ${nx}, PC ${b.pc}, base ${b.base}, limit ${b.limit}, R1 ${b.r1}. <b>${b.n} runs.</b>`);
-            await ctx.sleep(700); if (!ctx.alive) return;
+            await ctx.sleep(700); if (!live()) return;
             st.hl = []; draw(); setBusy(false);
           }
           function bad() {
@@ -507,12 +506,12 @@
             st.badBlock = true; st.hl = []; draw();
             log(`<span style="color:var(--bad)"><b>${w.n} tries address ${addr}</b></span>, past its limit of ${r.limit}. The hardware refuses and interrupts the OS, which would normally end ${w.n} with a bounds error. (Here it lets ${w.n} carry on.)`);
           }
-          function reset() { st = fresh(); logEl.replaceChildren(); log('A is running from the start of its block. B is ready and has never run.'); draw(); }
+          function reset() { gen++; setBusy(false); st = fresh(); logEl.replaceChildren(); log('A is running from the start of its block. B is ready and has never run.'); draw(); }
           el.append(h('div', { class: 'split l fill' },
             h('div', { class: 'stack' },
               h('p', { class: 'm0', html: 'A process has three parts: the executable <b>program</b>, its <b>data</b>, and its <span class="t">execution context</span> (what the OS needs to pause and resume it). A typical OS stores them like this:' }),
               h('ul', { class: 'small m0', html: '<li>The <span class="t">process list</span> has one entry per process: where the process is in memory, plus its saved context while it is not running (some systems keep part of it with the process instead).</li><li>Each process owns a block of memory holding its program and data.</li><li><b>Process index</b> names the running entry, the <b>PC</b> counts from the start of the block, and the <span class="t">base register</span> and <span class="t">limit register</span> give the block\'s start and size.</li>' }),
-              h('div', { class: 'row', style: { gap: '8px' } }, btn('Run 1 instruction', 'primary', run), btn('Interrupt: switch', 'os', sw), btn('Bad address', 'intr', bad), btn('Reset', 'ghost', reset)),
+              h('div', { class: 'row', style: { gap: '8px' } }, btn('Run 1 instruction', 'primary', run), btn('Interrupt: switch', 'os', sw), btn('Bad address', 'intr', bad), h('button', { class: 'btn sm ghost', type: 'button', onclick: reset }, 'Reset')),
               h('div', { class: 'callout tip m0', 'data-label': 'Try this', html: 'Run A three times, switch, run B twice, switch back. A resumes at PC 3 with R1 = 15, exactly where it stopped.' }),
               h('div', { class: 'callout warn m0', 'data-label': 'Common mistake', html: 'A <b>context switch</b> never copies the program or its data: it saves and reloads only a few register values.' })),
             h('div', { class: 'stack' }, fitWide(ctx, svg, 600), logEl)));
@@ -624,7 +623,7 @@
         render(el, ctx) {
           const { h, s } = ctx;
           const NP = 8, NF = 6;
-          let st, busy = false;
+          let st, busy = false, gen = 0;                   // gen: bumped by Reset so a page-fault handler in progress stops
           const fresh = () => ({ table: [3, 0, null, 5, null, 1, null, null], frames: [1, 5, null, 0, null, 3], order: [1, 5, 0, 3], faults: 0, n: 0, va: null, res: null, hl: {} });
           const svg = s('svg', { viewBox: '0 0 660 460', width: '100%', role: 'img', 'aria-label': 'Processor, MMU with page table, main memory frames and disk' });
           const input = h('input', { class: 'va-in', type: 'number', min: 0, max: 9999, value: '5000', 'aria-label': 'Virtual address', onkeydown: (e) => { if (e.key === 'Enter') go(); } });
@@ -699,20 +698,20 @@
             explain(); draw();
           }
           async function handle() {
-            const { p, off } = st.res; busy = true;
+            const { p, off } = st.res; busy = true; const g = gen, live = () => ctx.alive && g === gen;
             say.className = 'fb bad'; say.innerHTML = `<b>Page fault interrupt.</b> The OS takes over and blocks the process while it reads page ${p} from disk block ${50 + p}.`;
-            draw(); await ctx.sleep(1200); if (!ctx.alive) return;
+            draw(); await ctx.sleep(1200); if (!live()) return;
             let f = st.frames.indexOf(null), note;
             if (f < 0) { const v = st.order.shift(); f = st.table[v]; st.table[v] = null; note = `No frame is free, so the OS evicts page ${v}, the one in memory longest (saved to disk if changed).`; }
             else note = `Frame ${f} is free.`;
             st.frames[f] = p; st.table[p] = f; st.order.push(p); st.hl = { row: p, frame: f };
             say.innerHTML = `${note} The OS copies page ${p} into frame ${f} and updates the page table.`;
-            draw(); await ctx.sleep(1200); if (!ctx.alive) return;
+            draw(); await ctx.sleep(1200); if (!live()) return;
             busy = false; translate(st.va, true);
             say.className = 'fb ok'; say.innerHTML = `The instruction restarts. Now the MMU finds page ${p} in frame ${f}: real address ${f} × 1024 + ${off} = <b>${f * PAGE + off}</b>.`;
           }
           function go(v) { if (busy) return; const va = v != null ? v : Math.round(Number(input.value)); if (!Number.isFinite(va) || va < 0) return; input.value = String(va); translate(va); }
-          function reset() { if (busy) return; st = fresh(); say.className = 'fb'; say.innerHTML = 'Pick an address above. Try the ones that land <b>on disk</b>, then keep going until memory is full.'; brk.innerHTML = '<div class="muted">The page number and offset will appear here.</div>'; draw(); }
+          function reset() { gen++; busy = false; st = fresh(); say.className = 'fb'; say.innerHTML = 'Pick an address above. Try the ones that land <b>on disk</b>, then keep going until memory is full.'; brk.innerHTML = '<div class="muted">The page number and offset will appear here.</div>'; draw(); }
           el.append(h('div', { class: 'split l fill' },
             h('div', { class: 'stack', style: { gap: '10px' } },
               h('p', { class: 'm0', html: '<span class="t">Paging</span> cuts every program into fixed-size <b>pages</b> (here 1,024 bytes) and main memory into same-size <b>frames</b>. A <span class="t">virtual address</span> is a page number plus an offset. On every access the <span class="t">memory management unit (MMU)</span> looks it up in the <span class="t">page table</span>.' }),
@@ -797,7 +796,7 @@
         render(el, ctx) {
           const { h, s } = ctx;
           const CAP = 4;                                   // processes that fit in main memory
-          let st, busy = false;
+          let st, busy = false, gen = 0;                   // gen: bumped by Reset so an event chain already in flight stops
           const fresh = () => ({ run: 'P1', rq: ['P2', 'P3'], dq: ['P4'], pq: [], lt: ['P5', 'P6'], next: 7, done: 0, sw: 0, moved: null, path: null });
           const inMem = () => (st.run ? 1 : 0) + st.rq.length + st.dq.length + st.pq.length;
           const svg = s('svg', { viewBox: '0 0 660 322', width: '100%', role: 'img', 'aria-label': 'Long-term, short-term and I/O queues feeding the processor' });
@@ -834,8 +833,8 @@
           }
           const btns = [];
           const btn = (label, cls, fn) => { const b = h('button', { class: 'btn sm ' + cls, type: 'button', onclick: () => { if (!busy) run(fn); } }, label); btns.push(b); return b; };
-          async function run(fn) { busy = true; btns.forEach((b) => (b.disabled = true)); await fn(); if (!ctx.alive) return; busy = false; btns.forEach((b) => (b.disabled = false)); }
-          const beat = async (hi, path, moved, html) => { lit(hi); st.path = path; st.moved = moved; say.className = 'fb'; say.innerHTML = html; draw(); await ctx.sleep(1000); return ctx.alive; };
+          async function run(fn) { const g = gen; busy = true; btns.forEach((b) => (b.disabled = true)); await fn(); if (!ctx.alive || g !== gen) return; busy = false; btns.forEach((b) => (b.disabled = false)); }
+          const beat = async (hi, path, moved, html) => { const g = gen; lit(hi); st.path = path; st.moved = moved; say.className = 'fb'; say.innerHTML = html; draw(); await ctx.sleep(1000); return ctx.alive && g === gen; };
           async function dispatch() {
             if (st.run) return true;
             if (!st.rq.length) return beat(3, null, null, 'The short-term queue is empty, so the <b>processor sits idle</b> until an interrupt brings a process back.');
@@ -870,7 +869,7 @@
               if (!(await beat(2, null, p, `New job <b>${p}</b> arrives and joins the long-term queue. ${inMem() >= CAP ? 'Memory already holds ' + CAP + ' processes; admitting more would overcommit it, so ' + p + ' must wait.' : 'There is room in memory, so it can be admitted.'}`))) return;
               if (await admit()) await dispatch(); },
           };
-          function reset() { if (busy) return; st = fresh(); lit(-1); say.className = 'fb'; say.innerHTML = 'P1 is running. Fire an event on the left: every event goes to the OS, which then decides who runs next.'; draw(); }
+          function reset() { gen++; busy = false; btns.forEach((b) => (b.disabled = false)); st = fresh(); lit(-1); say.className = 'fb'; say.innerHTML = 'P1 is running. Fire an event on the left: every event goes to the OS, which then decides who runs next.'; draw(); }
           const group = (label, ...b) => h('div', { class: 'ctl' }, h('h4', {}, label), h('div', { class: 'row', style: { gap: '6px' } }, b));
           el.append(h('div', { class: 'split l fill' },
             h('div', { class: 'stack', style: { gap: '9px' } },

@@ -1,5 +1,5 @@
 /* Section 2.6 — OS Design Considerations for Multiprocessor and Multicore
-   Original teaching material, built step by step (see AUTHORING.txt).
+   Original teaching material, built step by step.
    Helpers live in this IIFE so nothing leaks into the global scope. */
 (() => {
   /* ------------------------------------------------------------------ shared helpers */

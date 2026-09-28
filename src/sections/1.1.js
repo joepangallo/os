@@ -732,6 +732,7 @@
             paint();
           }
           function reset() {
+            running = false; // Reset (and every setting change) stops the typist: nothing arrives until the student presses Start again
             tick = 0; pos = 0; buf = []; typed = []; mem = ''; nTyped = 0; nOk = 0; nLost = 0;
             event = 'Press <b>Start typing</b>, or <b>One key</b> to go slowly. The typist never waits: keys arrive whether or not anyone is ready for them.';
             paint();

@@ -1,5 +1,5 @@
 /* Section 2.2 — The Evolution of Operating Systems
-   Original teaching material. Built step by step (see AUTHORING.txt). */
+   Original teaching material. Built step by step. */
 Guide.section({
   id: '2.2',
   title: 'The Evolution of Operating Systems',

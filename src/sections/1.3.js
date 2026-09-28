@@ -124,7 +124,11 @@
       .sec-1-3 .cell-in.bad { border-color: var(--bad); background: var(--bad-bg); }
       .sec-1-3 .mrow { display: grid; grid-template-columns: 38px 76px minmax(0, 1fr); gap: 8px; align-items: center; padding: 2px 6px; border-radius: 9px; border: 2px solid transparent; }
       .sec-1-3 .mrow.pc { background: var(--cpu-bg); border-color: var(--cpu); }
-      .sec-1-3 .mrow .hint { font-family: var(--mono); font-size: 13px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .sec-1-3 .mrow .hint { font-family: var(--mono); font-size: 13px; line-height: 1.2; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .sec-1-3 .mrow .hint .was { font-family: var(--font); font-size: 12.5px; font-weight: 700; color: var(--warn); }
+      .sec-1-3 .cell-in.wr { border-color: var(--warn); background: var(--hl); }
+      .sec-1-3 .mrow.just .cell-in { outline: 3px solid var(--warn); outline-offset: 1px; }
+      .sec-1-3 .live-key { display: inline-block; width: 12px; height: 12px; border-radius: 3px; border: 2px solid var(--warn); background: var(--hl); vertical-align: -1px; margin-right: 4px; }
     `,
 
     steps: [
@@ -619,15 +623,18 @@
             ['Double a number', [0x1940, 0x5940, 0x2941, 0, 0, 0], [7, 0, 0, 0], 0x941],
             ['A negative number', [0x1940, 0x5941, 0x2942, 0, 0, 0], [0x8005, 2, 0, 0], 0x942],
           ];
-          const inputs = {}, hints = {}, rows = {};
+          // src = the words the student typed (their program + data). The boxes show LIVE memory while the machine runs;
+          // Reset (or any edit) reloads memory from src, so a program that rewrote itself gets its original words back.
+          const inputs = {}, hints = {}, rows = {}, src = {};
           const mk = (a) => {
             const inp = h('input', { type: 'text', maxlength: 4, spellcheck: 'false', class: 'cell-in', 'aria-label': 'Contents of address ' + hex(a, 3) });
-            inp.addEventListener('input', () => { inp.classList.toggle('bad', parseHex(inp.value) == null); resetMachine('Memory edited, so the machine was reset. Press Step or Run.'); });
+            inp.addEventListener('input', () => { src[a] = inp.value; resetMachine('Memory edited, so the machine was reset and your program reloaded. Press Step or Run.'); });
             inputs[a] = inp; hints[a] = h('span', { class: 'hint' });
             rows[a] = h('div', { class: 'mrow' }, h('span', { class: 'mono b' }, hex(a, 3)), inp, hints[a]);
             return rows[a];
           };
-          const image = () => { const m = new Map(); [...PA, ...DA].forEach((a) => m.set(a, parseHex(inputs[a].value) ?? 0)); return m; };
+          const image = () => { const m = new Map(); [...PA, ...DA].forEach((a) => m.set(a, parseHex(src[a]) ?? 0)); return m; };
+          const meaning = (a, w) => (DA.includes(a) ? '= ' + (signed(w) || '0') : w === 0 ? 'halt (stop)' : OPS[opOf(w)] ? OPS[opOf(w)].short(addrOf(w)) : 'opcode ' + opOf(w) + ': unknown here');
           let M;
           const regs = h('div', { class: 'row gap-s' });
           const log = h('div', { class: 'log grow', style: { minHeight: '120px' } });
@@ -635,36 +642,54 @@
           const sel = h('select', { class: 'mono', style: { font: 'inherit', fontSize: '15px', padding: '4px 6px', borderRadius: '8px', border: '1px solid var(--line-2)', background: 'var(--panel)', color: 'var(--ink)' } }, DA.map((a) => h('option', { value: a }, hex(a, 3))));
           const pred = h('input', { type: 'text', maxlength: 4, class: 'cell-in', placeholder: '????', 'aria-label': 'Your predicted value in hex' });
           function resetMachine(msg) {
-            M = { pc: 0x300, ir: null, ac: 0, mem: image(), halted: false, cycles: 0, why: '' };
+            M = { pc: 0x300, ir: null, ac: 0, mem: image(), halted: false, cycles: 0, why: '', wrote: null, selfMod: '', selfModAt: null };
             log.replaceChildren(h('div', { class: 'muted' }, msg || 'Ready. PC = 300.'));
+            Object.values(rows).forEach((r) => r.classList.remove('flash'));   // no leftover glow from before the reset
             paint();
           }
           function paint() {
             regs.replaceChildren(...[['PC', hex(M.pc, 3)], ['IR', M.ir == null ? '––––' : hex(M.ir)], ['AC', hex(M.ac) + ' (' + (signed(M.ac) || '0') + ')']].map(([n, v]) => h('span', { class: 'chip cpu mono' }, n + ' ' + v)), h('span', { class: 'chip mono' }, 'cycles ' + M.cycles));
-            PA.forEach((a) => {
-              const w = parseHex(inputs[a].value), op = w == null ? null : opOf(w), O = OPS[op];
-              hints[a].textContent = w == null ? 'not a hex word' : w === 0 ? 'halt (stop)' : O ? O.short(addrOf(w)) : 'opcode ' + op + ': unknown here';
-              rows[a].classList.toggle('pc', !M.halted && M.pc === a);
+            // every box shows the word in memory NOW, decoded fresh on every paint (so a rewritten instruction shows its new meaning)
+            [...PA, ...DA].forEach((a) => {
+              const orig = parseHex(src[a]), live = M.mem.get(a) ?? 0, changed = live !== (orig ?? 0), inp = inputs[a];
+              const shown = changed ? hex(live) : (src[a] ?? '');
+              if (inp.value !== shown) inp.value = shown;   // unchanged cells keep exactly what the student typed
+              inp.classList.toggle('bad', !changed && orig == null);
+              inp.classList.toggle('wr', changed);
+              hints[a].replaceChildren(!changed && orig == null ? 'not a hex word' : meaning(a, live),
+                ...(changed ? [h('br'), h('span', { class: 'was' }, 'changed · was ' + (orig == null ? '????' : hex(orig)))] : []));
+              rows[a].classList.toggle('pc', PA.includes(a) && !M.halted && M.pc === a);
+              rows[a].classList.toggle('just', M.wrote === a);
             });
-            DA.forEach((a) => {
-              const w0 = parseHex(inputs[a].value) ?? 0, now = M.mem.get(a) ?? 0;
-              hints[a].innerHTML = now !== w0 ? `<b style="color:var(--warn)">now ${hex(now)} (${signed(now) || '0'})</b>` : '= ' + (signed(w0) || '0');
-            });
-            if (!M.halted) verdict.innerHTML = '<span class="muted">Type your prediction, then press <b>Run to the end</b> (or step one cycle at a time).</span>';
+            if (!M.halted) verdict.innerHTML = M.selfMod || '<span class="muted">Type your prediction, then press <b>Run to the end</b> (or step one cycle at a time).</span>';
             else {
               const cell = +sel.value, v = M.mem.get(cell) ?? 0, p = parseHex(pred.value);
               verdict.innerHTML = `<b>${M.why}</b> Cell ${hex(cell, 3)} holds <b class="mono">${hex(v)}</b> (${signed(v) || '0'}). ` +
-                (p == null ? 'You did not enter a prediction.' : p === v ? '<b style="color:var(--ok)">✓ Your prediction was right.</b>' : `<b style="color:var(--bad)">✗ You predicted ${hex(p)}.</b> Step through again and watch the AC.`);
+                (p == null ? 'You did not enter a prediction.' : p === v ? '<b style="color:var(--ok)">✓ Your prediction was right.</b>' : `<b style="color:var(--bad)">✗ You predicted ${hex(p)}.</b> Step through again and watch the AC.`) +
+                (M.selfModAt != null ? ` <span style="color:var(--warn)">Along the way the program rewrote its own instruction at ${hex(M.selfModAt, 3)}.</span>` : '');
             }
           }
           function cycle() {
             if (M.halted) return;
             const at = M.pc, w = M.mem.get(at) ?? 0, op = opOf(w), a = addrOf(w);
-            M.ir = w; M.pc = (at + 1) & 0xFFF; M.cycles++;
+            M.ir = w; M.pc = (at + 1) & 0xFFF; M.cycles++; M.wrote = null;
             let line;
             if (op === 0) { M.halted = true; M.why = `Halted after ${M.cycles} cycles.`; line = 'halt: the machine stops'; }
             else if (op === 1) { M.ac = M.mem.get(a) ?? 0; line = `load: AC ← [${hex(a, 3)}] = ${hex(M.ac)}`; }
-            else if (op === 2) { M.mem.set(a, M.ac); line = `store: [${hex(a, 3)}] ← AC = ${hex(M.ac)}` + (PA.includes(a) ? ' (it overwrote an instruction!)' : ''); }
+            else if (op === 2) {
+              const old = M.mem.get(a) ?? 0;
+              M.mem.set(a, M.ac); M.wrote = a;
+              line = `store: [${hex(a, 3)}] ← AC = ${hex(M.ac)}`;
+              if (PA.includes(a)) {
+                // a store into the program area: the program has just rewritten one of its own instructions
+                line += old === M.ac ? ' (an instruction cell, but it already held that word)' : ` (it overwrote the instruction ${hex(old)}!)`;
+                if (old !== M.ac) {
+                  M.selfModAt = a;
+                  const when = a === M.pc ? 'The very next fetch' : a > M.pc ? `When the PC reaches ${hex(a, 3)}, the fetch` : `Cell ${hex(a, 3)} has already run, but any later fetch from it`;
+                  M.selfMod = `<b style="color:var(--warn)">The program rewrote itself.</b> Cell ${hex(a, 3)} held the instruction <b class="mono">${hex(old)}</b>; the store replaced it with <b class="mono">${hex(M.ac)}</b>. Instructions and data share one memory, so the processor cannot tell them apart. ${when} gets the new word: <span class="mono">${meaning(a, M.ac)}</span>. Reset puts your program back.`;
+                }
+              }
+            }
             else if (op === 5) {
               const sum = toInt(M.ac) + toInt(M.mem.get(a) ?? 0);
               M.ac = fromInt(sum);
@@ -675,8 +700,10 @@
             log.append(h('div', {}, h('b', {}, `#${M.cycles}  `), `fetch ${hex(at, 3)}: ${hex(w)} → `, line));
             log.scrollTop = log.scrollHeight;
             paint();
+            const r = M.wrote != null && rows[M.wrote];
+            if (r) { r.classList.remove('flash'); void r.offsetWidth; r.classList.add('flash'); }   // one-shot glow on the cell just written
           }
-          const load = (k) => { const [, P, D, cell] = PRESETS[k]; PA.forEach((a, i) => { inputs[a].value = hex(P[i]); inputs[a].classList.remove('bad'); }); DA.forEach((a, i) => { inputs[a].value = hex(D[i]); inputs[a].classList.remove('bad'); }); sel.value = cell; pred.value = ''; resetMachine('Loaded “' + PRESETS[k][0] + '”. Predict, then run.'); };
+          const load = (k) => { const [, P, D, cell] = PRESETS[k]; PA.forEach((a, i) => { src[a] = hex(P[i]); }); DA.forEach((a, i) => { src[a] = hex(D[i]); }); sel.value = cell; pred.value = ''; resetMachine('Loaded “' + PRESETS[k][0] + '”. Predict, then run.'); };
           sel.addEventListener('change', () => paint());
           pred.addEventListener('input', () => { if (M.halted) paint(); });
           el.append(h('div', { class: 'split r fill' },
@@ -685,7 +712,7 @@
               h('div', { class: 'grid-2', style: { gap: '10px', alignItems: 'start' } },
                 h('div', { class: 'card mem tight stack', style: { gap: '4px' } }, h('h4', { class: 'm0' }, 'Program (edit any word)'), PA.map(mk)),
                 h('div', { class: 'stack', style: { gap: '10px' } },
-                  h('div', { class: 'card mem tight stack', style: { gap: '4px' } }, h('h4', { class: 'm0' }, 'Data'), DA.map(mk)),
+                  h('div', { class: 'card mem tight stack', style: { gap: '4px' } }, h('div', { class: 'row', style: { justifyContent: 'space-between', flexWrap: 'nowrap' } }, h('h4', { class: 'm0' }, 'Data'), h('span', { class: 'xs muted', title: 'The boxes show memory as it is right now. Reset puts back the words you typed.' }, h('span', { class: 'live-key' }), 'changed by the program')), DA.map(mk)),
                   h('div', { class: 'card tight xs', html: '<b>Opcodes:</b> 1 = load AC · 2 = store AC · 5 = add to AC. <b>0000</b> = halt, a stop code added just for this lab. Numbers use sign-magnitude, so 8005 is −5.' }))),
               h('div', { class: 'callout tip m0 small', 'data-label': 'Challenge' }, 'Start from “3 + 2”. Change exactly one instruction so that cell 941 ends up holding 0006. Predict first, then run it.',
                 ctx.ui.reveal('Show one answer', '<div class="small" style="margin-top:4px">Change 301 from <b class="mono">5941</b> to <b class="mono">5940</b>: the add reads 940 again, so AC = 3 + 3 = 6 and the store writes 0006 into 941.</div>'))),
@@ -693,7 +720,7 @@
               h('h4', { class: 'm0' }, '1 · Predict'),
               h('div', { class: 'row gap-s small' }, 'When it halts, cell', sel, 'will hold', pred, h('span', { class: 'xs muted' }, '(hex)')),
               h('h4', { class: 'm0' }, '2 · Run'),
-              h('div', { class: 'row gap-s' }, h('button', { class: 'btn', onclick: cycle }, 'Step one cycle'), h('button', { class: 'btn primary', onclick: () => { let n = 0; while (!M.halted && n++ < 50) cycle(); } }, 'Run to the end'), h('button', { class: 'btn ghost', onclick: () => resetMachine() }, 'Reset')),
+              h('div', { class: 'row gap-s' }, h('button', { class: 'btn', onclick: cycle }, 'Step one cycle'), h('button', { class: 'btn primary', onclick: () => { let n = 0; while (!M.halted && n++ < 50) cycle(); } }, 'Run to the end'), h('button', { class: 'btn ghost', title: 'Stop, set PC = 300 and reload memory with the words you typed', onclick: () => resetMachine('Reset. Memory reloaded with the words you typed; PC = 300.') }, 'Reset')),
               regs, log, verdict)));
           load(0);
         },
@@ -913,7 +940,7 @@
 </table>
 <p><b>Capacity:</b> 4 opcode bits give 2<sup>4</sup> = 16 different opcodes. 12 address bits give 2<sup>12</sup> = 4,096 (4K) directly addressable words. In general, k bits give 2<sup>k</sup> patterns; a 16-bit instruction with a 6-bit opcode would leave 10 address bits, reaching 2<sup>10</sup> = 1,024 words.</p>
 <p><b>Hexadecimal</b> is used because each hex digit is exactly four bits. So the first hex digit of an instruction word is its opcode and the last three are its address. Worked example: 1940 hex = 0001 1001 0100 0000 → opcode 0001 (load AC), address 940. Note that 940 is hex: 9×256 + 4×16 = 2,368 in decimal. As a data word, 8005 hex = 1000 0000 0000 0101 → sign 1 (negative), magnitude 5, value −5.</p>
-<p>Memory cannot tell instructions from data. A word acts as an instruction when the PC fetches it, and as data when an instruction’s address field points at it.</p>
+<p>Memory cannot tell instructions from data. A word acts as an instruction when the PC fetches it, and as data when an instruction’s address field points at it. One consequence: a store whose address points into the program area overwrites an instruction, so the program changes itself. The next time the PC reaches that cell, the processor fetches and runs the new word, not the one the programmer wrote.</p>
 <h3>5. Tracing the example program (3 + 2)</h3>
 <p>Memory before the run: program at 300: <b>1940</b>, 301: <b>5941</b>, 302: <b>2941</b>; data at 940: <b>0003</b>, 941: <b>0002</b>. The PC starts at 300. Three instruction cycles make six stages ([x] means “the word stored at address x”):</p>
 <table>

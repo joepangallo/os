@@ -1,5 +1,5 @@
 /* Section 2.8 Traditional Unix Systems
-   Original teaching material. Built step by step (see AUTHORING.txt).
+   Original teaching material. Built step by step.
    Helpers live in this IIFE so nothing leaks into the global scope. */
 (() => {
   /* ------------------------------------------------------------------ shared helper

@@ -2,6 +2,8 @@
 
 Reviewed 2026-09-27. Recommendations only; the HTML and its implementation sources were not changed.
 
+Follow-up on 2026-09-28: many findings below have now been fixed. See [the follow-up review](REVIEW-ch1-5-followup.md) for current recommendations. The original clone-flag recommendation was incorrect for newer Linux kernels and is corrected below.
+
 The desktop presentation, semantic colors, worked examples, step-through simulations, glossary, and varied self-check questions provide a strong foundation. Keep that structure. Prioritize the functional and teaching issues below before adding more material.
 
 ## Fix first
@@ -12,7 +14,7 @@ At 390 × 844, the Start button extends beyond the visible canvas, the hero text
 
 Stack the hero and Start button vertically in narrow mode, reduce the mobile heading size, and use one column for the chapter cards. Also make Section notes available through a touch-accessible menu; its toolbar button is currently hidden in narrow mode.
 
-Sources: [home layout](/Users/joepangallo/keiser/os/src/shell/shell.js:534), [chapter card grid](/Users/joepangallo/keiser/os/src/shell/shell.css:499), [narrow-mode rules](/Users/joepangallo/keiser/os/src/shell/shell.css:160).
+Sources: [home layout](src/shell/shell.js:534), [chapter card grid](src/shell/shell.css:499), [narrow-mode rules](src/shell/shell.css:160).
 
 ### 2. Make Continue resume the learner's location
 
@@ -20,7 +22,7 @@ Reproduced: navigate to `3.2/5`, then select Home. The stored last location beco
 
 Store the last learning slide separately from the currently displayed page, and track the last location within each chapter.
 
-Sources: [navigation](/Users/joepangallo/keiser/os/src/shell/shell.js:386), [Home resume calculation](/Users/joepangallo/keiser/os/src/shell/shell.js:529), [chapter Continue](/Users/joepangallo/keiser/os/src/shell/shell.js:581).
+Sources: [navigation](src/shell/shell.js:386), [Home resume calculation](src/shell/shell.js:529), [chapter Continue](src/shell/shell.js:581).
 
 ### 3. Preserve quiz attempts across navigation and resizing
 
@@ -28,7 +30,7 @@ Reproduced on `1.1/9`: answer a question, then leave and return, or resize from 
 
 Retain answers, attempts, current question, and the sampled question IDs for chapter/final challenges. Preserve simulation state when changing layout where practical. A layout change should not discard learning work.
 
-Sources: [resize handler](/Users/joepangallo/keiser/os/src/shell/shell.js:438), [quiz state](/Users/joepangallo/keiser/os/src/shell/shell.js:880), [saved score](/Users/joepangallo/keiser/os/src/shell/shell.js:894).
+Sources: [resize handler](src/shell/shell.js:438), [quiz state](src/shell/shell.js:880), [saved score](src/shell/shell.js:894).
 
 ### 4. Make navigation and exercises work with a keyboard
 
@@ -36,29 +38,29 @@ Contents entries are clickable `div` elements without keyboard interaction. Tab 
 
 Use native links/buttons for navigation; make inactive drawers hidden or inert; manage focus when opening and closing overlays; implement keyboard selection for tabs; and keep global shortcuts from consuming keys intended for an active widget.
 
-Sources: [Contents entries](/Users/joepangallo/keiser/os/src/shell/shell.js:1178), [closed drawers](/Users/joepangallo/keiser/os/src/shell/shell.css:193), [tabs](/Users/joepangallo/keiser/os/src/shell/shell.js:727), [global shortcuts](/Users/joepangallo/keiser/os/src/shell/shell.js:1273).
+Sources: [Contents entries](src/shell/shell.js:1178), [closed drawers](src/shell/shell.css:193), [tabs](src/shell/shell.js:727), [global shortcuts](src/shell/shell.js:1273).
 
 ## Correct the teaching examples
 
 ### Dedicated-core comparison changes the workload
 
-[Section 2.6, step 7](/Users/joepangallo/keiser/os/src/sections/2.6.js:847) schedules 12 threads in shared mode but only eight in dedicated mode. A3, B3, C3, and D3 disappear. The narration does mention one worker per dedicated core, but it does not explain how the original work is redistributed before comparing switching costs.
+[Section 2.6, step 7](src/sections/2.6.js:847) schedules 12 threads in shared mode but only eight in dedicated mode. A3, B3, C3, and D3 disappear. The narration does mention one worker per dedicated core, but it does not explain how the original work is redistributed before comparing switching costs.
 
 Keep the same runnable threads and show scheduling within each process, or explicitly describe different worker configurations and compare the same completed work. Equal process-level core-slices alone do not establish an equivalent workload.
 
 ### The fork-output question needs an output-buffering assumption
 
-[Section 3.6's quiz](/Users/joepangallo/keiser/os/src/sections/3.6.js:1015) requires six lines for `fork(); printf("A\n"); fork(); printf("B\n");`. Running this with captured stdout produced eight lines: four A and four B. The second fork duplicates the unflushed A buffer.
+[Section 3.6's quiz](src/sections/3.6.js:1015) requires six lines for `fork(); printf("A\n"); fork(); printf("B\n");`. Running this with captured stdout produced eight lines: four A and four B. The second fork duplicates the unflushed A buffer.
 
-Add `fflush(stdout)` before the second fork, explicitly assume unbuffered output, or ask how many `printf` calls execute. The [notes](/Users/joepangallo/keiser/os/src/sections/3.6.js:1090) also omit newlines while discussing line counts. References: [POSIX fork](https://pubs.opengroup.org/onlinepubs/9799919799/functions/fork.html), [POSIX fflush](https://pubs.opengroup.org/onlinepubs/9699919799.2013edition/functions/fflush.html).
+Add `fflush(stdout)` before the second fork, explicitly assume unbuffered output, or ask how many `printf` calls execute. The [notes](src/sections/3.6.js:1090) also omit newlines while discussing line counts. References: [POSIX fork](https://pubs.opengroup.org/onlinepubs/9799919799/functions/fork.html), [POSIX fflush](https://pubs.opengroup.org/onlinepubs/9699919799.2013edition/functions/fflush.html).
 
-### The clone lab accepts an invalid flag combination
+### Withdrawn: the clone-flag recommendation
 
-[Section 4.6's validation](/Users/joepangallo/keiser/os/src/sections/4.6.js:187) omits the invalid combination `CLONE_NEWPID` plus `CLONE_PARENT`. In step 5, start with the fork preset and enable both: the guide reports a successful new process. Add the missing check and corresponding explanation. Linux returns `EINVAL` for this combination. Reference: [Linux clone manual](https://man7.org/linux/man-pages/man2/clone.2.html).
+Correction, 2026-09-28: my original recommendation to reject `CLONE_NEWPID` plus `CLONE_PARENT` unconditionally was wrong for newer Linux kernels. It followed an outdated statement in the clone manual. The [Linux 3.12 source](https://github.com/torvalds/linux/blob/v3.12/kernel/fork.c) includes CLONE_PARENT in the relevant rejection; the [Linux 3.13 source](https://github.com/torvalds/linux/blob/v3.13/kernel/fork.c) removes it. The updated guide's version-qualified explanation is correct. Do not add the originally recommended unconditional rejection.
 
 ### Shared code does not imply shared writable globals
 
-[Section 5.2's echo example](/Users/joepangallo/keiser/os/src/sections/5.2.js:949), repeated in its notes, says sharing one copy of the routine means its globals are shared. Processes can share code while retaining separate writable globals.
+[Section 5.2's echo example](src/sections/5.2.js:949), repeated in its notes, says sharing one copy of the routine means its globals are shared. Processes can share code while retaining separate writable globals.
 
 State explicitly that `chin` and `chout` are placed in shared memory, or make the callers threads of the same process. The demonstrated race remains useful with that assumption made explicit. Reference: [Microsoft DLL data documentation](https://learn.microsoft.com/en-us/windows/win32/dlls/dynamic-link-library-data).
 
@@ -66,11 +68,11 @@ State explicitly that `chin` and `chout` are placed in shared memory, or make th
 
 | Location | Recommended clarification |
 | --- | --- |
-| [1.3 quiz](/Users/joepangallo/keiser/os/src/sections/1.3.js:836) | Qualify “PC increases by one” as a rule of the word-addressed teaching machine. The notes already explain instruction-length increments. |
-| [1.6 cache recap](/Users/joepangallo/keiser/os/src/sections/1.6.js:956) | Say hardware normally handles fills and replacement; do not say caches are entirely invisible to the OS. The notes already discuss explicit cache maintenance. |
-| [3.6 nonpreemptible kernel](/Users/joepangallo/keiser/os/src/sections/3.6.js:1048) | Distinguish involuntary preemption from voluntarily blocking inside kernel code. |
-| [4.1 shared memory](/Users/joepangallo/keiser/os/src/sections/4.1.js:1170) | Replace “seen at once” with shared address space plus synchronization for reliable visibility and ordering. This also aligns with section 5.1's memory-order discussion. |
-| [5.7 readers/writers quiz](/Users/joepangallo/keiser/os/src/sections/5.7.js:1052) | A writer may read before modifying data. Describe readers as read-only and writers as requiring exclusive access, or label the narrower roles as exercise assumptions. |
+| [1.3 quiz](src/sections/1.3.js:836) | Qualify “PC increases by one” as a rule of the word-addressed teaching machine. The notes already explain instruction-length increments. |
+| [1.6 cache recap](src/sections/1.6.js:956) | Say hardware normally handles fills and replacement; do not say caches are entirely invisible to the OS. The notes already discuss explicit cache maintenance. |
+| [3.6 nonpreemptible kernel](src/sections/3.6.js:1048) | Distinguish involuntary preemption from voluntarily blocking inside kernel code. |
+| [4.1 shared memory](src/sections/4.1.js:1170) | Replace “seen at once” with shared address space plus synchronization for reliable visibility and ordering. This also aligns with section 5.1's memory-order discussion. |
+| [5.7 readers/writers quiz](src/sections/5.7.js:1052) | A writer may read before modifying data. Describe readers as read-only and writers as requiring exclusive access, or label the narrower roles as exercise assumptions. |
 
 Supporting references: [Linux cache maintenance](https://cdn.kernel.org/doc/html/latest/core-api/cachetlb.html), [Apple synchronization](https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/Multithreading/ThreadSafety/ThreadSafety.html), [Oracle read/write lock example](https://docs.oracle.com/en/java/javase/24/docs/api/java.base/java/util/concurrent/locks/ReentrantReadWriteLock.html).
 

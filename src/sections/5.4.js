@@ -971,7 +971,8 @@ void consumer() {              // the consumer process
             C: [['wait n', 'semWait(n);   // need an item'], ['wait s', 'semWait(s);   // lock the buffer'], ['take', 'take();       // item from b[out]'], ['signal s', 'semSignal(s); // unlock the buffer'], ['signal e', 'semSignal(e); // +1 free slot'], ['consume', 'consume();    // use the item']],
             Cbug: [['wait s', 'semWait(s);   // lock first (bug!)'], ['wait n', 'semWait(n);   // then need an item'], ['take', 'take();       // item from b[out]'], ['signal s', 'semSignal(s); // unlock the buffer'], ['signal e', 'semSignal(e); // +1 free slot'], ['consume', 'consume();    // use the item']],
           };
-          let bug = false, running = true, speed = { P: 4, C: 2 }, st, turn = 0, lastMsg = '';
+          // the factory starts stopped; Reset and the mode switch return it to that stopped state
+          let bug = false, running = false, started = false, speed = { P: 4, C: 2 }, st, turn = 0, lastMsg = '';
           const svg = s('svg', { viewBox: ctx.narrow ? '0 0 360 336' : '0 0 480 400', width: '100%', style: { maxHeight: '100%' } });
           const narr = h('div', { class: 'narr', style: { minHeight: '66px' } });
           const startInfo = h('span', { class: 'small muted' });
@@ -981,6 +982,7 @@ void consumer() {              // the consumer process
             st = { sem: { s: { v: 1, q: [] }, n: { v: prefill, q: [] }, e: { v: SIZE - prefill, q: [] } }, buf: Array(SIZE).fill(null), inP: prefill, outP: 0, made: prefill, used: 0, dead: false,
               P: { pc: 0, left: null, blocked: null, item: null }, C: { pc: 0, left: null, blocked: null, item: null } };
             for (let k = 0; k < prefill; k++) st.buf[k] = k + 1;
+            turn = 0; started = false;
             startInfo.innerHTML = `circular <span class="t">bounded buffer</span>, ${SIZE} slots · start: s = 1, n = ${prefill}, e = ${SIZE - prefill}`;
             // the side notes must describe the same starting values as the header above
             if (side.P) side.P.note.innerHTML = noteHTML('P', prefill);
@@ -1053,11 +1055,13 @@ void consumer() {              // the consumer process
               sd.code.clear();
               sd.code.mark(at(who) + 1, p.blocked ? 'bad' : 'cur');
               sd.state.className = 'chip ' + (p.blocked ? (st.dead ? 'bad' : 'warn') : 'ok');
-              sd.state.textContent = p.blocked ? `blocked on ${p.blocked}` : 'running';
+              sd.state.textContent = p.blocked ? `blocked on ${p.blocked}` : running ? 'running' : 'ready';
               sd.count.textContent = who === 'P' ? `items made: ${st.made}` : `items consumed: ${st.used}`;
             });
             let msg, tone = '';
-            if (st.dead) { msg = '<b><span class="t">Deadlock</span>.</b> The consumer locked the buffer (s) and then went to sleep on n because the buffer was empty, <b>still holding s</b>. The producer needs s to add the very item that would wake the consumer. Each waits for the other forever. Press Reset or switch back to the correct order.'; tone = 'bad'; }
+            if (!started) msg = bug ? 'The consumer now locks s <b>before</b> waiting on n. The buffer starts with 3 items and the consumer is set faster than the producer, so the buffer will drain. Press <b>Run</b> and watch the moment the buffer runs empty.'
+              : `The factory is stopped: an empty buffer with s = 1, n = 0 and e = ${SIZE}. Press <b>Run</b> to start the producer and the consumer, then try making one side much faster than the other.`;
+            else if (st.dead) { msg = '<b><span class="t">Deadlock</span>.</b> The consumer locked the buffer (s) and then went to sleep on n because the buffer was empty, <b>still holding s</b>. The producer needs s to add the very item that would wake the consumer. Each waits for the other forever. Press Reset or switch back to the correct order.'; tone = 'bad'; }
             else if (st.P.blocked === 'e') msg = `<b>Buffer full.</b> The producer called semWait(e) with no free slot announced, so e went to ${S.e.v} and it sleeps until the consumer’s semSignal(e) hands it a slot.${full < SIZE ? ' (A slot the consumer is emptying right now counts only once it calls semSignal(e).)' : ''}`;
             else if (bug && st.C.blocked === 'n') { msg = `<b>Danger.</b> The buffer ran empty, so the consumer’s semWait(n) took n to ${S.n.v} and it fell asleep. But in this order it had <b>already locked s</b>, and it still holds it (s = ${S.s.v}). The producer needs s to add the item that would wake it…`; tone = 'bad'; }
             else if (st.C.blocked === 'n') msg = `<b>Buffer empty.</b> The consumer called semWait(n) with no item announced, so n went to ${S.n.v} and it sleeps until the producer’s semSignal(n). It holds nothing while it sleeps, so the producer can still get in.${full ? ' (An item the producer has just appended counts only once it calls semSignal(n).)' : ''}`;
@@ -1089,17 +1093,20 @@ void consumer() {              // the consumer process
           fresh();
           const left = panel('P'), right = panel('C');
           function rebuildConsumer() { const old = side.C; const nc = ctx.ui.code(prog('C').map((x) => x[1]).join('\n'), { lang: 'c', fontSize: 13.5, nums: false }); old.code.replaceWith(nc); old.code = nc; }
-          const pauseBtn = h('button', { class: 'btn sm', type: 'button', onclick: () => { running = !running; pauseBtn.textContent = running ? 'Pause' : 'Run'; } }, 'Pause');
+          const pauseBtn = h('button', { class: 'btn sm primary', type: 'button', onclick: () => { setRunning(!running); if (running) started = true; draw(); } }, 'Run');
+          function setRunning(v) { running = v; pauseBtn.textContent = v ? 'Pause' : 'Run'; pauseBtn.classList.toggle('primary', !v); }
+          // Reset (and a mode switch) stop the ticker's work and load a fresh, stopped factory
+          function restart() { setRunning(false); fresh(bug ? 3 : 0); draw(); }
           const bugSeg = ctx.ui.seg([{ value: false, label: 'Correct order' }, { value: true, label: 'Swapped semWaits (bug)' }], false, (v) => {
             bug = v; rebuildConsumer();
             // the bug hides while items remain: start with 3 items and a consumer faster than the producer so the buffer drains
             if (v) { side.P.slider.set(2, true); side.C.slider.set(5, true); }
-            fresh(v ? 3 : 0); draw();
+            restart();
           });
           el.append(h('div', { class: 'stack fill', style: { gap: '10px' } },
             h('div', { class: 'row', style: { justifyContent: 'space-between' } },
               h('div', { class: 'row gap-s' }, h('span', { class: 'small b' }, 'Consumer code:'), bugSeg),
-              h('div', { class: 'row gap-s' }, startInfo, pauseBtn, h('button', { class: 'btn sm', type: 'button', onclick: () => { fresh(bug ? 3 : 0); draw(); } }, 'Reset'))),
+              h('div', { class: 'row gap-s' }, startInfo, pauseBtn, h('button', { class: 'btn sm', type: 'button', onclick: restart }, 'Reset'))),
             h('div', { class: 'grow mw0', style: { display: 'grid', gridTemplateColumns: ctx.narrow ? '1fr' : 'minmax(0, 330px) minmax(0, 1fr) minmax(0, 330px)', gap: '16px', minHeight: 0 } },
               left, h('div', { class: 'card white tight', style: { display: 'grid', placeItems: 'center', minHeight: 0 } }, svg), right),
             narr));

@@ -1,5 +1,5 @@
 /* Section 2.9 — Modern Unix Systems
-   Original teaching material. Built step by step (see AUTHORING.txt). */
+   Original teaching material. Built step by step. */
 Guide.section({
   id: '2.9',
   title: 'Modern Unix Systems',

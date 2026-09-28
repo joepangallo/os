@@ -384,8 +384,9 @@
           const L = side('Monitor: condition <code>c</code>', 'cwait(c) · csignal(c)');
           const R = side('Semaphore <code>s</code> (starts at 0)', 'semWait(s) · semSignal(s)');
           const say = h('div', { class: 'card' });
-          let mon, sem, n, lostFlash;
+          let mon, sem, n, lostFlash, gen = 0;   // gen: bumped to cancel a replay step still waiting to run
           function reset() {
+            gen++;
             mon = { q: [], run: [] }; sem = { count: 0, q: [], run: [] }; n = 0; lostFlash = false;
             L.log.innerHTML = ''; R.log.innerHTML = '';
             say.innerHTML = '<b>Ready.</b> Each button does the same thing to both worlds at once. Press <b>Someone signals</b> while nobody is waiting, then <b>A process waits</b>, and compare.';
@@ -433,9 +434,10 @@
             else say.innerHTML = `The monitor wakes <b>${mRes}</b>, still suspended on c. In the semaphore world ${mRes} never blocked, so this signal is saved instead (count ${sem.count}).`;
             paint();
           }
-          const btnW = h('button', { class: 'btn proc', type: 'button', onclick: doWait }, 'A process waits');
-          const btnS = h('button', { class: 'btn intr', type: 'button', onclick: doSignal }, 'Someone signals');
-          const demo = h('button', { class: 'btn sm', type: 'button', onclick: () => { reset(); doSignal(); ctx.after(900, doWait); } }, 'Replay: signal, then wait');
+          // a manual press takes over from a replay in progress, so its pending step is cancelled
+          const btnW = h('button', { class: 'btn proc', type: 'button', onclick: () => { gen++; doWait(); } }, 'A process waits');
+          const btnS = h('button', { class: 'btn intr', type: 'button', onclick: () => { gen++; doSignal(); } }, 'Someone signals');
+          const demo = h('button', { class: 'btn sm', type: 'button', onclick: () => { reset(); doSignal(); const g = gen; ctx.after(900, () => { if (g === gen) doWait(); }); } }, 'Replay: signal, then wait');
           reset();
           el.append(h('div', { class: 'stack fill' },
             h('p', { class: 'm0', html: 'A <span class="t">condition variable</span> is a named waiting line inside the monitor. <code>cwait(c)</code> suspends the caller on <code>c</code> <b>and releases the monitor</b> so another process may enter; <code>csignal(c)</code> resumes one process waiting on <code>c</code>. How does that differ from a semaphore?' }),

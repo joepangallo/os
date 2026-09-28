@@ -3,7 +3,7 @@
    GCD as an OS-managed thread pool, blocks (closures in C), dispatch
    queues (serial, concurrent, main, global), dispatch sources, and the
    "slow work on a global queue, UI update on the main queue" pattern.
-   Original teaching material, built step by step (see AUTHORING.txt).
+   Original teaching material, built step by step.
    ===================================================================== */
 (() => {
   /* ---------- shared helpers (scoped to this file) ---------- */

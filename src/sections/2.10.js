@@ -1,5 +1,5 @@
 /* Section 2.10 — Linux
-   Original teaching material. Built step by step (see AUTHORING.txt). */
+   Original teaching material. Built step by step. */
 Guide.section({
   id: '2.10',
   title: 'Linux',

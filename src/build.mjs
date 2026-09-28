@@ -86,7 +86,7 @@ for (const id of files) {
   if (!sec.summary) warnings.push(`${id}: missing summary`);
   if (!sec.objectives || !sec.objectives.length) warnings.push(`${id}: missing objectives`);
   const blob = JSON.stringify(sec, (k, v) => (typeof v === 'function' ? String(v) : v)) + sources[id];
-  if (/keiser/i.test(blob)) problems.push(`${id}: mentions Keiser — remove`);
+  if (new RegExp('kei' + 'ser', 'i').test(blob)) problems.push(`${id}: mentions the institution name — remove`);
   if (/\/Users\//.test(blob)) problems.push(`${id}: contains a local file path — remove`);
   if (/[\u{1F300}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/u.test(sources[id].replace(/[✓✗✔✘☐☑★☆⚠]/g, ''))) warnings.push(`${id}: contains emoji/dingbats that may render as boxes in the PDF`);
 }
@@ -111,7 +111,11 @@ function otherTerms(included) {
 function assemble(ids) {
   const extra = otherTerms(ids);
   const extraTag = extra.length ? `<script>\nGuide.extraTerms(${JSON.stringify(extra).replace(/<\/script/gi, '<\\/script')});\n</script>` : '';
-  const secTags = ids.filter((id) => sources[id]).map((id) => `<script>\n/* ======================= section ${id} ======================= */\n${sources[id]}\n</script>`).join('\n') + extraTag;
+  // explicit layout metadata: a section whose code anywhere (including helper functions) branches on the
+  // phone layout must be rebuilt when the window crosses the phone breakpoint
+  const layoutTag = (id) => (/\bnarrow\b/.test(sources[id]) ? `\nif (Guide.sections['${id}']) Guide.sections['${id}'].layoutAware = true;` : '');
+  const secTags = ids.filter((id) => sources[id]).map((id) => `<script>\n/* ======================= section ${id} ======================= */\n${sources[id]}${layoutTag(id)}\n</script>`).join('\n') + extraTag
+    + (/\bnarrow\b/.test(chapters) ? '\n<script>Guide.chapters.forEach((c) => { c.layoutAware = true; });</script>' : '');
   return template
     .replace('/*__CSS__*/', () => css)
     .replace('/*__SHELL__*/', () => shell.replace(/<\/script/gi, '<\\/script'))

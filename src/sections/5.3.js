@@ -220,7 +220,7 @@ reg = count;            // in critical section: read count
 count = reg + 1;        // in critical section: write count+1
 /* (no enable) */       // unprotected: nothing to undo`,
           };
-          let S, code, busy = false;
+          let S, code, busy = false, gen = 0;   // gen: bumped by every reset so an older replay loop stops
           const codeBox = h('div');
           const cpuRun = h('span', { class: 'tok p1' }, 'P1');
           const intChip = h('span', { class: 'chip ok' });
@@ -239,6 +239,7 @@ count = reg + 1;        // in critical section: write count+1
           const inside = (pc) => pc === 2 || pc === 3;
 
           function reset(mode) {
+            gen++;
             S = { mode, run: 1, pc: { 1: 0, 2: 0 }, reg: { 1: '–', 2: '–' }, count: 0, done: 0, ints: true, pending: false, violated: false, lost: false };
             code = listing(ctx, SRC[mode], { fontSize: 14 });
             if (mode === 'unprot') code.mark([2, 5], 'dim');
@@ -311,8 +312,9 @@ count = reg + 1;        // in critical section: write count+1
           async function replay() {
             const mode = S.mode;
             reset(mode); busy = true;
+            const g = gen;
             const seq = mode === 'unprot' ? ['run', 'run', 'timer', 'run', 'run', 'run', 'timer', 'run'] : ['run', 'run', 'run', 'timer', 'run', 'run', 'run', 'run'];
-            for (const k of seq) { await ctx.sleep(750); if (!ctx.alive || !busy || S.mode !== mode) return; act(k); }
+            for (const k of seq) { await ctx.sleep(750); if (!ctx.alive || g !== gen) return; act(k); }
             busy = false;
             if (mode === 'prot') paint(['ok', `<b>Replay over: no harm done.</b> The timer fired while ${PN(1)} was inside its critical section, but it was held until ${PN(1)} switched interrupts back on. count = ${S.count}, exactly the number of finished increments. Now try <b>Unprotected</b>.`]);
           }
@@ -477,7 +479,7 @@ bolt = 0;                                      // unlock: put the 0 back
               next: ['One instruction: read bolt, and if it is 0 write 1, all at once. Returned 1? Test again.', 'Use the shared resource, then leave.', 'Write 0 into bolt: the lock is free again.', 'Other work. Then it wants the lock again.'],
             },
           };
-          let mode = 'two', S, P, code, busy = false;
+          let mode = 'two', S, P, code, busy = false, gen = 0;   // gen: bumped by every reset so an older replay loop stops
           const codeBox = h('div');
           const cBolt = cell(ctx, 'bolt');
           const room = h('div', { class: 'room', style: { minWidth: '0' } });
@@ -492,6 +494,7 @@ bolt = 0;                                      // unlock: put the 0 back
             return { st, nx, card };
           });
           function reset(m) {
+            gen++;
             mode = m; P = PROGS[m];
             S = { pc: { 1: 0, 2: 0 }, bolt: 0, spins: { 1: 0, 2: 0 }, spinNow: { 1: false, 2: false }, overlaps: 0, both: false };
             code = listing(ctx, P.src, { fontSize: 13 });
@@ -545,7 +548,8 @@ bolt = 0;                                      // unlock: put the 0 back
           async function replay() {
             const m = mode;
             reset(m); busy = true;
-            for (const p of [1, 2, 1, 2, 1, 2]) { await ctx.sleep(800); if (!ctx.alive || !busy || mode !== m) return; stepP(p); }
+            const g = gen;
+            for (const p of [1, 2, 1, 2, 1, 2]) { await ctx.sleep(800); if (!ctx.alive || g !== gen) return; stepP(p); }
             busy = false;
           }
           const seg = ctx.ui.seg([{ value: 'two', label: 'Two steps: test, then set' }, { value: 'cas', label: 'One atomic instruction' }], 'two', (m) => { busy = false; reset(m); });
@@ -714,7 +718,7 @@ void P(int i) {                // every process runs this code
           /* ---- the machine: bolt in memory, one key register per process ---- */
           const BX = 235, BY = 56, KX = [80, 235, 390], KY = 196;
           const svg = s('svg', { viewBox: '0 0 470 236', width: '100%', role: 'img', 'aria-label': 'bolt in memory and the three private keys' });
-          let S, busy = false;
+          let S, busy = false, gen = 0;   // gen: bumped by Reset so a swap already in flight is ignored
           const say = verdict(ctx);
           const inv = h('div', { class: 'card white tight center mono', style: { fontSize: '14.5px', whiteSpace: ctx.narrow ? 'normal' : 'nowrap' } });
           const meaning = h('div', { class: 'small center', style: { minHeight: '22px' } });
@@ -758,6 +762,7 @@ void P(int i) {                // every process runs this code
             if (v) say.say(v[0], v[1]);
           }
           function reset() {
+            gen++;
             S = { bolt: 0, key: [1, 1, 1], st: ['rem', 'rem', 'rem'], broken: false };
             busy = false;
             paint(['info', '<b>You are the scheduler.</b> Step any process. A waiting process swaps its key with bolt and checks whether it pulled out the 0. Watch the sum above: no order of steps can change it.']);
@@ -767,9 +772,10 @@ void P(int i) {                // every process runs this code
             const tb = svg.querySelector('[data-slot="b"]'), tk = svg.querySelector('[data-slot="k' + p + '"]');
             const dx = KX[p - 1] - BX, dy = KY - BY;
             [tb, tk].forEach((t) => (t.style.transition = 'transform .5s ease'));
-            ctx.raf(() => { tb.style.transform = `translate(${dx}px, ${dy}px)`; tk.style.transform = `translate(${-dx}px, ${-dy}px)`; return false; });
+            const g = gen;
+            ctx.raf(() => { if (g === gen) { tb.style.transform = `translate(${dx}px, ${dy}px)`; tk.style.transform = `translate(${-dx}px, ${-dy}px)`; } return false; });
             busy = true;
-            ctx.after(560, () => { busy = false; done(); });
+            ctx.after(560, () => { if (g !== gen) return; busy = false; done(); });
           }
           function stepP(p) {
             const k = p - 1, st = S.st[k];

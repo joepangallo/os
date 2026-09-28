@@ -1,5 +1,5 @@
 /* Section 2.1 — Operating System Objectives and Functions
-   Original teaching material. Built step by step (see AUTHORING.txt). */
+   Original teaching material. Built step by step. */
 Guide.section({
   id: '2.1',
   title: 'Operating System Objectives and Functions',

@@ -726,7 +726,8 @@
             paint();
           }
           let auto = false;
-          const autoBtn = h('button', { class: 'btn', type: 'button', onclick: () => { auto = !auto; autoBtn.classList.toggle('on', auto); autoBtn.textContent = auto ? 'Pause auto-run' : 'Auto-run'; } }, 'Auto-run');
+          const setAuto = (v) => { auto = v; autoBtn.classList.toggle('on', auto); autoBtn.textContent = auto ? 'Pause auto-run' : 'Auto-run'; };
+          const autoBtn = h('button', { class: 'btn', type: 'button', onclick: () => setAuto(!auto) }, 'Auto-run');
           ctx.every(1000, () => { if (auto) stepOnce(); });
           const irqBtn = h('button', { class: 'btn intr', type: 'button', onclick: () => {
             if (st.pending) { ctx.toast('The printer’s request is already waiting.'); return; }
@@ -738,7 +739,7 @@
             if (st.kernel) { ctx.toast('The handler runs with interrupts disabled; RETURN turns them back on.'); enSeg.set(st.en); return; }
             st.en = v; say(v ? 'Interrupts enabled again: a pending request will be noticed at the next interrupt stage.' : 'Interrupts disabled (on a real machine only the OS is allowed to do this). The interrupt stage is now skipped, so any request stays pending.', 'muted'); paint();
           });
-          const resetBtn = h('button', { class: 'btn ghost', type: 'button', onclick: () => { st = fresh(); log.replaceChildren(); say('Reset. Press “Run next stage”, raise an interrupt at any moment, and watch when it is noticed.'); paint(); } }, 'Reset');
+          const resetBtn = h('button', { class: 'btn ghost', type: 'button', onclick: () => { setAuto(false); st = fresh(); log.replaceChildren(); say('Reset. Press “Run next stage”, raise an interrupt at any moment, and watch when it is noticed.'); paint(); } }, 'Reset');
           st = fresh();
           el.append(h('div', { class: 'split fill' },
             h('div', { class: 'stack' }, h('div', { class: 'card white tight' }, panWrap(ctx, svg, 520)),
