@@ -7,602 +7,602 @@
    always memory.
    ===================================================================== */
 
-:root {
-  --font: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+:root { /* :root is the whole page; the custom properties (named values like --bg) set here can be used by every rule below */
+  --font: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; /* --font: the reading typeface; the browser uses the first font in the list that the computer has installed */
+  --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; /* --mono: a fixed-width typeface for code, registers and addresses, so digits line up in columns */
 
-  --bg: #eef1f7;
-  --panel: #ffffff;
-  --panel-2: #f5f7fb;
-  --panel-3: #e9edf5;
-  --ink: #151c2c;
-  --ink-2: #3d4760;
-  --muted: #69738c;
-  --line: #d9deea;
-  --line-2: #c3cadb;
-  --accent: #4f46e5;
-  --accent-bg: #e8e7fd;
-  --accent-ink: #ffffff;
-  --shadow: 0 1px 2px rgba(20, 28, 48, .06), 0 6px 20px rgba(20, 28, 48, .07);
-  --shadow-lg: 0 18px 50px rgba(20, 28, 48, .22);
+  --bg: #eef1f7; /* --bg: the pale blue-grey page background behind all the panels in the light theme */
+  --panel: #ffffff; /* --panel: white, the fill for cards, bars and boxes that sit on top of the background */
+  --panel-2: #f5f7fb; /* --panel-2: a slightly tinted white for boxes nested inside a panel, so the layers stay visible */
+  --panel-3: #e9edf5; /* --panel-3: a deeper tint for a third level of nesting, such as buttons and track bars */
+  --ink: #151c2c; /* --ink: the main text color, a very dark blue that is softer on the eyes than pure black */
+  --ink-2: #3d4760; /* --ink-2: a lighter text color for secondary text such as labels and descriptions */
+  --muted: #69738c; /* --muted: grey text for hints, small print and anything the student can skip */
+  --line: #d9deea; /* --line: the thin border color that outlines panels and cards */
+  --line-2: #c3cadb; /* --line-2: a slightly darker border for controls such as buttons, so they stand out from cards */
+  --accent: #4f46e5; /* --accent: the indigo color for the current selection, the main button and focus rings */
+  --accent-bg: #e8e7fd; /* --accent-bg: a pale indigo fill behind selected items and default callout boxes */
+  --accent-ink: #ffffff; /* --accent-ink: the text color placed on top of an accent-colored fill (white in the light theme) */
+  --shadow: 0 1px 2px rgba(20, 28, 48, .06), 0 6px 20px rgba(20, 28, 48, .07); /* --shadow: a soft two-layer shadow that lifts cards slightly off the background */
+  --shadow-lg: 0 18px 50px rgba(20, 28, 48, .22); /* --shadow-lg: a deeper shadow for things that float above the page, like the menu drawer and pop-ups */
 
   /* semantic colour language (see the legend on the home page) */
-  --cpu: #2563eb;     --cpu-bg: #e1eaff;
-  --mem: #059669;     --mem-bg: #d7f5e8;
-  --io: #ea580c;      --io-bg: #ffe8d6;
-  --os: #7c3aed;      --os-bg: #eee5ff;
-  --proc: #0891b2;    --proc-bg: #d6f3f9;
-  --thread: #db2777;  --thread-bg: #fde2ef;
-  --intr: #dc2626;    --intr-bg: #fde1e1;
-  --ok: #15803d;      --ok-bg: #dcf5e3;
-  --bad: #dc2626;     --bad-bg: #fde1e1;
-  --warn: #b45309;    --warn-bg: #fff0d1;
-  --info: #2563eb;    --info-bg: #e1eaff;
-  --hl: #fde68a;
+  --cpu: #2563eb;     --cpu-bg: #e1eaff; /* --cpu blue marks the processor everywhere; --cpu-bg is the matching pale fill for its boxes */
+  --mem: #059669;     --mem-bg: #d7f5e8; /* --mem green marks memory; --mem-bg is its pale fill */
+  --io: #ea580c;      --io-bg: #ffe8d6; /* --io orange marks input/output devices and modules; --io-bg is its pale fill */
+  --os: #7c3aed;      --os-bg: #eee5ff; /* --os purple marks the operating system itself; --os-bg is its pale fill */
+  --proc: #0891b2;    --proc-bg: #d6f3f9; /* --proc teal marks processes (running programs); --proc-bg is its pale fill */
+  --thread: #db2777;  --thread-bg: #fde2ef; /* --thread pink marks threads (separate paths of execution inside one process); --thread-bg is its pale fill */
+  --intr: #dc2626;    --intr-bg: #fde1e1; /* --intr red marks interrupts (signals that pause the processor); --intr-bg is its pale fill */
+  --ok: #15803d;      --ok-bg: #dcf5e3; /* --ok green marks right answers and success; --ok-bg is its pale fill */
+  --bad: #dc2626;     --bad-bg: #fde1e1; /* --bad red marks wrong answers and errors; --bad-bg is its pale fill */
+  --warn: #b45309;    --warn-bg: #fff0d1; /* --warn amber marks warnings and common mistakes; --warn-bg is its pale fill */
+  --info: #2563eb;    --info-bg: #e1eaff; /* --info blue marks "why it matters" notes; --info-bg is its pale fill */
+  --hl: #fde68a; /* --hl: the yellow highlighter color used by mark tags and by the flash when a value changes */
 
   /* chapter colours */
-  --ch1: #2563eb; --ch2: #7c3aed; --ch3: #0891b2; --ch4: #db2777; --ch5: #ea580c;
-  --chc: var(--accent);
+  --ch1: #2563eb; --ch2: #7c3aed; --ch3: #0891b2; --ch4: #db2777; --ch5: #ea580c; /* one color per chapter (1 blue, 2 purple, 3 teal, 4 pink, 5 orange) for chapter tags and headers */
+  --chc: var(--accent); /* --chc: the color of the chapter now on screen; the script swaps it when the chapter changes, starting from the accent */
 
-  --r-sm: 8px; --r: 12px; --r-lg: 18px;
-  --top-h: 46px; --bot-h: 50px;
-}
+  --r-sm: 8px; --r: 12px; --r-lg: 18px; /* corner rounding sizes: --r (12px) rounds cards and callouts; --r-sm and --r-lg are spare smaller and larger sizes */
+  --top-h: 46px; --bot-h: 50px; /* --top-h and --bot-h: the fixed heights of the top bar and the bottom navigation bar, reused by the page grid */
+} /* ends the light-theme values in :root */
 
-html[data-theme="dark"] {
-  --bg: #0b0f1a;
-  --panel: #151b2b;
-  --panel-2: #1b2235;
-  --panel-3: #232b42;
-  --ink: #e9edf7;
-  --ink-2: #bcc4da;
-  --muted: #8a94ae;
-  --line: #2a3350;
-  --line-2: #3a4566;
-  --accent: #8b85ff;
-  --accent-bg: #27275a;
-  --accent-ink: #0b0f1a;
-  --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 6px 20px rgba(0, 0, 0, .3);
-  --shadow-lg: 0 18px 50px rgba(0, 0, 0, .55);
+html[data-theme="dark"] { /* dark theme: these values replace the ones above when the page's html tag has data-theme="dark" (set by the D key) */
+  --bg: #0b0f1a; /* --bg: the near-black page background for dark mode */
+  --panel: #151b2b; /* --panel: the dark navy fill for cards and bars */
+  --panel-2: #1b2235; /* --panel-2: a slightly lighter navy for boxes nested inside a panel */
+  --panel-3: #232b42; /* --panel-3: a lighter navy again for a third level, such as buttons and track bars */
+  --ink: #e9edf7; /* --ink: near-white main text, so text stays readable on dark panels */
+  --ink-2: #bcc4da; /* --ink-2: light grey-blue secondary text */
+  --muted: #8a94ae; /* --muted: mid grey for hints and small print */
+  --line: #2a3350; /* --line: dark border color for panels and cards */
+  --line-2: #3a4566; /* --line-2: a lighter border for buttons and controls */
+  --accent: #8b85ff; /* --accent: a lighter indigo that shows up well against a dark background */
+  --accent-bg: #27275a; /* --accent-bg: a deep indigo fill behind selected items */
+  --accent-ink: #0b0f1a; /* --accent-ink: dark text on accent fills, because the dark-mode accent is light */
+  --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 6px 20px rgba(0, 0, 0, .3); /* --shadow: a darker shadow, since pale shadows vanish on a dark page */
+  --shadow-lg: 0 18px 50px rgba(0, 0, 0, .55); /* --shadow-lg: a heavier floating shadow for the menu drawer and pop-ups in dark mode */
 
-  --cpu: #6ea0ff;     --cpu-bg: #16254a;
-  --mem: #34d399;     --mem-bg: #0f3327;
-  --io: #fb923c;      --io-bg: #3a2210;
-  --os: #b69cff;      --os-bg: #2a1d4d;
-  --proc: #38c7e6;    --proc-bg: #0e2f38;
-  --thread: #f472b6;  --thread-bg: #3a1429;
-  --intr: #f87171;    --intr-bg: #3d1717;
-  --ok: #4ade80;      --ok-bg: #0f3320;
-  --bad: #f87171;     --bad-bg: #3d1717;
-  --warn: #fbbf24;    --warn-bg: #3a2a0c;
-  --info: #6ea0ff;    --info-bg: #16254a;
-  --hl: #6b5310;
+  --cpu: #6ea0ff;     --cpu-bg: #16254a; /* dark-mode processor blue (brighter) and its deep fill, so the color meaning stays the same in both themes */
+  --mem: #34d399;     --mem-bg: #0f3327; /* dark-mode memory green and its deep fill */
+  --io: #fb923c;      --io-bg: #3a2210; /* dark-mode input/output orange and its deep fill */
+  --os: #b69cff;      --os-bg: #2a1d4d; /* dark-mode operating system purple and its deep fill */
+  --proc: #38c7e6;    --proc-bg: #0e2f38; /* dark-mode process teal and its deep fill */
+  --thread: #f472b6;  --thread-bg: #3a1429; /* dark-mode thread pink and its deep fill */
+  --intr: #f87171;    --intr-bg: #3d1717; /* dark-mode interrupt red and its deep fill */
+  --ok: #4ade80;      --ok-bg: #0f3320; /* dark-mode success green and its deep fill */
+  --bad: #f87171;     --bad-bg: #3d1717; /* dark-mode error red and its deep fill */
+  --warn: #fbbf24;    --warn-bg: #3a2a0c; /* dark-mode warning amber and its deep fill */
+  --info: #6ea0ff;    --info-bg: #16254a; /* dark-mode "why it matters" blue and its deep fill */
+  --hl: #6b5310; /* dark-mode highlighter: a dim gold, because bright yellow would glare on a dark page */
 
-  --ch1: #6ea0ff; --ch2: #b69cff; --ch3: #38c7e6; --ch4: #f472b6; --ch5: #fb923c;
-}
+  --ch1: #6ea0ff; --ch2: #b69cff; --ch3: #38c7e6; --ch4: #f472b6; --ch5: #fb923c; /* dark-mode chapter colors: lighter versions of the five chapter colors */
+} /* ends the dark-theme values */
 
-*, *::before, *::after { box-sizing: border-box; }
-html, body { height: 100%; margin: 0; overflow: hidden; }
-body {
-  font-family: var(--font);
-  background: var(--bg);
-  color: var(--ink);
-  -webkit-font-smoothing: antialiased;
-  -webkit-text-size-adjust: 100%;
-}
-button { font: inherit; color: inherit; }
-:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+*, *::before, *::after { box-sizing: border-box; } /* makes every box's width and height include its padding and border, so sizes add up the way you expect */
+html, body { height: 100%; margin: 0; overflow: hidden; } /* the page fills the window exactly and never scrolls as a whole; each panel scrolls on its own instead */
+body { /* base look for all page text */
+  font-family: var(--font); /* every piece of text uses the reading typeface unless a rule says otherwise */
+  background: var(--bg); /* paints the page background with the theme's background color */
+  color: var(--ink); /* sets the default text color from the theme */
+  -webkit-font-smoothing: antialiased; /* smooths the edges of letters on Mac screens so text looks crisper */
+  -webkit-text-size-adjust: 100%; /* stops phones from enlarging text on their own when the screen is turned sideways */
+} /* ends the body rule */
+button { font: inherit; color: inherit; } /* buttons normally use their own font and color; this makes them match the text around them */
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; border-radius: 6px; } /* draws a thick accent outline around whatever the keyboard has focused, so keyboard users can see where they are */
 
 /* ---------------------------------------------------------------- app frame */
-#app {
-  position: fixed; inset: 0;
-  display: grid;
-  grid-template-rows: var(--top-h) 1fr var(--bot-h);
-  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
-}
-#topbar, #botbar {
-  display: flex; align-items: center; gap: 8px;
-  padding: 0 12px;
-  background: var(--panel);
-  border-bottom: 1px solid var(--line);
-  min-width: 0;
-}
-#botbar { border-bottom: 0; border-top: 1px solid var(--line); position: relative; }
-.tb-btn {
-  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-  height: 32px; min-width: 32px; padding: 0 10px;
-  border: 1px solid transparent; border-radius: 9px;
-  background: transparent; cursor: pointer; font-size: 14px; font-weight: 600; color: var(--ink-2);
-  white-space: nowrap;
-}
-.tb-btn:hover { background: var(--panel-2); border-color: var(--line); color: var(--ink); }
-.tb-btn[aria-pressed="true"] { background: var(--accent-bg); color: var(--accent); }
-.tb-btn svg { width: 18px; height: 18px; flex: none; }
-.tb-brand { font-weight: 800; font-size: 15px; letter-spacing: -.01em; white-space: nowrap; color: var(--ink); cursor: pointer; background: none; border: 0; padding: 0 4px; }
-.tb-crumb { font-size: 14px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 1; }
-.tb-crumb b { color: var(--ink); font-weight: 650; }
-.tb-chaps { display: flex; gap: 4px; }
-.tb-chap {
-  width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--line);
-  background: var(--panel-2); font-weight: 800; font-size: 13px; cursor: pointer; color: var(--ink-2);
-}
-.tb-chap:hover { border-color: var(--c); color: var(--c); }
-.tb-chap.on { background: var(--c); color: #fff; border-color: var(--c); }
-html[data-theme="dark"] .tb-chap.on { color: #0b0f1a; }
-.tb-sep { width: 1px; height: 22px; background: var(--line); margin: 0 2px; flex: none; }
-.tb-spacer { flex: 1; }
+#app { /* #app is the outer frame of the whole guide: top bar, main area and bottom bar */
+  position: fixed; inset: 0; /* pins the frame to the window and stretches it to all four edges (inset: 0) */
+  display: grid; /* lays the frame out as a grid (rows and columns the browser sizes for you) */
+  grid-template-rows: var(--top-h) 1fr var(--bot-h); /* three rows: the top bar at its fixed height, the main area taking all leftover space (1fr), the bottom bar */
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); /* pads the frame by the "safe area" so phone notches and rounded screen corners do not cover any content */
+} /* ends the #app frame rule */
+#topbar, #botbar { /* shared look for the top bar (title, chapter buttons, tools) and the bottom bar (Back, step dots, Next) */
+  display: flex; align-items: center; gap: 8px; /* lines the bar's items up in a row (flexbox), centered top to bottom, with 8px between them */
+  padding: 0 12px; /* keeps the items 12px away from the left and right edges of the window */
+  background: var(--panel); /* gives both bars the plain panel fill so they stand apart from the page background */
+  border-bottom: 1px solid var(--line); /* draws a thin line under the bar to separate it from the main area */
+  min-width: 0; /* lets the bar shrink on small screens instead of pushing the window wider */
+} /* ends the shared bar rule */
+#botbar { border-bottom: 0; border-top: 1px solid var(--line); position: relative; } /* the bottom bar moves its dividing line to the top edge and becomes the anchor for the progress strip */
+.tb-btn { /* .tb-btn: the small tool buttons in the top bar (Contents, Notes, Glossary, theme, full screen) */
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px; /* centers the icon and label inside the button with a small gap between them */
+  height: 32px; min-width: 32px; padding: 0 10px; /* fixes the button height at 32px and makes icon-only buttons at least square */
+  border: 1px solid transparent; border-radius: 9px; /* starts with an invisible border so the button does not shift in size when a border appears on hover */
+  background: transparent; cursor: pointer; font-size: 14px; font-weight: 600; color: var(--ink-2); /* no fill until hovered, a hand cursor, and slightly bold secondary-colored text */
+  white-space: nowrap; /* keeps the label on one line */
+} /* ends the .tb-btn rule */
+.tb-btn:hover { background: var(--panel-2); border-color: var(--line); color: var(--ink); } /* hovering a tool button gives it a light fill and border so the student sees it is clickable */
+.tb-btn[aria-pressed="true"] { background: var(--accent-bg); color: var(--accent); } /* a button that is switched on (aria-pressed="true", read by screen readers too) shows the accent colors */
+.tb-btn svg { width: 18px; height: 18px; flex: none; } /* sets every tool icon (an SVG, the browser's drawing format) to 18px and stops it from being squeezed */
+.tb-brand { font-weight: 800; font-size: 15px; letter-spacing: -.01em; white-space: nowrap; color: var(--ink); cursor: pointer; background: none; border: 0; padding: 0 4px; } /* .tb-brand: the "Operating Systems" title at the left of the top bar; it is a button that jumps to the home page */
+.tb-crumb { font-size: 14px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 1; } /* .tb-crumb: the breadcrumb (Chapter, section, step) that takes the spare width and ends in "..." if it is too long */
+.tb-crumb b { color: var(--ink); font-weight: 650; } /* the current section name inside the breadcrumb is darker and bolder than the rest */
+.tb-chaps { display: flex; gap: 4px; } /* .tb-chaps: the row of numbered chapter buttons in the top bar */
+.tb-chap { /* .tb-chap: one numbered chapter button */
+  width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--line); /* a 30px rounded square with a thin border */
+  background: var(--panel-2); font-weight: 800; font-size: 13px; cursor: pointer; color: var(--ink-2); /* light fill, bold number, and a hand cursor */
+} /* ends the .tb-chap rule */
+.tb-chap:hover { border-color: var(--c); color: var(--c); } /* on hover the border and number take that chapter's own color (--c, set on each button by the script) */
+.tb-chap.on { background: var(--c); color: #fff; border-color: var(--c); } /* the chapter now on screen is filled solid with its chapter color and white text */
+html[data-theme="dark"] .tb-chap.on { color: #0b0f1a; } /* in dark mode the current chapter's number is dark, because the dark chapter colors are light */
+.tb-sep { width: 1px; height: 22px; background: var(--line); margin: 0 2px; flex: none; } /* .tb-sep: a thin vertical divider line between groups of top-bar buttons */
+.tb-spacer { flex: 1; } /* .tb-spacer: an empty item that grows to push the buttons after it to the far right */
 
-#stage { position: relative; overflow: hidden; display: grid; place-items: center; min-height: 0; }
-#canvasWrap { position: relative; }
-#canvas {
-  position: absolute; left: 0; top: 0;
-  width: 1200px; height: 640px;
-  transform-origin: 0 0;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 18px;
-  box-shadow: var(--shadow);
-  padding: 16px 24px 20px;
-  display: flex; flex-direction: column; gap: 10px;
-  font-size: 17px; line-height: 1.5;
-  color: var(--ink);
-  overflow: hidden;
-}
-.step-head { height: 54px; flex: none; display: flex; flex-direction: column; justify-content: center; border-bottom: 1px solid var(--line); padding-bottom: 6px; }
-.step-eyebrow { font-size: 12.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); display: flex; align-items: center; gap: 8px; white-space: nowrap; overflow: hidden; }
-.step-eyebrow .sid { color: #fff; background: var(--chc); padding: 1px 8px; border-radius: 999px; letter-spacing: .02em; }
-html[data-theme="dark"] .step-eyebrow .sid { color: #0b0f1a; }
-.step-eyebrow .kind { color: var(--chc); }
-.step-title { font-size: 25px; font-weight: 800; letter-spacing: -.015em; margin: 0; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.step-body { position: relative; width: 1152px; height: 540px; flex: none; overflow: hidden; }
-.step-body.overflowing { overflow: auto; }
+#stage { position: relative; overflow: hidden; display: grid; place-items: center; min-height: 0; } /* #stage: the middle area between the bars; it centers the scaled canvas and hides anything that spills past it */
+#canvasWrap { position: relative; } /* #canvasWrap: holds the canvas; the script sets its size to the canvas size times the current zoom */
+#canvas { /* #canvas: the fixed 1200 x 640 drawing area every step is built inside */
+  position: absolute; left: 0; top: 0; /* positioned at the top-left corner of the wrapper so zooming grows it toward the right and down */
+  width: 1200px; height: 640px; /* the fixed design size; every step is laid out for exactly these pixels, then zoomed as a whole */
+  transform-origin: 0 0; /* zooms from the top-left corner, matching the wrapper the script sizes around it */
+  background: var(--panel); /* white panel fill behind the step */
+  border: 1px solid var(--line); /* thin outline around the canvas */
+  border-radius: 18px; /* large rounded corners so the canvas reads as one card */
+  box-shadow: var(--shadow); /* soft shadow that lifts the canvas off the page */
+  padding: 16px 24px 20px; /* inner spacing between the canvas edge and the step content */
+  display: flex; flex-direction: column; gap: 10px; /* stacks the header and the step body top to bottom with 10px between them */
+  font-size: 17px; line-height: 1.5; /* base text size and line spacing for step content */
+  color: var(--ink); /* default text color for step content */
+  overflow: hidden; /* clips anything drawn past the canvas edge so the layout stays tidy */
+} /* ends the #canvas rule */
+.step-head { height: 54px; flex: none; display: flex; flex-direction: column; justify-content: center; border-bottom: 1px solid var(--line); padding-bottom: 6px; } /* .step-head: the fixed 54px header at the top of each step (small label line plus title) with a line under it */
+.step-eyebrow { font-size: 12.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); display: flex; align-items: center; gap: 8px; white-space: nowrap; overflow: hidden; } /* .step-eyebrow: the small uppercase label above the title (section number, section name, kind of step) */
+.step-eyebrow .sid { color: #fff; background: var(--chc); padding: 1px 8px; border-radius: 999px; letter-spacing: .02em; } /* .sid: the section number shown as a pill filled with the current chapter color */
+html[data-theme="dark"] .step-eyebrow .sid { color: #0b0f1a; } /* in dark mode the pill text is dark, because the dark chapter colors are light */
+.step-eyebrow .kind { color: var(--chc); } /* .kind (the kind of step, such as Learn, Explore or Check Yourself) is written in the chapter color */
+.step-title { font-size: 25px; font-weight: 800; letter-spacing: -.015em; margin: 0; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } /* .step-title: the big bold step title, kept on one line and cut off with "..." if it is too long */
+.step-body { position: relative; width: 1152px; height: 540px; flex: none; overflow: hidden; } /* .step-body: the fixed 1152 x 540 area below the header where each step draws its content */
+.step-body.overflowing { overflow: auto; } /* if a step's content does not fit, the script adds "overflowing" and the body gets scroll bars as a fallback */
 
 /* narrow (phone portrait / small tablet): reflow instead of scaling */
-body.narrow #stage { display: block; place-items: normal; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; }
-body.narrow .step-eyebrow { white-space: normal; flex-wrap: wrap; row-gap: 2px; }
-body.narrow #canvasWrap { width: auto !important; height: auto !important; padding: 8px; max-width: 100%; min-width: 0; }
-body.narrow #canvas { position: relative; width: auto; max-width: 100%; min-width: 0; height: auto; min-height: 100%; transform: none !important; padding: 12px 14px 18px; border-radius: 14px; }
-body.narrow .step-head { height: auto; }
-body.narrow .step-title { white-space: normal; font-size: 22px; }
-body.narrow .step-body { width: auto; height: auto; overflow: visible; }
-body.narrow .split, body.narrow .grid-2, body.narrow .grid-3, body.narrow .grid-4, body.narrow .cols { grid-template-columns: 1fr !important; }
-body.narrow .fill { height: auto !important; }
-body.narrow .tb-crumb, body.narrow .tb-chaps, body.narrow .tb-hide-narrow { display: none; }
-body.narrow svg { max-width: 100%; height: auto; }
+body.narrow #stage { display: block; place-items: normal; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; } /* small screens: the stage becomes a normal scrolling column instead of centering a zoomed canvas */
+body.narrow .step-eyebrow { white-space: normal; flex-wrap: wrap; row-gap: 2px; } /* small screens: the label line above the title may wrap onto several lines */
+body.narrow #canvasWrap { width: auto !important; height: auto !important; padding: 8px; max-width: 100%; min-width: 0; } /* small screens: the wrapper drops the size the script set and just fills the width with a little padding */
+body.narrow #canvas { position: relative; width: auto; max-width: 100%; min-width: 0; height: auto; min-height: 100%; transform: none !important; padding: 12px 14px 18px; border-radius: 14px; } /* small screens: the canvas flows at its natural height with no zoom, and gets smaller padding and corners */
+body.narrow .step-head { height: auto; } /* small screens: the step header grows to fit a title that wraps */
+body.narrow .step-title { white-space: normal; font-size: 22px; } /* small screens: the title may wrap and is a little smaller */
+body.narrow .step-body { width: auto; height: auto; overflow: visible; } /* small screens: the step body loses its fixed size and just grows with its content */
+body.narrow .split, body.narrow .grid-2, body.narrow .grid-3, body.narrow .grid-4, body.narrow .cols { grid-template-columns: 1fr !important; } /* small screens: every multi-column layout becomes a single column so nothing is squeezed */
+body.narrow .fill { height: auto !important; } /* small screens: boxes that normally fill the full step height shrink to their content */
+body.narrow .tb-crumb, body.narrow .tb-chaps, body.narrow .tb-hide-narrow { display: none; } /* small screens: the breadcrumb, chapter buttons and less important tool labels are hidden to save room */
+body.narrow svg { max-width: 100%; height: auto; } /* small screens: drawings shrink to the screen width and keep their shape */
 
 /* ---------------------------------------------------------------- bottom bar */
-.bb-nav { height: 36px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel-2); cursor: pointer; font-weight: 700; font-size: 14px; display: inline-flex; align-items: center; gap: 6px; max-width: 34vw; }
-.bb-nav span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.bb-nav svg { width: 18px; height: 18px; flex: none; }
-.btn svg { width: 16px; height: 16px; flex: none; }
-.bb-nav:hover { border-color: var(--accent); color: var(--accent); }
-.bb-nav.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
-.bb-nav.primary:hover { filter: brightness(1.08); color: var(--accent-ink); }
-.bb-nav:disabled { opacity: .35; cursor: default; }
-.bb-mid { flex: 1; display: flex; align-items: center; justify-content: center; gap: 12px; min-width: 0; }
-.bb-dots { display: flex; gap: 6px; align-items: center; flex-wrap: nowrap; overflow: hidden; }
-.bb-dot { width: 11px; height: 11px; border-radius: 50%; border: 2px solid var(--line-2); background: transparent; cursor: pointer; padding: 0; flex: none; }
-.bb-dot.seen { background: var(--line-2); }
-.bb-dot.on { background: var(--chc); border-color: var(--chc); transform: scale(1.25); }
-.bb-count { font-size: 13px; color: var(--muted); font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.bb-prog { position: absolute; left: 0; top: -1px; height: 3px; background: var(--chc); transition: width .25s; }
-body.narrow .bb-nav span { display: none; }
+.bb-nav { height: 36px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel-2); cursor: pointer; font-weight: 700; font-size: 14px; display: inline-flex; align-items: center; gap: 6px; max-width: 34vw; } /* .bb-nav: the Back and Next buttons: 36px tall, rounded, bordered, bold, never wider than about a third of the screen */
+.bb-nav span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } /* the Back/Next label stays on one line and ends in "..." if the neighboring step's name is long */
+.bb-nav svg { width: 18px; height: 18px; flex: none; } /* the arrow icons in Back/Next are fixed at 18px */
+.btn svg { width: 16px; height: 16px; flex: none; } /* icons inside ordinary .btn buttons are fixed at 16px */
+.bb-nav:hover { border-color: var(--accent); color: var(--accent); } /* hovering Back or Next turns its border and text the accent color */
+.bb-nav.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); } /* Next is the main button, so it is filled with the accent color */
+.bb-nav.primary:hover { filter: brightness(1.08); color: var(--accent-ink); } /* hovering Next brightens it slightly instead of changing colors */
+.bb-nav:disabled { opacity: .35; cursor: default; } /* a disabled Back (first page) or Next (last page) is faded and no longer shows a hand cursor */
+.bb-mid { flex: 1; display: flex; align-items: center; justify-content: center; gap: 12px; min-width: 0; } /* .bb-mid: the middle of the bottom bar, holding the step dots and the step counter, centered */
+.bb-dots { display: flex; gap: 6px; align-items: center; flex-wrap: nowrap; overflow: hidden; } /* .bb-dots: the row of dots, one per step in the current section; extra dots are hidden rather than wrapped */
+.bb-dot { width: 11px; height: 11px; border-radius: 50%; border: 2px solid var(--line-2); background: transparent; cursor: pointer; padding: 0; flex: none; } /* .bb-dot: one step dot, an 11px hollow circle that jumps to that step when clicked */
+.bb-dot.seen { background: var(--line-2); } /* a dot for a step the student has already visited is filled in grey */
+.bb-dot.on { background: var(--chc); border-color: var(--chc); transform: scale(1.25); } /* the dot for the current step is filled with the chapter color and made a little bigger */
+.bb-count { font-size: 13px; color: var(--muted); font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; } /* .bb-count: the "step 3 of 8" text; tabular numbers keep every digit the same width so it does not wobble */
+.bb-prog { position: absolute; left: 0; top: -1px; height: 3px; background: var(--chc); transition: width .25s; } /* .bb-prog: the thin progress strip along the top edge of the bottom bar; its width grows smoothly as you advance */
+body.narrow .bb-nav span { display: none; } /* small screens: Back and Next show only their arrows, not their labels */
 
 /* ---------------------------------------------------------------- drawers + overlays */
-.scrim { position: fixed; inset: 0; background: rgba(8, 12, 24, .38); opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 40; }
-.scrim.on { opacity: 1; pointer-events: auto; }
-.drawer {
-  position: fixed; top: 0; bottom: 0; width: min(380px, 92vw); z-index: 50;
-  background: var(--panel); border-right: 1px solid var(--line); box-shadow: var(--shadow-lg);
-  display: flex; flex-direction: column; transition: transform .22s ease;
-}
-.drawer.left { left: 0; transform: translateX(-104%); }
-.drawer.right { right: 0; transform: translateX(104%); border-right: 0; border-left: 1px solid var(--line); width: min(460px, 94vw); }
-.drawer.on { transform: none; }
-.dr-head { display: flex; align-items: center; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
-.dr-head h3 { margin: 0; font-size: 16px; flex: 1; }
-.dr-search { width: 100%; height: 36px; border-radius: 9px; border: 1px solid var(--line); background: var(--panel-2); color: var(--ink); padding: 0 12px; font: inherit; font-size: 14px; }
-.dr-body { flex: 1; overflow-y: auto; padding: 10px 12px 30px; font-size: 14.5px; line-height: 1.5; }
-.toc-ch { margin-bottom: 12px; }
-.toc-ch-head { display: flex; align-items: center; gap: 8px; padding: 8px 8px; border-radius: 9px; cursor: pointer; font-weight: 800; }
-.toc-ch-head:hover { background: var(--panel-2); }
-.toc-ch-num { width: 26px; height: 26px; border-radius: 7px; background: var(--c); color: #fff; display: grid; place-items: center; font-size: 13px; flex: none; }
-html[data-theme="dark"] .toc-ch-num { color: #0b0f1a; }
-.toc-ch-title { flex: 1; }
-.toc-pct { font-size: 12px; color: var(--muted); font-weight: 700; }
-.toc-sec { display: flex; gap: 8px; align-items: baseline; padding: 6px 8px 6px 42px; border-radius: 8px; cursor: pointer; color: var(--ink-2); }
-.toc-sec:hover { background: var(--panel-2); color: var(--ink); }
-.toc-sec.on { background: var(--accent-bg); color: var(--ink); font-weight: 650; }
-.toc-sec .n { font-weight: 700; color: var(--muted); min-width: 30px; font-variant-numeric: tabular-nums; }
-.toc-sec .tt { flex: 1; }
-.toc-sec .ck { color: var(--ok); font-weight: 900; }
-.toc-sec.extra { font-style: italic; }
-.gl-item { padding: 10px 6px; border-bottom: 1px solid var(--line); }
-.gl-item b { font-size: 15px; }
-.gl-item .src { font-size: 12px; color: var(--accent); cursor: pointer; font-weight: 700; margin-left: 6px; }
-.gl-item p { margin: 3px 0 0; color: var(--ink-2); }
-.gl-letter { font-weight: 900; color: var(--muted); margin: 14px 6px 2px; font-size: 13px; letter-spacing: .08em; }
-.notes-doc h3 { font-size: 18px; margin: 16px 0 6px; }
-.notes-doc h4 { font-size: 15px; margin: 14px 0 4px; }
-.notes-doc table { border-collapse: collapse; font-size: 13.5px; width: 100%; margin: 8px 0; }
-.notes-doc td, .notes-doc th { border: 1px solid var(--line); padding: 4px 6px; text-align: left; vertical-align: top; }
-.notes-doc svg { max-width: 100%; height: auto; }
+.scrim { position: fixed; inset: 0; background: rgba(8, 12, 24, .38); opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 40; } /* .scrim: the dark see-through layer over the page while a drawer or pop-up is open; hidden and click-through by default */
+.scrim.on { opacity: 1; pointer-events: auto; } /* when a drawer opens, the scrim fades in and catches clicks, so clicking outside closes the drawer */
+.drawer { /* .drawer: the panels that slide in from the side (Contents on the left, Glossary and Notes on the right) */
+  position: fixed; top: 0; bottom: 0; width: min(380px, 92vw); z-index: 50; /* fixed to the full window height, up to 380px wide, and stacked above the scrim (z-index 50 beats 40) */
+  background: var(--panel); border-right: 1px solid var(--line); box-shadow: var(--shadow-lg); /* panel fill, a dividing line on its inner edge, and a deep shadow so it floats over the page */
+  display: flex; flex-direction: column; transition: transform .22s ease; /* stacks its header and list top to bottom; the transition animates the slide in and out */
+} /* ends the .drawer rule */
+.drawer.left { left: 0; transform: translateX(-104%); } /* the Contents drawer sits at the left edge and starts pushed just past the left of the window, out of sight */
+.drawer.right { right: 0; transform: translateX(104%); border-right: 0; border-left: 1px solid var(--line); width: min(460px, 94vw); } /* Glossary and Notes sit at the right edge, start hidden off to the right, and are a little wider */
+.drawer.on { transform: none; } /* an open drawer (class "on") slides back to its normal place on screen */
+.dr-head { display: flex; align-items: center; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--line); } /* .dr-head: the header strip at the top of each drawer (title, search box, close button) with a line under it */
+.dr-head h3 { margin: 0; font-size: 16px; flex: 1; } /* the drawer title takes up the spare width so the close button is pushed to the right */
+.dr-search { width: 100%; height: 36px; border-radius: 9px; border: 1px solid var(--line); background: var(--panel-2); color: var(--ink); padding: 0 12px; font: inherit; font-size: 14px; } /* .dr-search: the full-width search box in the Glossary drawer, styled to match the rest of the page */
+.dr-body { flex: 1; overflow-y: auto; padding: 10px 12px 30px; font-size: 14.5px; line-height: 1.5; } /* .dr-body: the drawer's list area; it fills the leftover height and scrolls on its own, with room at the bottom */
+.toc-ch { margin-bottom: 12px; } /* .toc-ch: one chapter's group in the Contents drawer, with space before the next chapter */
+.toc-ch-head { display: flex; align-items: center; gap: 8px; padding: 8px 8px; border-radius: 9px; cursor: pointer; font-weight: 800; } /* .toc-ch-head: the clickable chapter row in Contents (number, title, percent done), bold and rounded */
+.toc-ch-head:hover { background: var(--panel-2); } /* hovering a chapter row gives it a light fill */
+.toc-ch-num { width: 26px; height: 26px; border-radius: 7px; background: var(--c); color: #fff; display: grid; place-items: center; font-size: 13px; flex: none; } /* .toc-ch-num: the chapter number in a small rounded square filled with that chapter's color (--c) */
+html[data-theme="dark"] .toc-ch-num { color: #0b0f1a; } /* in dark mode the chapter number is dark, because the dark chapter colors are light */
+.toc-ch-title { flex: 1; } /* .toc-ch-title: the chapter title fills the middle of the row, pushing the percentage to the right */
+.toc-pct { font-size: 12px; color: var(--muted); font-weight: 700; } /* .toc-pct: the small grey "percent of this chapter visited" number at the end of a chapter row */
+.toc-sec { display: flex; gap: 8px; align-items: baseline; padding: 6px 8px 6px 42px; border-radius: 8px; cursor: pointer; color: var(--ink-2); } /* .toc-sec: one section row in Contents, indented under its chapter so the nesting is clear */
+.toc-sec:hover { background: var(--panel-2); color: var(--ink); } /* hovering a section row gives it a light fill and darker text */
+.toc-sec.on { background: var(--accent-bg); color: var(--ink); font-weight: 650; } /* the section the student is in now is filled with the pale accent color and made bolder */
+.toc-sec .n { font-weight: 700; color: var(--muted); min-width: 30px; font-variant-numeric: tabular-nums; } /* .n: the section number, in a fixed-width column of evenly spaced digits so the titles line up */
+.toc-sec .tt { flex: 1; } /* .tt: the section title takes the remaining width of the row */
+.toc-sec .ck { color: var(--ok); font-weight: 900; } /* .ck: the green check mark shown once every step of a section has been visited */
+.toc-sec.extra { font-style: italic; } /* the extra rows at the end of each chapter (key-term flashcards, chapter challenge) are in italics */
+.gl-item { padding: 10px 6px; border-bottom: 1px solid var(--line); } /* .gl-item: one glossary entry, separated from the next by a thin line */
+.gl-item b { font-size: 15px; } /* the glossary term itself is bold and slightly larger */
+.gl-item .src { font-size: 12px; color: var(--accent); cursor: pointer; font-weight: 700; margin-left: 6px; } /* .src: the small accent-colored link after a term that jumps to the section where it is taught */
+.gl-item p { margin: 3px 0 0; color: var(--ink-2); } /* the definition text under each glossary term, in the secondary text color */
+.gl-letter { font-weight: 900; color: var(--muted); margin: 14px 6px 2px; font-size: 13px; letter-spacing: .08em; } /* .gl-letter: the grey letter heading (A, B, C...) that starts each alphabetical group in the glossary */
+.notes-doc h3 { font-size: 18px; margin: 16px 0 6px; } /* .notes-doc: the section notes drawer; its main headings are 18px with space above */
+.notes-doc h4 { font-size: 15px; margin: 14px 0 4px; } /* sub-headings in the notes are 15px */
+.notes-doc table { border-collapse: collapse; font-size: 13.5px; width: 100%; margin: 8px 0; } /* tables in the notes use single shared borders, fill the drawer width and use slightly smaller text */
+.notes-doc td, .notes-doc th { border: 1px solid var(--line); padding: 4px 6px; text-align: left; vertical-align: top; } /* each table cell gets a thin border, a little padding, and text lined up at the top left */
+.notes-doc svg { max-width: 100%; height: auto; } /* drawings in the notes shrink to the drawer width and keep their shape */
 
-.modal { position: fixed; inset: 0; display: grid; place-items: center; z-index: 60; pointer-events: none; opacity: 0; transition: opacity .15s; }
-.modal.on { pointer-events: auto; opacity: 1; }
-.modal-card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow-lg); padding: 20px 24px; width: min(560px, 92vw); max-height: 86vh; overflow: auto; }
-.modal-card h3 { margin: 0 0 10px; }
-.keys { display: grid; grid-template-columns: auto 1fr; gap: 8px 16px; align-items: center; font-size: 15px; }
+.modal { position: fixed; inset: 0; display: grid; place-items: center; z-index: 60; pointer-events: none; opacity: 0; transition: opacity .15s; } /* .modal: the full-window layer that centers a pop-up box (such as the keyboard shortcuts list); hidden by default */
+.modal.on { pointer-events: auto; opacity: 1; } /* an open modal fades in and starts catching clicks */
+.modal-card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow-lg); padding: 20px 24px; width: min(560px, 92vw); max-height: 86vh; overflow: auto; } /* .modal-card: the pop-up box itself: panel fill, rounded, deep shadow, at most 560px wide, scrolls if too tall */
+.modal-card h3 { margin: 0 0 10px; } /* the pop-up's title has no top margin and a little space below */
+.keys { display: grid; grid-template-columns: auto 1fr; gap: 8px 16px; align-items: center; font-size: 15px; } /* .keys: the keyboard shortcut list as a two-column grid, key on the left and what it does on the right */
 
-.term-pop {
-  position: fixed; z-index: 70; max-width: 340px; background: var(--panel); color: var(--ink);
-  border: 1px solid var(--line-2); border-radius: 12px; box-shadow: var(--shadow-lg);
-  padding: 10px 12px; font-size: 14.5px; line-height: 1.45; display: none;
-}
-.term-pop.on { display: block; }
-.term-pop b { display: block; margin-bottom: 2px; }
-.term-pop .src { font-size: 12px; color: var(--muted); margin-top: 6px; }
-.toast { position: fixed; left: 50%; bottom: calc(var(--bot-h) + 14px); transform: translateX(-50%) translateY(20px); background: var(--ink); color: var(--panel); padding: 9px 16px; border-radius: 10px; font-size: 14px; font-weight: 600; opacity: 0; transition: .2s; z-index: 80; pointer-events: none; }
-.toast.on { opacity: 1; transform: translateX(-50%); }
+.term-pop { /* .term-pop: the small definition box that appears when the student points at an underlined key term */
+  position: fixed; z-index: 70; max-width: 340px; background: var(--panel); color: var(--ink); /* fixed above the page (z-index 70 beats drawers and pop-ups), at most 340px wide, in the panel colors */
+  border: 1px solid var(--line-2); border-radius: 12px; box-shadow: var(--shadow-lg); /* a slightly darker border, rounded corners and a deep shadow so it floats above the step */
+  padding: 10px 12px; font-size: 14.5px; line-height: 1.45; display: none; /* inner padding and slightly smaller text; hidden until the script shows it */
+} /* ends the .term-pop rule */
+.term-pop.on { display: block; } /* the script adds "on" to show the definition box next to the term */
+.term-pop b { display: block; margin-bottom: 2px; } /* the term's name sits on its own line above the definition */
+.term-pop .src { font-size: 12px; color: var(--muted); margin-top: 6px; } /* the grey line at the bottom saying where the term is taught and that G opens the full glossary */
+.toast { position: fixed; left: 50%; bottom: calc(var(--bot-h) + 14px); transform: translateX(-50%) translateY(20px); background: var(--ink); color: var(--panel); padding: 9px 16px; border-radius: 10px; font-size: 14px; font-weight: 600; opacity: 0; transition: .2s; z-index: 80; pointer-events: none; } /* .toast: a short message bubble that appears just above the bottom bar, centered, dark on light, hidden by default */
+.toast.on { opacity: 1; transform: translateX(-50%); } /* when shown, the toast fades in and slides up into place; the script removes "on" after about two seconds */
 
 /* ===================================================================
    Content vocabulary available to every step (use these classes!)
    =================================================================== */
-#canvas h3, .x h3 { font-size: 20px; margin: 0 0 6px; line-height: 1.25; letter-spacing: -.01em; }
-#canvas h4 { font-size: 13px; margin: 0 0 4px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); }
-#canvas p { margin: 0 0 10px; }
-#canvas ul, #canvas ol { margin: 0 0 10px; padding-left: 22px; }
-#canvas li { margin: 2px 0; }
-#canvas li::marker { color: var(--chc); }
-.lead { font-size: 19px; line-height: 1.5; color: var(--ink); }
-.muted { color: var(--muted); }
-.small { font-size: 14.5px; }
-.xs { font-size: 12.5px; }
-.b { font-weight: 700; }
-.center { text-align: center; }
-.mono, code, kbd { font-family: var(--mono); }
-code { font-size: .9em; background: var(--panel-3); padding: 1px 5px; border-radius: 5px; }
-kbd, .kbd { font-family: var(--mono); font-size: .85em; padding: 1px 6px; border: 1px solid var(--line-2); border-bottom-width: 2px; border-radius: 6px; background: var(--panel-2); }
-mark, .hl { background: var(--hl); color: inherit; padding: 0 3px; border-radius: 4px; }
+#canvas h3, .x h3 { font-size: 20px; margin: 0 0 6px; line-height: 1.25; letter-spacing: -.01em; } /* step headings (h3) are 20px, bold and tight; the .x class gives other boxes the same heading look */
+#canvas h4 { font-size: 13px; margin: 0 0 4px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); } /* small h4 labels are uppercase, spaced out and grey, used as captions over boxes */
+#canvas p { margin: 0 0 10px; } /* paragraphs in a step keep a 10px gap below them */
+#canvas ul, #canvas ol { margin: 0 0 10px; padding-left: 22px; } /* bullet and numbered lists keep a gap below and an indent for the markers */
+#canvas li { margin: 2px 0; } /* list items get a small gap between them */
+#canvas li::marker { color: var(--chc); } /* the bullets and numbers of lists are drawn in the current chapter color */
+.lead { font-size: 19px; line-height: 1.5; color: var(--ink); } /* .lead: the larger opening sentence of a step */
+.muted { color: var(--muted); } /* .muted: grey text for side remarks */
+.small { font-size: 14.5px; } /* .small: slightly smaller text */
+.xs { font-size: 12.5px; } /* .xs: very small text, for fine print and labels */
+.b { font-weight: 700; } /* .b: bold text */
+.center { text-align: center; } /* .center: centers text */
+.mono, code, kbd { font-family: var(--mono); } /* code, keyboard keys and anything marked .mono use the fixed-width typeface */
+code { font-size: .9em; background: var(--panel-3); padding: 1px 5px; border-radius: 5px; } /* inline code gets a slightly smaller size and a light rounded background, like a chip */
+kbd, .kbd { font-family: var(--mono); font-size: .85em; padding: 1px 6px; border: 1px solid var(--line-2); border-bottom-width: 2px; border-radius: 6px; background: var(--panel-2); } /* keyboard keys (kbd) look like little keycaps: a thicker bottom border suggests the key sticks up */
+mark, .hl { background: var(--hl); color: inherit; padding: 0 3px; border-radius: 4px; } /* mark and .hl paint a yellow highlighter behind important words */
 
-.split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; height: 100%; min-height: 0; }
-.split.l { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); }
-.split.r { grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); }
-.split.l3 { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); }
-.split.r3 { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
-.split > * { min-width: 0; min-height: 0; }
-.grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
-.grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
-.grid-4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
-.row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
-.row.nw { flex-wrap: nowrap; }
-.stack { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
-.fill { height: 100%; }
-.grow { flex: 1; min-height: 0; }
-.gap-s { gap: 6px; } .gap-l { gap: 20px; }
-.mt { margin-top: 12px; } .mb { margin-bottom: 12px; } .m0 { margin: 0 !important; }
+.split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; height: 100%; min-height: 0; } /* .split: two columns of equal width filling the full step height; minmax(0, 1fr) lets a column shrink below its content */
+.split.l { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); } /* .split.l: the left column is the smaller one, 5 parts to 7 */
+.split.r { grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); } /* .split.r: the right column is the smaller one, 7 parts to 5 */
+.split.l3 { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); } /* .split.l3: the left column takes one third, the right two thirds */
+.split.r3 { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); } /* .split.r3: the left column takes two thirds, the right one third */
+.split > * { min-width: 0; min-height: 0; } /* lets each column shrink so a long word or wide drawing cannot push the layout out of shape */
+.grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; } /* .grid-2: two equal columns with 14px gaps */
+.grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; } /* .grid-3: three equal columns with 14px gaps */
+.grid-4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; } /* .grid-4: four equal columns with 12px gaps */
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; } /* .row: items side by side, centered vertically, wrapping onto a new line when they run out of room */
+.row.nw { flex-wrap: nowrap; } /* .row.nw: a row that never wraps */
+.stack { display: flex; flex-direction: column; gap: 12px; min-height: 0; } /* .stack: items stacked top to bottom with 12px gaps */
+.fill { height: 100%; } /* .fill: takes the full height of its container */
+.grow { flex: 1; min-height: 0; } /* .grow: takes whatever height is left over in a stack */
+.gap-s { gap: 6px; } .gap-l { gap: 20px; } /* .gap-s and .gap-l: smaller (6px) or larger (20px) spacing between items */
+.mt { margin-top: 12px; } .mb { margin-bottom: 12px; } .m0 { margin: 0 !important; } /* .mt and .mb add 12px above or below; .m0 removes all margins, overriding other rules (!important) */
 
-.card { background: var(--panel-2); border: 1px solid var(--line); border-radius: var(--r); padding: 14px 16px; min-width: 0; }
-.card.white { background: var(--panel); }
-.card.tight { padding: 10px 12px; }
-.card > :last-child, .callout > :last-child { margin-bottom: 0; }
-.card.cpu { background: var(--cpu-bg); border-color: color-mix(in srgb, var(--cpu) 35%, transparent); }
-.card.mem { background: var(--mem-bg); border-color: color-mix(in srgb, var(--mem) 35%, transparent); }
-.card.io { background: var(--io-bg); border-color: color-mix(in srgb, var(--io) 35%, transparent); }
-.card.os { background: var(--os-bg); border-color: color-mix(in srgb, var(--os) 35%, transparent); }
-.card.proc { background: var(--proc-bg); border-color: color-mix(in srgb, var(--proc) 35%, transparent); }
-.card.thread { background: var(--thread-bg); border-color: color-mix(in srgb, var(--thread) 35%, transparent); }
-.card.intr { background: var(--intr-bg); border-color: color-mix(in srgb, var(--intr) 35%, transparent); }
+.card { background: var(--panel-2); border: 1px solid var(--line); border-radius: var(--r); padding: 14px 16px; min-width: 0; } /* .card: the basic content box: lightly tinted, thin border, rounded corners and inner padding */
+.card.white { background: var(--panel); } /* .card.white: a card with the plain white panel fill instead of the tint */
+.card.tight { padding: 10px 12px; } /* .card.tight: a card with less padding, for small boxes */
+.card > :last-child, .callout > :last-child { margin-bottom: 0; } /* removes the bottom margin of the last thing inside a card or callout so the padding looks even */
+.card.cpu { background: var(--cpu-bg); border-color: color-mix(in srgb, var(--cpu) 35%, transparent); } /* .card.cpu: a processor card: pale blue fill and a see-through blue border (color-mix blends two colors) */
+.card.mem { background: var(--mem-bg); border-color: color-mix(in srgb, var(--mem) 35%, transparent); } /* .card.mem: a memory card in pale green with a green-tinted border */
+.card.io { background: var(--io-bg); border-color: color-mix(in srgb, var(--io) 35%, transparent); } /* .card.io: an input/output card in pale orange with an orange-tinted border */
+.card.os { background: var(--os-bg); border-color: color-mix(in srgb, var(--os) 35%, transparent); } /* .card.os: an operating system card in pale purple with a purple-tinted border */
+.card.proc { background: var(--proc-bg); border-color: color-mix(in srgb, var(--proc) 35%, transparent); } /* .card.proc: a process card in pale teal with a teal-tinted border */
+.card.thread { background: var(--thread-bg); border-color: color-mix(in srgb, var(--thread) 35%, transparent); } /* .card.thread: a thread card in pale pink with a pink-tinted border */
+.card.intr { background: var(--intr-bg); border-color: color-mix(in srgb, var(--intr) 35%, transparent); } /* .card.intr: an interrupt card in pale red with a red-tinted border */
 
-.callout { border-radius: var(--r); padding: 11px 14px; background: var(--accent-bg); border-left: 5px solid var(--accent); margin: 0 0 10px; }
-.callout[data-label]::before { content: attr(data-label); display: block; font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); margin-bottom: 2px; }
-.callout.analogy { background: var(--os-bg); border-color: var(--os); } .callout.analogy::before { color: var(--os); }
-.callout.tip { background: var(--ok-bg); border-color: var(--ok); } .callout.tip::before { color: var(--ok); }
-.callout.warn { background: var(--warn-bg); border-color: var(--warn); } .callout.warn::before { color: var(--warn); }
-.callout.why { background: var(--info-bg); border-color: var(--info); } .callout.why::before { color: var(--info); }
-.callout.bad { background: var(--bad-bg); border-color: var(--bad); } .callout.bad::before { color: var(--bad); }
+.callout { border-radius: var(--r); padding: 11px 14px; background: var(--accent-bg); border-left: 5px solid var(--accent); margin: 0 0 10px; } /* .callout: a highlighted note box with a thick colored bar on the left, pale accent by default */
+.callout[data-label]::before { content: attr(data-label); display: block; font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); margin-bottom: 2px; } /* a callout with a data-label attribute shows that label (such as "Why") as a small uppercase title above its text */
+.callout.analogy { background: var(--os-bg); border-color: var(--os); } .callout.analogy::before { color: var(--os); } /* .callout.analogy: an everyday comparison, in the operating system purple */
+.callout.tip { background: var(--ok-bg); border-color: var(--ok); } .callout.tip::before { color: var(--ok); } /* .callout.tip: a helpful tip, in success green */
+.callout.warn { background: var(--warn-bg); border-color: var(--warn); } .callout.warn::before { color: var(--warn); } /* .callout.warn: a warning about a common mistake, in amber */
+.callout.why { background: var(--info-bg); border-color: var(--info); } .callout.why::before { color: var(--info); } /* .callout.why: a "why it matters" note in info blue; the ::before part colors its small label to match */
+.callout.bad { background: var(--bad-bg); border-color: var(--bad); } .callout.bad::before { color: var(--bad); } /* .callout.bad: a note about something that goes wrong, in error red with a matching label */
 
-.chip { display: inline-flex; align-items: center; gap: 5px; padding: 1px 9px; border-radius: 999px; font-size: 13px; font-weight: 700; background: var(--panel-3); color: var(--ink-2); white-space: nowrap; line-height: 1.6; }
-.chip.cpu { background: var(--cpu-bg); color: var(--cpu); } .chip.mem { background: var(--mem-bg); color: var(--mem); }
-.chip.io { background: var(--io-bg); color: var(--io); } .chip.os { background: var(--os-bg); color: var(--os); }
-.chip.proc { background: var(--proc-bg); color: var(--proc); } .chip.thread { background: var(--thread-bg); color: var(--thread); }
-.chip.intr { background: var(--intr-bg); color: var(--intr); } .chip.ok { background: var(--ok-bg); color: var(--ok); }
-.chip.bad { background: var(--bad-bg); color: var(--bad); } .chip.warn { background: var(--warn-bg); color: var(--warn); }
-.chip.accent { background: var(--accent-bg); color: var(--accent); }
+.chip { display: inline-flex; align-items: center; gap: 5px; padding: 1px 9px; border-radius: 999px; font-size: 13px; font-weight: 700; background: var(--panel-3); color: var(--ink-2); white-space: nowrap; line-height: 1.6; } /* .chip: a small pill-shaped tag with a light fill and bold text, kept on one line, used for labels and states */
+.chip.cpu { background: var(--cpu-bg); color: var(--cpu); } .chip.mem { background: var(--mem-bg); color: var(--mem); } /* .chip.cpu and .chip.mem: processor (blue) and memory (green) tags, each in its pale fill with strong text */
+.chip.io { background: var(--io-bg); color: var(--io); } .chip.os { background: var(--os-bg); color: var(--os); } /* .chip.io and .chip.os: input/output (orange) and operating system (purple) tags */
+.chip.proc { background: var(--proc-bg); color: var(--proc); } .chip.thread { background: var(--thread-bg); color: var(--thread); } /* .chip.proc and .chip.thread: process (teal) and thread (pink) tags */
+.chip.intr { background: var(--intr-bg); color: var(--intr); } .chip.ok { background: var(--ok-bg); color: var(--ok); } /* .chip.intr and .chip.ok: interrupt (red) and success (green) tags */
+.chip.bad { background: var(--bad-bg); color: var(--bad); } .chip.warn { background: var(--warn-bg); color: var(--warn); } /* .chip.bad and .chip.warn: error (red) and warning (amber) tags */
+.chip.accent { background: var(--accent-bg); color: var(--accent); } /* .chip.accent: a tag in the accent indigo, for the current or chosen item */
 
-.btn {
-  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-  height: 36px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--line-2);
-  background: var(--panel); color: var(--ink); font-size: 15px; font-weight: 650; cursor: pointer;
-  white-space: nowrap; user-select: none; transition: background .12s, border-color .12s, transform .06s;
-}
-.btn:hover { border-color: var(--accent); color: var(--accent); }
-.btn:active { transform: translateY(1px); }
-.btn:disabled { opacity: .4; cursor: default; pointer-events: none; }
-.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
-.btn.primary:hover { filter: brightness(1.08); color: var(--accent-ink); }
-.btn.ghost { background: transparent; border-color: transparent; }
-.btn.ghost:hover { background: var(--panel-2); }
-.btn.sm { height: 30px; padding: 0 10px; font-size: 13.5px; border-radius: 8px; }
-.btn.lg { height: 44px; padding: 0 20px; font-size: 16.5px; }
-.btn.danger { border-color: var(--bad); color: var(--bad); }
-.btn.on, .btn[aria-pressed="true"] { background: var(--accent-bg); border-color: var(--accent); color: var(--accent); }
-.btn.cpu { border-color: var(--cpu); color: var(--cpu); } .btn.mem { border-color: var(--mem); color: var(--mem); }
-.btn.io { border-color: var(--io); color: var(--io); } .btn.os { border-color: var(--os); color: var(--os); }
-.btn.proc { border-color: var(--proc); color: var(--proc); } .btn.thread { border-color: var(--thread); color: var(--thread); }
-.btn.intr { border-color: var(--intr); color: var(--intr); }
+.btn { /* .btn: the standard button used inside steps (Play, Check, Reset and so on) */
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px; /* centers the icon and label with a small gap between them */
+  height: 36px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--line-2); /* 36px tall with side padding, rounded corners and a visible border */
+  background: var(--panel); color: var(--ink); font-size: 15px; font-weight: 650; cursor: pointer; /* white fill, main text color, bold label and a hand cursor */
+  white-space: nowrap; user-select: none; transition: background .12s, border-color .12s, transform .06s; /* one line only, label text cannot be selected by accident, and color and press changes animate quickly */
+} /* ends the .btn rule */
+.btn:hover { border-color: var(--accent); color: var(--accent); } /* hovering a button turns its border and label the accent color */
+.btn:active { transform: translateY(1px); } /* while pressed, the button moves down 1px so it feels like it is pushed in */
+.btn:disabled { opacity: .4; cursor: default; pointer-events: none; } /* a disabled button is faded and ignores the mouse completely */
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); } /* .btn.primary: the main action of a step, filled with the accent color */
+.btn.primary:hover { filter: brightness(1.08); color: var(--accent-ink); } /* hovering a primary button brightens it slightly instead of changing colors */
+.btn.ghost { background: transparent; border-color: transparent; } /* .btn.ghost: a quiet button with no fill or border until hovered */
+.btn.ghost:hover { background: var(--panel-2); } /* hovering a ghost button gives it a light fill */
+.btn.sm { height: 30px; padding: 0 10px; font-size: 13.5px; border-radius: 8px; } /* .btn.sm: a smaller 30px button for toolbars and tight spaces */
+.btn.lg { height: 44px; padding: 0 20px; font-size: 16.5px; } /* .btn.lg: a larger 44px button for the main call to action */
+.btn.danger { border-color: var(--bad); color: var(--bad); } /* .btn.danger: a red-outlined button for actions that erase something, such as resetting progress */
+.btn.on, .btn[aria-pressed="true"] { background: var(--accent-bg); border-color: var(--accent); color: var(--accent); } /* a button that is switched on (class "on" or aria-pressed) shows the pale accent fill and accent border */
+.btn.cpu { border-color: var(--cpu); color: var(--cpu); } .btn.mem { border-color: var(--mem); color: var(--mem); } /* .btn.cpu and .btn.mem: buttons outlined in processor blue or memory green, to match what they act on */
+.btn.io { border-color: var(--io); color: var(--io); } .btn.os { border-color: var(--os); color: var(--os); } /* .btn.io and .btn.os: buttons outlined in input/output orange or operating system purple */
+.btn.proc { border-color: var(--proc); color: var(--proc); } .btn.thread { border-color: var(--thread); color: var(--thread); } /* .btn.proc and .btn.thread: buttons outlined in process teal or thread pink */
+.btn.intr { border-color: var(--intr); color: var(--intr); } /* .btn.intr: a button outlined in interrupt red */
 
-.box { border: 2px solid var(--line-2); background: var(--panel-2); border-radius: 10px; padding: 8px 10px; text-align: center; font-weight: 650; }
-.box.cpu { border-color: var(--cpu); background: var(--cpu-bg); } .box.mem { border-color: var(--mem); background: var(--mem-bg); }
-.box.io { border-color: var(--io); background: var(--io-bg); } .box.os { border-color: var(--os); background: var(--os-bg); }
-.box.proc { border-color: var(--proc); background: var(--proc-bg); } .box.thread { border-color: var(--thread); background: var(--thread-bg); }
-.box.intr { border-color: var(--intr); background: var(--intr-bg); }
-.box.accent { border-color: var(--accent); background: var(--accent-bg); }
-.box.ok { border-color: var(--ok); background: var(--ok-bg); } .box.bad { border-color: var(--bad); background: var(--bad-bg); } .box.warn { border-color: var(--warn); background: var(--warn-bg); }
+.box { border: 2px solid var(--line-2); background: var(--panel-2); border-radius: 10px; padding: 8px 10px; text-align: center; font-weight: 650; } /* .box: a labeled block in a diagram built from HTML, with a thick border, tinted fill and centered bold text */
+.box.cpu { border-color: var(--cpu); background: var(--cpu-bg); } .box.mem { border-color: var(--mem); background: var(--mem-bg); } /* .box.cpu and .box.mem: processor (blue) and memory (green) blocks with matching border and pale fill */
+.box.io { border-color: var(--io); background: var(--io-bg); } .box.os { border-color: var(--os); background: var(--os-bg); } /* .box.io and .box.os: input/output (orange) and operating system (purple) blocks */
+.box.proc { border-color: var(--proc); background: var(--proc-bg); } .box.thread { border-color: var(--thread); background: var(--thread-bg); } /* .box.proc and .box.thread: process (teal) and thread (pink) blocks */
+.box.intr { border-color: var(--intr); background: var(--intr-bg); } /* .box.intr: an interrupt block in red */
+.box.accent { border-color: var(--accent); background: var(--accent-bg); } /* .box.accent: a block in the accent indigo, for the one being pointed at */
+.box.ok { border-color: var(--ok); background: var(--ok-bg); } .box.bad { border-color: var(--bad); background: var(--bad-bg); } .box.warn { border-color: var(--warn); background: var(--warn-bg); } /* .box.ok, .box.bad and .box.warn: blocks colored for success, error and warning */
 
-table.tbl { border-collapse: separate; border-spacing: 0; width: 100%; font-size: 15px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
-table.tbl th { background: var(--panel-3); text-align: left; font-size: 13px; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-2); }
-table.tbl th, table.tbl td { padding: 6px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
-table.tbl tr:last-child td { border-bottom: 0; }
-table.tbl tr.on td { background: var(--accent-bg); }
-table.tbl.compact th, table.tbl.compact td { padding: 4px 8px; font-size: 14px; }
+table.tbl { border-collapse: separate; border-spacing: 0; width: 100%; font-size: 15px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; } /* table.tbl: the standard data table, full width with a thin rounded outline (overflow hidden clips the corners) */
+table.tbl th { background: var(--panel-3); text-align: left; font-size: 13px; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-2); } /* table header cells get a tinted fill and small uppercase secondary-colored text */
+table.tbl th, table.tbl td { padding: 6px 10px; border-bottom: 1px solid var(--line); vertical-align: top; } /* every cell gets padding, a thin line underneath, and text lined up at the top */
+table.tbl tr:last-child td { border-bottom: 0; } /* the last row has no bottom line, since the table's outline already closes it */
+table.tbl tr.on td { background: var(--accent-bg); } /* a highlighted row (class "on") is filled with the pale accent color */
+table.tbl.compact th, table.tbl.compact td { padding: 4px 8px; font-size: 14px; } /* table.tbl.compact: a denser table with less padding and smaller text */
 
-.big { font-size: 40px; font-weight: 800; letter-spacing: -.02em; line-height: 1.1; font-variant-numeric: tabular-nums; }
-.num { font-variant-numeric: tabular-nums; }
-.t { border-bottom: 2px dotted color-mix(in srgb, var(--chc) 70%, transparent); cursor: help; font-weight: 600; }
-.t:hover { background: var(--accent-bg); border-radius: 3px; }
-.flash { animation: flash 1s ease; }
-@keyframes flash { 0% { box-shadow: 0 0 0 0 var(--hl); background-color: var(--hl); } 100% { box-shadow: 0 0 0 10px transparent; } }
-.pulse { animation: pulse 1.4s ease-in-out infinite; }
-@keyframes pulse { 50% { opacity: .45; } }
-.fade-in { animation: fadein .35s ease both; }
-@keyframes fadein { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-.meter { height: 10px; border-radius: 99px; background: var(--panel-3); overflow: hidden; }
-.meter > i { display: block; height: 100%; background: var(--chc); border-radius: 99px; transition: width .3s; }
-.scroll-y { overflow-y: auto; min-height: 0; }
-.log { font-family: var(--mono); font-size: 13.5px; line-height: 1.45; background: var(--panel-3); border-radius: 10px; padding: 8px 10px; overflow-y: auto; min-height: 0; }
-.log > div { padding: 1px 0; border-bottom: 1px dashed var(--line); }
+.big { font-size: 40px; font-weight: 800; letter-spacing: -.02em; line-height: 1.1; font-variant-numeric: tabular-nums; } /* .big: a large bold number, used for results like totals and percentages; even-width digits stop it jumping */
+.num { font-variant-numeric: tabular-nums; } /* .num: evenly spaced digits so numbers in a column line up */
+.t { border-bottom: 2px dotted color-mix(in srgb, var(--chc) 70%, transparent); cursor: help; font-weight: 600; } /* .t: a key term in the text: dotted underline in the chapter color and a question-mark cursor, hinting it has a definition */
+.t:hover { background: var(--accent-bg); border-radius: 3px; } /* hovering a key term gives it a pale accent background while its definition box is shown */
+.flash { animation: flash 1s ease; } /* .flash: the script adds this for one second to draw the eye to a value that just changed */
+@keyframes flash { 0% { box-shadow: 0 0 0 0 var(--hl); background-color: var(--hl); } 100% { box-shadow: 0 0 0 10px transparent; } } /* the flash animation: starts with a yellow fill and glow, then the glow spreads out and fades away */
+.pulse { animation: pulse 1.4s ease-in-out infinite; } /* .pulse: makes something gently fade in and out over and over, to show it is waiting or active */
+@keyframes pulse { 50% { opacity: .45; } } /* the pulse animation: halfway through each cycle the element is at 45% opacity */
+.fade-in { animation: fadein .35s ease both; } /* .fade-in: makes new content fade in while sliding up slightly, instead of popping in */
+@keyframes fadein { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } } /* the fade-in animation: from invisible and 6px lower to fully visible in place */
+.meter { height: 10px; border-radius: 99px; background: var(--panel-3); overflow: hidden; } /* .meter: a thin rounded progress track with a tinted background */
+.meter > i { display: block; height: 100%; background: var(--chc); border-radius: 99px; transition: width .3s; } /* the colored fill inside a meter; the script sets its width as a percentage and it grows smoothly */
+.scroll-y { overflow-y: auto; min-height: 0; } /* .scroll-y: lets a box scroll up and down on its own when its content is taller than it */
+.log { font-family: var(--mono); font-size: 13.5px; line-height: 1.45; background: var(--panel-3); border-radius: 10px; padding: 8px 10px; overflow-y: auto; min-height: 0; } /* .log: a scrolling event log in the fixed-width typeface on a tinted background, like a terminal */
+.log > div { padding: 1px 0; border-bottom: 1px dashed var(--line); } /* each log entry is separated from the next by a dashed line */
 
 /* SVG helpers: fills/strokes that follow the theme */
-svg .s-cpu { fill: var(--cpu-bg); stroke: var(--cpu); } svg .s-mem { fill: var(--mem-bg); stroke: var(--mem); }
-svg .s-io { fill: var(--io-bg); stroke: var(--io); } svg .s-os { fill: var(--os-bg); stroke: var(--os); }
-svg .s-proc { fill: var(--proc-bg); stroke: var(--proc); } svg .s-thread { fill: var(--thread-bg); stroke: var(--thread); }
-svg .s-intr { fill: var(--intr-bg); stroke: var(--intr); } svg .s-ok { fill: var(--ok-bg); stroke: var(--ok); }
-svg .s-bad { fill: var(--bad-bg); stroke: var(--bad); } svg .s-warn { fill: var(--warn-bg); stroke: var(--warn); }
-svg .s-panel { fill: var(--panel-2); stroke: var(--line-2); } svg .s-accent { fill: var(--accent-bg); stroke: var(--accent); }
-svg .s-line { fill: none; stroke: var(--ink-2); stroke-width: 2; }
-svg .s-muted { fill: none; stroke: var(--line-2); stroke-width: 2; }
-svg text, svg .s-text { fill: var(--ink); font-family: var(--font); }
-svg .s-sub { fill: var(--muted); }
-svg .s-monot { font-family: var(--mono); }
+svg .s-cpu { fill: var(--cpu-bg); stroke: var(--cpu); } svg .s-mem { fill: var(--mem-bg); stroke: var(--mem); } /* SVG shape classes: .s-cpu fills a shape pale blue with a blue outline; .s-mem does the same in green */
+svg .s-io { fill: var(--io-bg); stroke: var(--io); } svg .s-os { fill: var(--os-bg); stroke: var(--os); } /* .s-io colors a drawn shape orange (input/output); .s-os colors it purple (operating system) */
+svg .s-proc { fill: var(--proc-bg); stroke: var(--proc); } svg .s-thread { fill: var(--thread-bg); stroke: var(--thread); } /* .s-proc colors a drawn shape teal (process); .s-thread colors it pink (thread) */
+svg .s-intr { fill: var(--intr-bg); stroke: var(--intr); } svg .s-ok { fill: var(--ok-bg); stroke: var(--ok); } /* .s-intr colors a drawn shape red (interrupt); .s-ok colors it green (success) */
+svg .s-bad { fill: var(--bad-bg); stroke: var(--bad); } svg .s-warn { fill: var(--warn-bg); stroke: var(--warn); } /* .s-bad colors a drawn shape red (error); .s-warn colors it amber (warning) */
+svg .s-panel { fill: var(--panel-2); stroke: var(--line-2); } svg .s-accent { fill: var(--accent-bg); stroke: var(--accent); } /* .s-panel draws a neutral shape; .s-accent draws one in the accent indigo */
+svg .s-line { fill: none; stroke: var(--ink-2); stroke-width: 2; } /* .s-line draws an unfilled 2px line in the secondary ink color, used for arrows and connectors */
+svg .s-muted { fill: none; stroke: var(--line-2); stroke-width: 2; } /* .s-muted draws an unfilled 2px line in a faint border color, for background guides */
+svg text, svg .s-text { fill: var(--ink); font-family: var(--font); } /* text inside drawings uses the main ink color and reading typeface, so it switches with the theme */
+svg .s-sub { fill: var(--muted); } /* .s-sub: grey text for smaller labels inside drawings */
+svg .s-monot { font-family: var(--mono); } /* .s-monot: fixed-width text inside drawings, for addresses and register values */
 
 /* ----------------------------------------------------------- ui.player */
-.player { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
-.player-cap { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; font-size: 15.5px; line-height: 1.45; min-height: 3.2em; }
-.player-cap b { color: var(--chc); }
-.player-ctl { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.player-count { font-size: 13px; color: var(--muted); font-weight: 700; font-variant-numeric: tabular-nums; margin-left: 4px; }
-.player-bar { flex: 1; min-width: 60px; height: 6px; border-radius: 9px; background: var(--panel-3); overflow: hidden; }
-.player-bar > i { display: block; height: 100%; background: var(--chc); transition: width .2s; }
+.player { display: flex; flex-direction: column; gap: 8px; min-width: 0; } /* .player: the step-by-step animation player (caption on top, controls below), stacked with 8px gaps */
+.player-cap { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; font-size: 15.5px; line-height: 1.45; min-height: 3.2em; } /* .player-cap: the caption box that explains the current frame; its minimum height keeps the controls from jumping */
+.player-cap b { color: var(--chc); } /* bold words in a caption are drawn in the chapter color */
+.player-ctl { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; } /* .player-ctl: the row of controls (reset, back, play, forward, frame count, progress bar, speed), wrapping if needed */
+.player-count { font-size: 13px; color: var(--muted); font-weight: 700; font-variant-numeric: tabular-nums; margin-left: 4px; } /* .player-count: the small "Step 2 / 5" counter, with even-width digits */
+.player-bar { flex: 1; min-width: 60px; height: 6px; border-radius: 9px; background: var(--panel-3); overflow: hidden; } /* .player-bar: the progress track that fills the remaining width of the control row */
+.player-bar > i { display: block; height: 100%; background: var(--chc); transition: width .2s; } /* the colored fill of the player's progress track; its width grows as frames advance */
 
 /* ----------------------------------------------------------- ui.slider / seg / tabs */
-.ui-slider { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; font-size: 15px; }
-.ui-slider label { font-weight: 650; white-space: nowrap; }
-.ui-slider output { font-family: var(--mono); font-weight: 700; min-width: 4.5ch; text-align: right; color: var(--chc); }
-input[type="range"] { accent-color: var(--chc); width: 100%; }
-.seg { display: inline-flex; padding: 3px; border-radius: 11px; background: var(--panel-3); gap: 2px; flex-wrap: wrap; }
-.seg button { border: 0; background: transparent; padding: 5px 12px; border-radius: 8px; font-size: 14.5px; font-weight: 650; cursor: pointer; color: var(--ink-2); white-space: nowrap; }
-.seg button:hover { color: var(--ink); }
-.seg button.on { background: var(--panel); color: var(--chc); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
-.tabs { display: flex; flex-direction: column; min-height: 0; height: 100%; }
-.tabs-strip { display: flex; gap: 4px; border-bottom: 2px solid var(--line); margin-bottom: 10px; flex: none; flex-wrap: wrap; }
-.tabs-strip button { border: 0; background: none; padding: 7px 14px; font-weight: 700; font-size: 15px; color: var(--muted); cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -2px; border-radius: 8px 8px 0 0; }
-.tabs-strip button.on { color: var(--chc); border-bottom-color: var(--chc); background: var(--panel-2); }
-.tabs-panel { flex: 1; min-height: 0; position: relative; }
-.reveal-btn { margin-top: 4px; }
-.reveal-body { display: none; }
-.reveal-body.on { display: block; animation: fadein .3s ease; }
+.ui-slider { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; font-size: 15px; } /* .ui-slider: a labeled slider laid out as three columns: label, the slider itself, then its current value */
+.ui-slider label { font-weight: 650; white-space: nowrap; } /* the slider's label is bold and stays on one line */
+.ui-slider output { font-family: var(--mono); font-weight: 700; min-width: 4.5ch; text-align: right; color: var(--chc); } /* the value readout next to the slider: fixed-width, bold, right-aligned and in the chapter color */
+input[type="range"] { accent-color: var(--chc); width: 100%; } /* every range slider uses the chapter color for its track and knob and fills its column */
+.seg { display: inline-flex; padding: 3px; border-radius: 11px; background: var(--panel-3); gap: 2px; flex-wrap: wrap; } /* .seg: a segmented control, a set of option buttons joined in one tinted pill (pick one of several) */
+.seg button { border: 0; background: transparent; padding: 5px 12px; border-radius: 8px; font-size: 14.5px; font-weight: 650; cursor: pointer; color: var(--ink-2); white-space: nowrap; } /* each option in a segmented control is a plain borderless button with bold secondary text */
+.seg button:hover { color: var(--ink); } /* hovering an option darkens its text */
+.seg button.on { background: var(--panel); color: var(--chc); box-shadow: 0 1px 3px rgba(0,0,0,.12); } /* the chosen option looks raised: white fill, chapter-colored text and a small shadow */
+.tabs { display: flex; flex-direction: column; min-height: 0; height: 100%; } /* .tabs: a tab box that stacks the tab strip above the panel and fills the height it is given */
+.tabs-strip { display: flex; gap: 4px; border-bottom: 2px solid var(--line); margin-bottom: 10px; flex: none; flex-wrap: wrap; } /* .tabs-strip: the row of tab buttons with a line under it, wrapping to a second line if needed */
+.tabs-strip button { border: 0; background: none; padding: 7px 14px; font-weight: 700; font-size: 15px; color: var(--muted); cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -2px; border-radius: 8px 8px 0 0; } /* each tab button is plain bold text with an invisible bottom bar that overlaps the strip's line by 2px */
+.tabs-strip button.on { color: var(--chc); border-bottom-color: var(--chc); background: var(--panel-2); } /* the chosen tab shows a colored bottom bar and chapter-colored text on a light fill, like a folder tab */
+.tabs-panel { flex: 1; min-height: 0; position: relative; } /* .tabs-panel: the content area under the tabs, taking the leftover height */
+.reveal-btn { margin-top: 4px; } /* .reveal-btn: the small "Show answer" style button gets a little space above it */
+.reveal-body { display: none; } /* .reveal-body: the hidden text that a reveal button uncovers; hidden until clicked */
+.reveal-body.on { display: block; animation: fadein .3s ease; } /* once revealed (class "on"), the hidden text appears and fades in */
 
 /* ----------------------------------------------------------- ui.code */
-pre.code {
-  margin: 0; font-family: var(--mono); font-size: 14px; line-height: 1.5; background: var(--panel-3);
-  border: 1px solid var(--line); border-radius: 10px; padding: 8px 0; overflow: auto; tab-size: 4; min-height: 0;
-}
-pre.code .ln { display: block; padding: 0 12px 0 0; white-space: pre; border-left: 4px solid transparent; }
-pre.code .ln::before { content: attr(data-n); display: inline-block; width: 2.6em; padding-right: .8em; text-align: right; color: var(--muted); opacity: .7; user-select: none; }
-pre.code.nonum .ln::before { display: none; }
-pre.code.nonum .ln { padding-left: 12px; }
-pre.code .ln.cur { background: color-mix(in srgb, var(--chc) 16%, transparent); border-left-color: var(--chc); }
-pre.code .ln.ok { background: var(--ok-bg); border-left-color: var(--ok); }
-pre.code .ln.bad { background: var(--bad-bg); border-left-color: var(--bad); }
-pre.code .ln.dim { opacity: .45; }
-.tk-kw { color: var(--os); font-weight: 700; }
-.tk-com { color: var(--muted); font-style: italic; }
-.tk-str { color: var(--mem); }
-.tk-num { color: var(--io); }
-.tk-fn { color: var(--cpu); }
+pre.code { /* pre.code: a block of code or pseudo-code shown to students (pre keeps every space and line break as typed) */
+  margin: 0; font-family: var(--mono); font-size: 14px; line-height: 1.5; background: var(--panel-3); /* no margin, fixed-width text at 14px on a tinted background */
+  border: 1px solid var(--line); border-radius: 10px; padding: 8px 0; overflow: auto; tab-size: 4; min-height: 0; /* thin rounded border, scrolls if the code is too long, and tab characters count as 4 spaces */
+} /* ends the pre.code rule */
+pre.code .ln { display: block; padding: 0 12px 0 0; white-space: pre; border-left: 4px solid transparent; } /* .ln: one code line on its own row, with an invisible left bar that can light up to point at that line */
+pre.code .ln::before { content: attr(data-n); display: inline-block; width: 2.6em; padding-right: .8em; text-align: right; color: var(--muted); opacity: .7; user-select: none; } /* the line number is drawn before each line from its data-n attribute, grey and right-aligned, and cannot be selected */
+pre.code.nonum .ln::before { display: none; } /* code blocks marked .nonum hide the line numbers */
+pre.code.nonum .ln { padding-left: 12px; } /* without line numbers, each line gets a small left indent instead */
+pre.code .ln.cur { background: color-mix(in srgb, var(--chc) 16%, transparent); border-left-color: var(--chc); } /* .ln.cur: the line running right now, tinted and marked with a bar in the chapter color */
+pre.code .ln.ok { background: var(--ok-bg); border-left-color: var(--ok); } /* .ln.ok: a line marked as correct or safe, tinted green */
+pre.code .ln.bad { background: var(--bad-bg); border-left-color: var(--bad); } /* .ln.bad: a line marked as the problem, tinted red */
+pre.code .ln.dim { opacity: .45; } /* .ln.dim: lines that do not matter at this moment are faded */
+.tk-kw { color: var(--os); font-weight: 700; } /* syntax coloring: keywords such as if and while are purple and bold */
+.tk-com { color: var(--muted); font-style: italic; } /* comments inside shown code are grey and italic */
+.tk-str { color: var(--mem); } /* text strings inside shown code are green */
+.tk-num { color: var(--io); } /* numbers inside shown code are orange */
+.tk-fn { color: var(--cpu); } /* function names inside shown code are blue */
 
 /* ----------------------------------------------------------- flip cards */
-.flip { perspective: 900px; cursor: pointer; min-height: 90px; }
-.flip-in { position: relative; width: 100%; height: 100%; min-height: inherit; transition: transform .45s; transform-style: preserve-3d; }
-.flip.on .flip-in { transform: rotateY(180deg); }
-.flip-face { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; border-radius: 12px; border: 1px solid var(--line); padding: 10px 12px; display: flex; align-items: center; justify-content: center; text-align: center; background: var(--panel-2); overflow: hidden; }
-.flip-face.front { font-weight: 800; font-size: 17px; }
-.flip-face > div { max-width: 100%; }
-.flip-face.back { transform: rotateY(180deg); background: var(--accent-bg); font-size: 14.5px; line-height: 1.4; }
+.flip { perspective: 900px; cursor: pointer; min-height: 90px; } /* .flip: a flash card that turns over when clicked; perspective gives the turn a 3D depth */
+.flip-in { position: relative; width: 100%; height: 100%; min-height: inherit; transition: transform .45s; transform-style: preserve-3d; } /* .flip-in: the inner layer that actually rotates, holding both faces in 3D space */
+.flip.on .flip-in { transform: rotateY(180deg); } /* when the card is flipped (class "on"), the inner layer turns half a circle around its vertical axis */
+.flip-face { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; border-radius: 12px; border: 1px solid var(--line); padding: 10px 12px; display: flex; align-items: center; justify-content: center; text-align: center; background: var(--panel-2); overflow: hidden; } /* .flip-face: each side of the card, stacked on top of each other; the side facing away from the viewer is hidden */
+.flip-face.front { font-weight: 800; font-size: 17px; } /* the front face shows the term in bold, slightly larger text */
+.flip-face > div { max-width: 100%; } /* keeps the content of a face from spilling past its edges */
+.flip-face.back { transform: rotateY(180deg); background: var(--accent-bg); font-size: 14.5px; line-height: 1.4; } /* the back face starts already turned around, so it faces the viewer after the flip; it holds the definition */
 
 /* ----------------------------------------------------------- quiz */
-.quiz { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 10px; height: 100%; }
-.quiz-top { display: flex; align-items: center; gap: 10px; }
-.quiz-pills { display: flex; gap: 5px; flex-wrap: wrap; flex: 1; }
-.quiz-pill { width: 30px; height: 30px; border-radius: 8px; border: 2px solid var(--line-2); background: var(--panel); font-size: 13px; font-weight: 800; cursor: pointer; color: var(--ink-2); }
-.quiz-pill.on { border-color: var(--chc); color: var(--chc); }
-.quiz-pill.right { background: var(--ok); border-color: var(--ok); color: #fff; }
-.quiz-pill.late { background: var(--warn); border-color: var(--warn); color: #fff; }
-.quiz-pill.wrong { background: var(--bad); border-color: var(--bad); color: #fff; }
-.quiz-score { font-weight: 800; font-size: 15px; color: var(--ink-2); white-space: nowrap; }
-.quiz-main { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 18px; min-height: 0; }
-.quiz-q { display: flex; flex-direction: column; gap: 10px; min-height: 0; overflow-y: auto; overflow-x: hidden; }
-.quiz-main.dense .quiz-q { gap: 7px; }
-.quiz-main.dense .quiz-qtext { font-size: 17px; }
-.quiz-main.dense .qopts { gap: 5px; }
-.quiz-main.dense .qopt { padding: 6px 10px; font-size: 15px; }
-.quiz-main.dense .qrow, .quiz-main.dense .qord { padding: 4px 8px; font-size: 14px; }
-.quiz-main.dense .qrow .seg button { padding: 3px 9px; font-size: 13.5px; }
-.quiz-main.denser .quiz-qtext { font-size: 16px; line-height: 1.3; }
-.quiz-main.denser .qopts { gap: 3px; }
-.quiz-main.denser .qopt { padding: 4px 9px; font-size: 14px; }
-.quiz-main.denser .qopt .ql { width: 20px; height: 20px; }
-.quiz-main.denser .qrow, .quiz-main.denser .qord { padding: 2px 7px; font-size: 13.5px; }
-.quiz-main.denser .qord .mv button { width: 22px; height: 22px; }
-.quiz-qtext { font-size: 19px; font-weight: 650; line-height: 1.4; }
-.quiz-type { font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
-.quiz-src { font-size: 12px; font-weight: 800; color: var(--chc); margin-left: 8px; }
-.qopts { display: flex; flex-direction: column; gap: 7px; }
-.qopt { display: flex; align-items: flex-start; gap: 10px; text-align: left; width: 100%; padding: 9px 12px; border-radius: 10px; border: 2px solid var(--line); background: var(--panel); cursor: pointer; font-size: 16px; line-height: 1.35; color: var(--ink); }
-.qopt:hover:not(:disabled) { border-color: var(--chc); }
-.qopt .ql { flex: none; width: 24px; height: 24px; border-radius: 7px; background: var(--panel-3); display: grid; place-items: center; font-size: 13px; font-weight: 800; color: var(--ink-2); }
-.qopt.sel { border-color: var(--chc); background: color-mix(in srgb, var(--chc) 9%, var(--panel)); }
-.qopt.right { border-color: var(--ok); background: var(--ok-bg); }
-.qopt.right .ql { background: var(--ok); color: #fff; }
-.qopt.wrong { border-color: var(--bad); background: var(--bad-bg); }
-.qopt.wrong .ql { background: var(--bad); color: #fff; }
-.qopt:disabled { cursor: default; }
-.qopt.dim { opacity: .55; }
-.quiz-fb { background: var(--panel-2); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; font-size: 15.5px; line-height: 1.5; overflow-y: auto; min-height: 0; }
-.quiz-fb .verdict { font-weight: 900; font-size: 18px; margin-bottom: 4px; }
-.quiz-fb .verdict.ok { color: var(--ok); } .quiz-fb .verdict.bad { color: var(--bad); } .quiz-fb .verdict.warn { color: var(--warn); }
-.quiz-fb .why { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--line-2); }
-.quiz-ctl { display: flex; align-items: center; gap: 8px; }
-.qrow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 6px 10px; border: 2px solid var(--line); border-radius: 10px; background: var(--panel); font-size: 15px; }
-.qrow.right { border-color: var(--ok); background: var(--ok-bg); }
-.qrow.wrong { border-color: var(--bad); background: var(--bad-bg); }
-.qrow select { font: inherit; font-size: 14.5px; padding: 4px 8px; border-radius: 8px; border: 1px solid var(--line-2); background: var(--panel); color: var(--ink); max-width: 330px; }
-.qord { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border: 2px solid var(--line); border-radius: 10px; background: var(--panel); font-size: 15px; cursor: grab; }
-.qord.drag { opacity: .4; }
-.qord.right { border-color: var(--ok); background: var(--ok-bg); }
-.qord.wrong { border-color: var(--bad); background: var(--bad-bg); }
-.qord .grip { color: var(--muted); font-weight: 900; cursor: grab; }
-.qord .txt { flex: 1; }
-.qord .mv { display: flex; gap: 2px; }
-.qord .mv button { width: 26px; height: 26px; border-radius: 7px; border: 1px solid var(--line); background: var(--panel-2); cursor: pointer; font-size: 12px; }
-.qnum { display: flex; gap: 8px; align-items: center; }
-.qnum input { font: inherit; font-size: 18px; width: 170px; height: 42px; border-radius: 10px; border: 2px solid var(--line-2); padding: 0 12px; background: var(--panel); color: var(--ink); font-family: var(--mono); }
-.qnum input.right { border-color: var(--ok); background: var(--ok-bg); }
-.qnum input.wrong { border-color: var(--bad); background: var(--bad-bg); }
-.quiz-sum { display: grid; place-items: center; text-align: center; height: 100%; }
-body.narrow .quiz-main { grid-template-columns: 1fr; }
-body.narrow .quiz { height: auto; }
+.quiz { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 10px; height: 100%; } /* .quiz: the quiz layout in three rows: question buttons on top, the question and feedback, then the controls */
+.quiz-top { display: flex; align-items: center; gap: 10px; } /* .quiz-top: the top row with numbered question buttons and the score */
+.quiz-pills { display: flex; gap: 5px; flex-wrap: wrap; flex: 1; } /* .quiz-pills: the numbered question buttons, wrapping to more lines if there are many */
+.quiz-pill { width: 30px; height: 30px; border-radius: 8px; border: 2px solid var(--line-2); background: var(--panel); font-size: 13px; font-weight: 800; cursor: pointer; color: var(--ink-2); } /* .quiz-pill: one numbered question button, a 30px rounded square */
+.quiz-pill.on { border-color: var(--chc); color: var(--chc); } /* the question on screen now has a chapter-colored border and number */
+.quiz-pill.right { background: var(--ok); border-color: var(--ok); color: #fff; } /* a question answered right on the first try is filled green */
+.quiz-pill.late { background: var(--warn); border-color: var(--warn); color: #fff; } /* a question answered right only on the second try is filled amber */
+.quiz-pill.wrong { background: var(--bad); border-color: var(--bad); color: #fff; } /* a question answered wrong is filled red */
+.quiz-score { font-weight: 800; font-size: 15px; color: var(--ink-2); white-space: nowrap; } /* .quiz-score: the running score text at the right of the top row */
+.quiz-main { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 18px; min-height: 0; } /* .quiz-main: two columns, the question on the left (3 parts) and the feedback on the right (2 parts) */
+.quiz-q { display: flex; flex-direction: column; gap: 10px; min-height: 0; overflow-y: auto; overflow-x: hidden; } /* .quiz-q: the question column, stacked, scrolling if the question is very long */
+.quiz-main.dense .quiz-q { gap: 7px; } /* dense: the script adds this when a question does not fit; everything in it gets a little tighter */
+.quiz-main.dense .quiz-qtext { font-size: 17px; } /* dense: the question text shrinks to 17px */
+.quiz-main.dense .qopts { gap: 5px; } /* dense: less space between answer choices */
+.quiz-main.dense .qopt { padding: 6px 10px; font-size: 15px; } /* dense: answer choices get less padding and smaller text */
+.quiz-main.dense .qrow, .quiz-main.dense .qord { padding: 4px 8px; font-size: 14px; } /* dense: rows of matching and ordering questions get less padding and smaller text */
+.quiz-main.dense .qrow .seg button { padding: 3px 9px; font-size: 13.5px; } /* dense: the option buttons inside matching rows get smaller */
+.quiz-main.denser .quiz-qtext { font-size: 16px; line-height: 1.3; } /* denser: the second, tighter level the script adds if the question still does not fit; the text shrinks again */
+.quiz-main.denser .qopts { gap: 3px; } /* denser: even less space between answer choices */
+.quiz-main.denser .qopt { padding: 4px 9px; font-size: 14px; } /* denser: answer choices get even less padding and smaller text */
+.quiz-main.denser .qopt .ql { width: 20px; height: 20px; } /* denser: the letter badge in front of each choice shrinks to 20px */
+.quiz-main.denser .qrow, .quiz-main.denser .qord { padding: 2px 7px; font-size: 13.5px; } /* denser: matching and ordering rows get the least padding */
+.quiz-main.denser .qord .mv button { width: 22px; height: 22px; } /* denser: the up and down arrow buttons in ordering questions shrink */
+.quiz-qtext { font-size: 19px; font-weight: 650; line-height: 1.4; } /* .quiz-qtext: the question itself, in large, fairly bold text */
+.quiz-type { font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); } /* .quiz-type: the small grey label above the question ("Question 2 of 6" and the question type) */
+.quiz-src { font-size: 12px; font-weight: 800; color: var(--chc); margin-left: 8px; } /* .quiz-src: the section number the question came from, in the chapter color, shown in chapter challenges */
+.qopts { display: flex; flex-direction: column; gap: 7px; } /* .qopts: the list of answer choices, stacked with small gaps */
+.qopt { display: flex; align-items: flex-start; gap: 10px; text-align: left; width: 100%; padding: 9px 12px; border-radius: 10px; border: 2px solid var(--line); background: var(--panel); cursor: pointer; font-size: 16px; line-height: 1.35; color: var(--ink); } /* .qopt: one answer choice button: full width, left-aligned text, thick border and rounded corners */
+.qopt:hover:not(:disabled) { border-color: var(--chc); } /* hovering a choice that can still be picked turns its border the chapter color */
+.qopt .ql { flex: none; width: 24px; height: 24px; border-radius: 7px; background: var(--panel-3); display: grid; place-items: center; font-size: 13px; font-weight: 800; color: var(--ink-2); } /* .ql: the letter badge (A, B, C...) in front of each choice, a small tinted square */
+.qopt.sel { border-color: var(--chc); background: color-mix(in srgb, var(--chc) 9%, var(--panel)); } /* a selected choice has a chapter-colored border and a light tint of the same color */
+.qopt.right { border-color: var(--ok); background: var(--ok-bg); } /* after checking, the correct choice is shown with a green border and pale green fill */
+.qopt.right .ql { background: var(--ok); color: #fff; } /* the correct choice's letter badge becomes solid green */
+.qopt.wrong { border-color: var(--bad); background: var(--bad-bg); } /* a chosen wrong answer is shown with a red border and pale red fill */
+.qopt.wrong .ql { background: var(--bad); color: #fff; } /* the wrong choice's letter badge becomes solid red */
+.qopt:disabled { cursor: default; } /* once the question is finished, the choices no longer show a hand cursor */
+.qopt.dim { opacity: .55; } /* choices that were neither right nor picked are faded after checking */
+.quiz-fb { background: var(--panel-2); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; font-size: 15.5px; line-height: 1.5; overflow-y: auto; min-height: 0; } /* .quiz-fb: the feedback panel on the right, which explains the answer and scrolls if long */
+.quiz-fb .verdict { font-weight: 900; font-size: 18px; margin-bottom: 4px; } /* .verdict: the big bold result line at the top of the feedback (for example "Correct!") */
+.quiz-fb .verdict.ok { color: var(--ok); } .quiz-fb .verdict.bad { color: var(--bad); } .quiz-fb .verdict.warn { color: var(--warn); } /* the verdict is green for right, red for wrong, amber for right on a later try */
+.quiz-fb .why { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--line-2); } /* .why: the explanation under the verdict, separated by a dashed line */
+.quiz-ctl { display: flex; align-items: center; gap: 8px; } /* .quiz-ctl: the bottom row of quiz buttons (Check, Next question and so on) */
+.qrow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 6px 10px; border: 2px solid var(--line); border-radius: 10px; background: var(--panel); font-size: 15px; } /* .qrow: one row of a matching question: the statement on the left and its answer picker on the right */
+.qrow.right { border-color: var(--ok); background: var(--ok-bg); } /* a matching row answered right turns green */
+.qrow.wrong { border-color: var(--bad); background: var(--bad-bg); } /* a matching row answered wrong turns red */
+.qrow select { font: inherit; font-size: 14.5px; padding: 4px 8px; border-radius: 8px; border: 1px solid var(--line-2); background: var(--panel); color: var(--ink); max-width: 330px; } /* the drop-down list (select) in a matching row matches the page font and colors and is at most 330px wide */
+.qord { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border: 2px solid var(--line); border-radius: 10px; background: var(--panel); font-size: 15px; cursor: grab; } /* .qord: one item in a put-in-order question, shown with a grab cursor because it can be dragged */
+.qord.drag { opacity: .4; } /* the item being dragged is faded so the student sees where it came from */
+.qord.right { border-color: var(--ok); background: var(--ok-bg); } /* an item in the right position turns green after checking */
+.qord.wrong { border-color: var(--bad); background: var(--bad-bg); } /* an item in the wrong position turns red after checking */
+.qord .grip { color: var(--muted); font-weight: 900; cursor: grab; } /* .grip: the dotted handle at the left of each item that hints you can drag it */
+.qord .txt { flex: 1; } /* .txt: the item's text takes the middle of the row */
+.qord .mv { display: flex; gap: 2px; } /* .mv: the pair of small up and down buttons, for moving an item without dragging */
+.qord .mv button { width: 26px; height: 26px; border-radius: 7px; border: 1px solid var(--line); background: var(--panel-2); cursor: pointer; font-size: 12px; } /* each up or down button is a 26px rounded square */
+.qnum { display: flex; gap: 8px; align-items: center; } /* .qnum: the row for a type-in number answer (input box, unit, Check button) */
+.qnum input { font: inherit; font-size: 18px; width: 170px; height: 42px; border-radius: 10px; border: 2px solid var(--line-2); padding: 0 12px; background: var(--panel); color: var(--ink); font-family: var(--mono); } /* the number input box: large fixed-width digits, 170px wide, with a thick rounded border */
+.qnum input.right { border-color: var(--ok); background: var(--ok-bg); } /* a correct typed answer turns the box green */
+.qnum input.wrong { border-color: var(--bad); background: var(--bad-bg); } /* a wrong typed answer turns the box red */
+.quiz-sum { display: grid; place-items: center; text-align: center; height: 100%; } /* .quiz-sum: the end-of-quiz summary, centered in the full quiz area */
+body.narrow .quiz-main { grid-template-columns: 1fr; } /* small screens: the question and feedback stack in one column instead of side by side */
+body.narrow .quiz { height: auto; } /* small screens: the quiz grows with its content instead of filling a fixed height */
 
 /* ----------------------------------------------------------- home / chapter / review slides */
-.home-hero h1 { font-size: 40px; margin: 0; letter-spacing: -.025em; line-height: 1.08; }
-.home-hero p { margin: 8px 0 0; color: var(--ink-2); font-size: 17px; }
-.chcards { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
-.chcard { position: relative; text-align: left; border: 1px solid var(--line); border-radius: 14px; background: var(--panel-2); padding: 12px 14px 12px; cursor: pointer; display: flex; flex-direction: column; gap: 6px; min-height: 0; border-top: 5px solid var(--c); color: var(--ink); }
-.chcard:hover { border-color: var(--c); box-shadow: var(--shadow); }
-.chcard .n { font-size: 12px; font-weight: 900; letter-spacing: .09em; text-transform: uppercase; color: var(--c); }
-.chcard .tt { font-size: 17px; font-weight: 800; line-height: 1.2; }
-.chcard ul { margin: 0; padding-left: 16px !important; font-size: 12.5px; color: var(--ink-2); line-height: 1.35; }
-.chcard { overflow: hidden; }
-.hc1 .chcard ul { font-size: 12px; line-height: 1.22; }
-.hc1 .chcard .tt { font-size: 15.5px; }
-.hc1 .chcard { gap: 4px; padding: 10px 12px; }
-.hc2 .home-hero p { display: none; }
-.hc2 .home-hero h1 { font-size: 32px; }
-.hc3 .home-hero > .row { display: none; }
-.hc3 .home-hero h1 { margin-top: 0 !important; }
-.hc3 .chcard .tt { font-size: 14.5px; }
-.hc3 .chcard ul { font-size: 11.5px; line-height: 1.17; }
-.hc4 .chcard ul li:nth-child(n+10) { display: none; }
-.hc4 .chcard ul:has(li:nth-child(10))::after { content: '… and more'; display: block; color: var(--muted); font-size: 11.5px; }
-.chcard .meter > i { background: var(--c); }
-.legend { display: flex; gap: 8px; flex-wrap: wrap; }
-.chmap { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-.chmap button { text-align: left; border: 1px solid var(--line); border-left: 4px solid var(--chc); background: var(--panel-2); border-radius: 10px; padding: 8px 10px; cursor: pointer; font-size: 14px; line-height: 1.35; color: var(--ink); }
-.chmap button:hover { border-color: var(--chc); }
-.chmap button b { display: block; font-size: 15px; }
-.chmap button .muted { font-size: 13px; }
-.chov.cm1 .chmap button .muted { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
-.chov.cm1 .chmap { gap: 6px; }
-.chov.cm1 .chmap button { padding: 6px 9px; }
-.chov.cm2 .chmap button .muted { display: none; }
-.chov.cm3 { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
-.chov.cm3 .chmap button b { font-size: 14px; }
-.chov.cm4 .card ul { font-size: 13px !important; }
-.chov.cm4 .lead { font-size: 17px; }
-.fc-big { perspective: 1200px; width: 100%; height: 300px; cursor: pointer; }
-.fc-big .flip-in { height: 100%; }
-.fc-big .flip-face.front { font-size: 30px; }
-.fc-big .flip-face.back { font-size: 19px; padding: 20px 28px; }
+.home-hero h1 { font-size: 40px; margin: 0; letter-spacing: -.025em; line-height: 1.08; } /* .home-hero: the large welcome heading on the home page, tight and bold */
+.home-hero p { margin: 8px 0 0; color: var(--ink-2); font-size: 17px; } /* the short introduction under the welcome heading */
+.chcards { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; } /* .chcards: the five chapter cards on the home page, side by side in equal columns */
+.chcard { position: relative; text-align: left; border: 1px solid var(--line); border-radius: 14px; background: var(--panel-2); padding: 12px 14px 12px; cursor: pointer; display: flex; flex-direction: column; gap: 6px; min-height: 0; border-top: 5px solid var(--c); color: var(--ink); } /* .chcard: one chapter card: rounded, clickable, stacked, with a thick top edge in that chapter's color (--c) */
+.chcard:hover { border-color: var(--c); box-shadow: var(--shadow); } /* hovering a chapter card outlines it in the chapter color and lifts it with a shadow */
+.chcard .n { font-size: 12px; font-weight: 900; letter-spacing: .09em; text-transform: uppercase; color: var(--c); } /* .n: the small uppercase "Chapter 3" label at the top of each card, in the chapter color */
+.chcard .tt { font-size: 17px; font-weight: 800; line-height: 1.2; } /* .tt: the chapter title on each card, bold and slightly larger */
+.chcard ul { margin: 0; padding-left: 16px !important; font-size: 12.5px; color: var(--ink-2); line-height: 1.35; } /* the list of section names on each card, in small secondary text with a small indent */
+.chcard { overflow: hidden; } /* clips a card's content at its edges so a long section list cannot spill into the next card */
+.hc1 .chcard ul { font-size: 12px; line-height: 1.22; } /* hc1: the first tightening step the script adds when the home page does not fit; section lists get smaller */
+.hc1 .chcard .tt { font-size: 15.5px; } /* hc1: the chapter titles on the cards shrink a little */
+.hc1 .chcard { gap: 4px; padding: 10px 12px; } /* hc1: cards get less padding and smaller gaps */
+.hc2 .home-hero p { display: none; } /* hc2: the second tightening step hides the introduction paragraph under the welcome heading */
+.hc2 .home-hero h1 { font-size: 32px; } /* hc2: the welcome heading shrinks to 32px */
+.hc3 .home-hero > .row { display: none; } /* hc3: the third tightening step hides the row of small tags above the welcome heading */
+.hc3 .home-hero h1 { margin-top: 0 !important; } /* hc3: removes the space above the welcome heading now that the tags are gone */
+.hc3 .chcard .tt { font-size: 14.5px; } /* hc3: the chapter titles on the cards shrink again */
+.hc3 .chcard ul { font-size: 11.5px; line-height: 1.17; } /* hc3: the section lists on the cards shrink again with tighter lines */
+.hc4 .chcard ul li:nth-child(n+10) { display: none; } /* hc4: the last tightening step shows only the first 9 sections on each card */
+.hc4 .chcard ul:has(li:nth-child(10))::after { content: '… and more'; display: block; color: var(--muted); font-size: 11.5px; } /* hc4: a card that had 10 or more sections ends its list with a grey "... and more" line */
+.chcard .meter > i { background: var(--c); } /* the progress meter on each chapter card fills in that chapter's own color */
+.legend { display: flex; gap: 8px; flex-wrap: wrap; } /* .legend: the row of colored tags on the home page that explains what each diagram color means */
+.chmap { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; } /* .chmap: the grid of section buttons on a chapter's overview page, two per row */
+.chmap button { text-align: left; border: 1px solid var(--line); border-left: 4px solid var(--chc); background: var(--panel-2); border-radius: 10px; padding: 8px 10px; cursor: pointer; font-size: 14px; line-height: 1.35; color: var(--ink); } /* each section button: left-aligned text, a thick left edge in the chapter color, rounded and clickable */
+.chmap button:hover { border-color: var(--chc); } /* hovering a section button outlines it in the chapter color */
+.chmap button b { display: block; font-size: 15px; } /* the section title inside the button sits on its own line in bold */
+.chmap button .muted { font-size: 13px; } /* the short description under each section title is a little smaller */
+.chov.cm1 .chmap button .muted { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; } /* cm1: the first tightening step the script adds when a chapter overview does not fit; descriptions keep only one line */
+.chov.cm1 .chmap { gap: 6px; } /* cm1: less space between the section buttons */
+.chov.cm1 .chmap button { padding: 6px 9px; } /* cm1: section buttons get less padding */
+.chov.cm2 .chmap button .muted { display: none; } /* cm2: the second tightening step hides the descriptions entirely */
+.chov.cm3 { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } /* cm3: the third tightening step gives the overview's two columns equal width */
+.chov.cm3 .chmap button b { font-size: 14px; } /* cm3: section titles in the buttons shrink a little */
+.chov.cm4 .card ul { font-size: 13px !important; } /* cm4: the last tightening step shrinks the bullet lists in the overview's cards */
+.chov.cm4 .lead { font-size: 17px; } /* cm4: the overview's opening sentence shrinks too */
+.fc-big { perspective: 1200px; width: 100%; height: 300px; cursor: pointer; } /* .fc-big: the large key-term flash card (300px tall) on each chapter's key-terms page */
+.fc-big .flip-in { height: 100%; } /* its rotating inner layer fills the full height of the big card */
+.fc-big .flip-face.front { font-size: 30px; } /* the term on the front of the big card is shown very large */
+.fc-big .flip-face.back { font-size: 19px; padding: 20px 28px; } /* the definition on the back of the big card is larger than on small cards, with roomy padding */
 
 /* ----------------------------------------------------------- error card */
-.err-card { border: 2px dashed var(--bad); background: var(--bad-bg); border-radius: 12px; padding: 14px; font-family: var(--mono); font-size: 13px; white-space: pre-wrap; }
+.err-card { border: 2px dashed var(--bad); background: var(--bad-bg); border-radius: 12px; padding: 14px; font-family: var(--mono); font-size: 13px; white-space: pre-wrap; } /* .err-card: the dashed red box shown in place of a step whose code failed, with the error message in fixed-width text */
 
 /* ----------------------------------------------------------- print (PDF study guide) */
-.print-doc { display: none; }
-body.print { overflow: visible; height: auto; background: #fff; color: #111; }
-html.print, html.print body { overflow: visible; height: auto; }
-body.print #app, body.print .drawer, body.print .scrim, body.print .modal, body.print .toast, body.print .term-pop { display: none !important; }
-body.print .print-doc { display: block; max-width: 7.2in; margin: 0 auto; font-family: var(--font); font-size: 10.5pt; line-height: 1.5; color: #111; }
-.print-doc h1 { font-size: 28pt; margin: 0 0 6pt; letter-spacing: -.02em; }
-.print-doc h2 { font-size: 19pt; margin: 0 0 8pt; padding-bottom: 4pt; border-bottom: 3px solid var(--c, #4f46e5); break-after: avoid; }
-.print-doc h3 { font-size: 13.5pt; margin: 14pt 0 5pt; break-after: avoid; }
-.print-doc h4 { font-size: 11pt; margin: 10pt 0 3pt; break-after: avoid; }
-.print-doc p { margin: 0 0 6pt; }
-.print-doc ul, .print-doc ol { margin: 0 0 6pt; padding-left: 18pt; }
-.print-doc table { border-collapse: collapse; width: 100%; margin: 6pt 0 8pt; font-size: 9.5pt; break-inside: avoid; }
-.print-doc th, .print-doc td { border: 1px solid #c9cfdc; padding: 3pt 5pt; text-align: left; vertical-align: top; }
-.print-doc th { background: #eef1f7; }
-.print-doc svg { max-width: 100%; height: auto; break-inside: avoid; }
-.print-doc figure { margin: 6pt 0 8pt; break-inside: avoid; }
-.print-doc code { background: #eef1f7; }
-.print-doc pre { font-family: var(--mono); font-size: 8.8pt; background: #f4f6fa; border: 1px solid #dde2ec; border-radius: 6px; padding: 6pt 8pt; white-space: pre-wrap; break-inside: avoid; }
-.print-doc .p-chapter { break-before: page; }
-.print-doc .p-sec { margin-top: 14pt; }
-.print-doc .p-sec-h { display: flex; gap: 8pt; align-items: baseline; font-size: 15pt; font-weight: 800; margin: 0 0 6pt; break-after: avoid; }
-.print-doc .p-sec-h .n { color: var(--c, #4f46e5); }
-.print-doc .p-obj { background: #f4f6fa; border-radius: 6px; padding: 6pt 10pt; margin: 6pt 0 10pt; break-inside: avoid; }
-.print-doc .p-q { margin: 0 0 7pt; break-inside: avoid; }
-.print-doc .p-q .a { color: #15803d; font-weight: 700; }
-.print-doc .p-q .w { color: #444; }
-.print-doc .p-terms dt { font-weight: 800; }
-.print-doc .p-terms dd { margin: 0 0 4pt 12pt; }
-.print-doc .p-title { height: 9in; display: flex; flex-direction: column; justify-content: center; }
-.print-doc .p-toc { break-before: page; }
-.print-doc .p-toc li { margin: 2pt 0; }
-.print-doc .callout { border-left: 4px solid #4f46e5; background: #f1f0fe; padding: 5pt 9pt; border-radius: 4px; margin: 6pt 0; break-inside: avoid; }
-@page { size: Letter; margin: 0.6in 0.65in 0.7in; }
-@media print {
-  html, body { overflow: visible !important; height: auto !important; }
-  body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-}
-.print-doc .t { border: 0; font-weight: inherit; cursor: auto; }
-.print-doc .hl, .print-doc mark { background: #fde68a; }
+.print-doc { display: none; } /* .print-doc: the printable study guide is built into the page but stays hidden during normal use */
+body.print { overflow: visible; height: auto; background: #fff; color: #111; } /* print view (body class "print"): the page scrolls normally and switches to black text on white paper */
+html.print, html.print body { overflow: visible; height: auto; } /* print view: the html element and body both grow to their full height instead of being clipped to the window */
+body.print #app, body.print .drawer, body.print .scrim, body.print .modal, body.print .toast, body.print .term-pop { display: none !important; } /* print view: hides the interactive guide and every drawer, pop-up and message so only the study guide shows */
+body.print .print-doc { display: block; max-width: 7.2in; margin: 0 auto; font-family: var(--font); font-size: 10.5pt; line-height: 1.5; color: #111; } /* print view: shows the study guide as a column about the width of a letter page, in print-sized text */
+.print-doc h1 { font-size: 28pt; margin: 0 0 6pt; letter-spacing: -.02em; } /* the title of the printed guide, very large */
+.print-doc h2 { font-size: 19pt; margin: 0 0 8pt; padding-bottom: 4pt; border-bottom: 3px solid var(--c, #4f46e5); break-after: avoid; } /* each chapter heading in print, underlined in the chapter color, never left alone at the bottom of a page */
+.print-doc h3 { font-size: 13.5pt; margin: 14pt 0 5pt; break-after: avoid; } /* section headings in print, kept together with the text that follows */
+.print-doc h4 { font-size: 11pt; margin: 10pt 0 3pt; break-after: avoid; } /* small headings in print, also kept together with the text that follows */
+.print-doc p { margin: 0 0 6pt; } /* paragraph spacing in print */
+.print-doc ul, .print-doc ol { margin: 0 0 6pt; padding-left: 18pt; } /* list spacing and indent in print */
+.print-doc table { border-collapse: collapse; width: 100%; margin: 6pt 0 8pt; font-size: 9.5pt; break-inside: avoid; } /* tables in print use single shared borders and are never split across two pages */
+.print-doc th, .print-doc td { border: 1px solid #c9cfdc; padding: 3pt 5pt; text-align: left; vertical-align: top; } /* table cells in print get a light grey border and text lined up at the top left */
+.print-doc th { background: #eef1f7; } /* table header cells in print get a light grey-blue fill */
+.print-doc svg { max-width: 100%; height: auto; break-inside: avoid; } /* drawings in print fit the page width and are never split across pages */
+.print-doc figure { margin: 6pt 0 8pt; break-inside: avoid; } /* figures in print get space around them and are never split across pages */
+.print-doc code { background: #eef1f7; } /* inline code in print gets a light grey-blue background */
+.print-doc pre { font-family: var(--mono); font-size: 8.8pt; background: #f4f6fa; border: 1px solid #dde2ec; border-radius: 6px; padding: 6pt 8pt; white-space: pre-wrap; break-inside: avoid; } /* code blocks in print are small, fixed-width, boxed, wrap long lines, and stay on one page */
+.print-doc .p-chapter { break-before: page; } /* each chapter of the printed guide starts on a new page */
+.print-doc .p-sec { margin-top: 14pt; } /* space above each section in print */
+.print-doc .p-sec-h { display: flex; gap: 8pt; align-items: baseline; font-size: 15pt; font-weight: 800; margin: 0 0 6pt; break-after: avoid; } /* each section heading in print: section number and title side by side, bold, kept with the text below */
+.print-doc .p-sec-h .n { color: var(--c, #4f46e5); } /* the section number in a printed heading is drawn in the chapter color */
+.print-doc .p-obj { background: #f4f6fa; border-radius: 6px; padding: 6pt 10pt; margin: 6pt 0 10pt; break-inside: avoid; } /* the learning objectives box in print: a light grey panel that is never split across pages */
+.print-doc .p-q { margin: 0 0 7pt; break-inside: avoid; } /* each practice question in print is kept whole on one page */
+.print-doc .p-q .a { color: #15803d; font-weight: 700; } /* the answer line under a printed question is green and bold */
+.print-doc .p-q .w { color: #444; } /* the explanation under a printed question is dark grey */
+.print-doc .p-terms dt { font-weight: 800; } /* key terms in the printed glossary list are bold */
+.print-doc .p-terms dd { margin: 0 0 4pt 12pt; } /* each term's definition in print is indented under the term */
+.print-doc .p-title { height: 9in; display: flex; flex-direction: column; justify-content: center; } /* the printed cover page fills most of a page and centers its title vertically */
+.print-doc .p-toc { break-before: page; } /* the printed table of contents starts on a new page */
+.print-doc .p-toc li { margin: 2pt 0; } /* small gaps between table-of-contents lines in print */
+.print-doc .callout { border-left: 4px solid #4f46e5; background: #f1f0fe; padding: 5pt 9pt; border-radius: 4px; margin: 6pt 0; break-inside: avoid; } /* callout boxes in print: a simple indigo left bar on a very light fill, never split across pages */
+@page { size: Letter; margin: 0.6in 0.65in 0.7in; } /* @page sets the paper size (US Letter) and page margins used when printing */
+@media print { /* @media print: these rules apply only while the browser is actually printing or saving a PDF */
+  html, body { overflow: visible !important; height: auto !important; } /* while printing, let the page run over as many sheets as it needs instead of being cut off at one screen */
+  body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } /* while printing, keep the background colors and tints instead of letting the browser drop them to save ink */
+} /* ends the print-only rules */
+.print-doc .t { border: 0; font-weight: inherit; cursor: auto; } /* key terms in print lose their dotted underline and question-mark cursor, since you cannot hover paper */
+.print-doc .hl, .print-doc mark { background: #fde68a; } /* highlighted words in print keep a fixed yellow highlighter color */
 
 /* ---------- narrow (phone) home + chapter pages ---------- */
-.tb-show-narrow { display: none; }
-body.narrow .tb-show-narrow { display: inline; }
-body.narrow .home-top { flex-direction: column; align-items: stretch !important; gap: 12px !important; }
-body.narrow .home-top .home-go { align-items: stretch !important; }
-body.narrow .home-top .btn.lg { width: 100%; white-space: normal; height: auto; min-height: 46px; padding: 8px 14px; text-align: center; }
-body.narrow .home-hero h1 { font-size: 26px; }
-body.narrow .chcards { grid-template-columns: 1fr; }
-body.narrow .chcard { overflow: visible; }
-body.narrow .chmap { grid-template-columns: 1fr; }
-body.narrow .home-go .seg { flex-wrap: wrap; }
+.tb-show-narrow { display: none; } /* the short "OS" title in the top bar is hidden on normal screens */
+body.narrow .tb-show-narrow { display: inline; } /* small screens: show the short "OS" title instead of the full one */
+body.narrow .home-top { flex-direction: column; align-items: stretch !important; gap: 12px !important; } /* small screens: the home page's welcome text and Start button stack on top of each other, full width */
+body.narrow .home-top .home-go { align-items: stretch !important; } /* small screens: the Start button area stretches to the full width */
+body.narrow .home-top .btn.lg { width: 100%; white-space: normal; height: auto; min-height: 46px; padding: 8px 14px; text-align: center; } /* small screens: the big Start or Continue button fills the width and may wrap its label onto two lines */
+body.narrow .home-hero h1 { font-size: 26px; } /* small screens: the welcome heading shrinks to 26px */
+body.narrow .chcards { grid-template-columns: 1fr; } /* small screens: the chapter cards stack in a single column */
+body.narrow .chcard { overflow: visible; } /* small screens: chapter cards show all their content instead of clipping it */
+body.narrow .chmap { grid-template-columns: 1fr; } /* small screens: the section buttons on a chapter overview stack in a single column */
+body.narrow .home-go .seg { flex-wrap: wrap; } /* small screens: the Full course / Core path choice on the home page may wrap onto two lines */
 /* ---------- contents entries are buttons ---------- */
-button.toc-sec, button.toc-ch-head { width: 100%; border: 0; background: transparent; font: inherit; color: inherit; text-align: left; }
-button.toc-sec .chip { font-size: 11px; line-height: 1.5; padding: 0 6px; }
-button.toc-sec:focus-visible, button.toc-ch-head:focus-visible { outline: 3px solid var(--accent); outline-offset: -2px; }
-.drawer[inert], .modal[inert] { visibility: hidden; }
-.drawer.on, .modal.on { visibility: visible; }
-.bb-dot.skip { opacity: .3; }
+button.toc-sec, button.toc-ch-head { width: 100%; border: 0; background: transparent; font: inherit; color: inherit; text-align: left; } /* Contents rows are real buttons (so the keyboard can reach them); this removes the default button look */
+button.toc-sec .chip { font-size: 11px; line-height: 1.5; padding: 0 6px; } /* the small quiz score tag in a Contents row is shrunk to fit the row */
+button.toc-sec:focus-visible, button.toc-ch-head:focus-visible { outline: 3px solid var(--accent); outline-offset: -2px; } /* a keyboard-focused Contents row gets the accent outline drawn just inside its edges so it is not clipped */
+.drawer[inert], .modal[inert] { visibility: hidden; } /* a closed drawer or pop-up is marked inert by the script (it cannot be clicked or tabbed to) and is fully hidden */
+.drawer.on, .modal.on { visibility: visible; } /* an open drawer or pop-up is visible again */
+.bb-dot.skip { opacity: .3; } /* on the core path, dots for steps that are not part of it are faded */
 /* ---------- print view toolbar ---------- */
-.print-bar { display: none; }
-body.print .print-bar { display: flex; gap: 10px; justify-content: center; padding: 14px; position: sticky; top: 0; background: #fff; border-bottom: 1px solid #dde2ec; z-index: 5; }
-@media print { body.print .print-bar { display: none !important; } }
-body.narrow table.tbl { display: block; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.print-bar { display: none; } /* .print-bar: the toolbar at the top of the print view (Print, Back to the guide) is hidden normally */
+body.print .print-bar { display: flex; gap: 10px; justify-content: center; padding: 14px; position: sticky; top: 0; background: #fff; border-bottom: 1px solid #dde2ec; z-index: 5; } /* print view: shows the toolbar centered at the top, and sticky keeps it in view while the guide scrolls */
+@media print { body.print .print-bar { display: none !important; } } /* on the actual printed pages the toolbar is hidden, so it never appears on paper */
+body.narrow table.tbl { display: block; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; } /* small screens: wide data tables scroll sideways inside their own box instead of widening the page */
 
-.quiz-pill.fixed { background: var(--warn); border-color: var(--warn); color: #fff; opacity: .8; }
-.route-top { display: none; }
-body.narrow .route-top { display: block; }
-body.narrow .route-bottom { display: none; }
+.quiz-pill.fixed { background: var(--warn); border-color: var(--warn); color: #fff; opacity: .8; } /* a quiz question answered right only on a retry is filled amber and slightly faded */
+.route-top { display: none; } /* .route-top: the Full course / Core path choice placed at the top of the home page is hidden on normal screens */
+body.narrow .route-top { display: block; } /* small screens: show that route choice at the top of the home page, where it is easy to reach */
+body.narrow .route-bottom { display: none; } /* small screens: hide the second copy of the route choice lower on the home page */

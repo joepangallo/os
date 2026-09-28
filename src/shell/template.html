@@ -1,25 +1,39 @@
-<!doctype html>
-<html lang="en" data-theme="light">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="description" content="Interactive guide to operating systems chapters 1-5: computer system overview, operating system overview, processes, threads, and concurrency with mutual exclusion and synchronization.">
-<title>Operating Systems · Chapters 1–5 · Interactive Guide</title>
-<style>
-/*__CSS__*/
-</style>
-</head>
-<body>
-<noscript><p style="padding:24px;font:16px system-ui">This interactive guide needs JavaScript turned on.</p></noscript>
-<script>
-/*__SHELL__*/
-</script>
-<script>
-/*__CHAPTERS__*/
-</script>
-/*__SECTIONS__*/
-<script>
-Guide.start();
-</script>
-</body>
-</html>
+<!doctype html> <!-- tells the browser this is a modern HTML page, so it uses today's standard layout rules -->
+<!--
+  HOW TO READ THE COMMENTS IN THIS PAGE'S SOURCE
+  Every line of code in this page has a comment that says what the line does and why it is there.
+  Three kinds of comment appear, because the page mixes three languages:
+  - HTML lines, like this note, put the comment between the markers that surround this block.
+  - JavaScript lines end with // and the comment. The browser ignores everything after // on that line.
+  - Style (CSS) lines end with /* comment */. The browser skips everything between /* and */.
+  One special case: some JavaScript builds page text between backticks (`like this`). Everything between
+  the backticks is shown on screen, so a // there would appear on the page. Those lines end with
+  ${/* comment */''} instead. The ${ } slot inserts the value of what is inside it, here an empty
+  string (''), so the text on screen does not change, and the /* ... */ inside it is skipped.
+  This page is generated: a build script joins the style sheet, the guide's engine, the chapter data and
+  one script per section into this single file, which is why it can be opened offline.
+-->
+<html lang="en" data-theme="light"> <!-- the root element: lang tells screen readers the page is in English; the theme starts light until the saved choice is applied -->
+<head> <!-- information about the page (title, character set, styles) rather than visible content -->
+<meta charset="utf-8"> <!-- the text is stored as UTF-8, so symbols such as arrows, Greek letters and minus signs display correctly -->
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"> <!-- phones use their real screen width at normal zoom, and the page may use the full screen around a notch -->
+<meta name="description" content="Interactive guide to operating systems chapters 1-5: computer system overview, operating system overview, processes, threads, and concurrency with mutual exclusion and synchronization."> <!-- a one-sentence summary for search results and link previews -->
+<title>Operating Systems · Chapters 1–5 · Interactive Guide</title> <!-- the name shown on the browser tab and in bookmarks -->
+<style> /* the guide's whole style sheet follows: colours, layout, buttons, diagrams and quizzes */
+/*__CSS__*/ /* end of the guide's style sheet */
+</style> <!-- ends the style sheet -->
+</head> <!-- ends the page information; the visible page follows -->
+<body> <!-- everything shown on screen lives here; the scripts below build all of it -->
+<noscript><p style="padding:24px;font:16px system-ui">This interactive guide needs JavaScript turned on.</p></noscript> <!-- shown only when JavaScript is off, because the scripts build the entire guide -->
+<script> // the guide's engine starts on the next line: navigation, quizzes, drawing helpers, notes and saved progress
+/*__SHELL__*/ // end of the guide's engine
+</script> <!-- ends the engine script -->
+<script> // chapter data starts on the next line: each chapter's title, overview, objectives, key terms and styles
+/*__CHAPTERS__*/ // end of the chapter data
+</script> <!-- ends the chapter data script -->
+/*__SECTIONS__*/ <!-- end of the section scripts: each one registered its steps, quizzes and notes with the guide -->
+<script> // this script runs last, after every section has registered itself
+Guide.start(); // builds the glossary and slide list, draws the frame, applies the saved theme, then opens the slide named in the address (or the home page)
+</script> <!-- ends the start-up script -->
+</body> <!-- ends the visible page -->
+</html> <!-- ends the document -->

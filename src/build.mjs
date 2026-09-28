@@ -110,12 +110,12 @@ function otherTerms(included) {
 /* ---------- write ---------- */
 function assemble(ids) {
   const extra = otherTerms(ids);
-  const extraTag = extra.length ? `<script>\nGuide.extraTerms(${JSON.stringify(extra).replace(/<\/script/gi, '<\\/script')});\n</script>` : '';
+  const extraTag = extra.length ? `<script> // glossary terms from sections left out of this partial build, so term links still work\nGuide.extraTerms(${JSON.stringify(extra).replace(/<\/script/gi, '<\\/script')}); // hands those [term, definition, section] entries to the guide\n</script> <!-- end of the extra glossary terms -->` : '';
   // explicit layout metadata: a section whose code anywhere (including helper functions) branches on the
   // phone layout must be rebuilt when the window crosses the phone breakpoint
-  const layoutTag = (id) => (/\bnarrow\b/.test(sources[id]) ? `\nif (Guide.sections['${id}']) Guide.sections['${id}'].layoutAware = true;` : '');
-  const secTags = ids.filter((id) => sources[id]).map((id) => `<script>\n/* ======================= section ${id} ======================= */\n${sources[id]}${layoutTag(id)}\n</script>`).join('\n') + extraTag
-    + (/\bnarrow\b/.test(chapters) ? '\n<script>Guide.chapters.forEach((c) => { c.layoutAware = true; });</script>' : '');
+  const layoutTag = (id) => (/\bnarrow\b/.test(sources[id]) ? `\nif (Guide.sections['${id}']) Guide.sections['${id}'].layoutAware = true; // this section lays out differently on phone-width screens, so the guide redraws it when the window crosses that width` : '');
+  const secTags = ids.filter((id) => sources[id]).map((id) => `<script> // section ${id} starts here: its steps, quizzes and notes, registered with the guide\n/* ======================= section ${id} ======================= */\n${sources[id]}${layoutTag(id)}\n</script> <!-- end of section ${id} -->`).join('\n') + extraTag
+    + (/\bnarrow\b/.test(chapters) ? '\n<script>Guide.chapters.forEach((c) => { c.layoutAware = true; }); /* chapter pages also lay out differently on phone-width screens, so redraw them when the window crosses that width */</script>' : '');
   return template
     .replace('/*__CSS__*/', () => css)
     .replace('/*__SHELL__*/', () => shell.replace(/<\/script/gi, '<\\/script'))
