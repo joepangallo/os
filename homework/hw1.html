@@ -1,0 +1,1069 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Chapters 1 and 2: registers and the instruction cycle, interrupts, the memory hierarchy and caches, I/O techniques, multiprogramming, fault tolerance and OS structure, plus a Python simulator of a small accumulator machine.">
+<title>Homework 1: The Machine and Its Manager</title>
+<style>
+:root {  /* design tokens: every color and size the page uses is named once here */
+  --font: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;  /* the reading typeface: whatever system font the computer already has */
+  --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;  /* a fixed-width typeface for code, registers and hex values */
+  --bg: #eef1f7;  /* the pale blue-grey page background behind the cards */
+  --panel: #ffffff;  /* white, the fill for cards and answer boxes */
+  --panel-2: #f5f7fb;  /* a slightly tinted white for boxes nested inside cards */
+  --ink: #151c2c;  /* the main text color, a very dark blue */
+  --ink-2: #3d4760;  /* a lighter text color for secondary text */
+  --muted: #69738c;  /* grey text for hints and small print */
+  --line: #d9deea;  /* the thin border color around panels and table cells */
+  --accent: #4f46e5;  /* indigo, for buttons, links and focus rings */
+  --accent-bg: #e8e7fd;  /* a pale indigo fill behind highlighted items */
+  --accent-ink: #ffffff;  /* text placed on top of the accent color */
+  --hw: #2563eb;  /* this homework's own color; each page overrides it in its body tag */
+  --good: #15803d;  /* green, for "saved" and success messages */
+  --warn: #b45309;  /* amber, for cautions */
+  --code-bg: #0f172a;  /* the dark background of code blocks */
+  --code-ink: #e2e8f0;  /* the light text inside code blocks */
+  --code-comment: #94a3b8;  /* comments inside code, dimmer than the code itself */
+  --code-string: #fbbf24;  /* strings inside code */
+  --code-keyword: #c4b5fd;  /* Python keywords inside code */
+  --code-number: #7dd3fc;  /* numbers inside code */
+  --radius: 12px;  /* the corner rounding used by cards and boxes */
+  --shadow: 0 1px 2px rgba(20, 28, 48, .06), 0 6px 18px rgba(20, 28, 48, .06);  /* a soft shadow that lifts cards off the page */
+}  /* end of the light-theme tokens */
+@media (prefers-color-scheme: dark) {  /* when the computer is set to dark mode... */
+  :root {  /* ...swap the tokens for darker ones; every rule below uses the tokens, so nothing else changes */
+    --bg: #0d1220;  /* near-black blue page */
+    --panel: #151c2e;  /* dark cards */
+    --panel-2: #1b2438;  /* slightly lighter nested boxes */
+    --ink: #e7ebf5;  /* light main text */
+    --ink-2: #c3cadb;  /* light secondary text */
+    --muted: #8f99b3;  /* grey hints that still read on dark */
+    --line: #2b3550;  /* dark borders */
+    --accent: #8b85ff;  /* a lighter indigo that stays readable on dark */
+    --accent-bg: #25234d;  /* dark indigo fill */
+    --accent-ink: #0d1220;  /* dark text on the light-indigo buttons */
+    --good: #4ade80;  /* lighter green */
+    --warn: #fbbf24;  /* lighter amber */
+    --shadow: 0 1px 2px rgba(0, 0, 0, .4);  /* shadows barely show on dark, so keep them small */
+  }  /* end of the dark tokens */
+}  /* end of the dark-mode block */
+*, *::before, *::after { box-sizing: border-box; }  /* widths include padding and border, which makes layouts predictable */
+html { scroll-behavior: smooth; scroll-padding-top: 76px; }  /* in-page links glide, and stop below the sticky bar instead of under it */
+body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.6 var(--font); -webkit-font-smoothing: antialiased; }  /* base page: background, text color, size and line spacing */
+a { color: var(--accent); }  /* links use the accent color */
+code, kbd, pre, textarea.mono, .grid input { font-family: var(--mono); }  /* code and hex values use the fixed-width face */
+code { background: var(--panel-2); border: 1px solid var(--line); border-radius: 5px; padding: 0 .3em; font-size: .92em; }  /* inline code gets a small tinted pill */
+kbd { border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; padding: 0 .35em; font-size: .88em; background: var(--panel); }  /* a key on the keyboard */
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }  /* a clear ring shows where keyboard focus is */
+.wrap { width: min(920px, calc(100% - 32px)); margin: 0 auto; }  /* the reading column: at most 920px wide, 16px gutter each side on phones */
+.skip { position: absolute; left: 12px; top: -60px; z-index: 50; padding: 8px 12px; background: var(--ink); color: var(--bg); border-radius: 8px; }  /* "skip to content" link, hidden above the page... */
+.skip:focus { top: 8px; }  /* ...until a keyboard user tabs onto it */
+header.hero { background: linear-gradient(135deg, var(--hw), #1e1b4b); color: #fff; padding: 40px 0 34px; }  /* the colored title band at the top */
+.hero .kicker { display: block; font-size: .78rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; opacity: .85; }  /* the small label above the title */
+.hero h1 { margin: 6px 0 10px; font-size: clamp(1.9rem, 5vw, 2.9rem); line-height: 1.15; letter-spacing: -.02em; }  /* the title grows with the screen but never overflows a phone */
+.hero p { margin: 0; max-width: 62ch; font-size: 1.06rem; opacity: .95; }  /* the one-paragraph summary under the title */
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; padding: 0; list-style: none; }  /* a row of small labels that wraps on phones */
+.chips li { border: 1px solid rgba(255, 255, 255, .35); border-radius: 999px; padding: 3px 11px; font-size: .8rem; font-weight: 700; background: rgba(255, 255, 255, .1); }  /* one pill-shaped label */
+nav.bar { position: sticky; top: 0; z-index: 20; background: var(--panel); border-bottom: 1px solid var(--line); box-shadow: var(--shadow); }  /* the navigation bar that stays at the top while scrolling */
+.bar .wrap { display: flex; align-items: center; gap: 6px 14px; flex-wrap: wrap; padding: 8px 0; }  /* bar contents sit in one row and wrap onto two on phones */
+.bar a.nav { color: var(--ink-2); text-decoration: none; font-weight: 650; font-size: .9rem; padding: 4px 2px; }  /* each section link */
+.bar a.nav:hover { color: var(--accent); }  /* links light up under the mouse */
+.bar .spacer { flex: 1; }  /* pushes the progress counter and button to the right-hand end */
+.bar .progress { font-size: .85rem; color: var(--muted); white-space: nowrap; }  /* "7 of 40 answered" */
+button, .btn { font: inherit; font-size: .9rem; font-weight: 700; border: 1px solid var(--accent); background: var(--accent); color: var(--accent-ink); border-radius: 8px; padding: 6px 12px; cursor: pointer; }  /* the main button style */
+button.ghost { background: transparent; color: var(--accent); }  /* a quieter outline button for secondary actions */
+button:hover { filter: brightness(1.08); }  /* buttons brighten slightly under the mouse */
+main { padding: 26px 0 60px; }  /* space above and below the main content */
+section.card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 22px 24px; margin: 0 0 22px; }  /* one white card per problem or topic */
+@media (max-width: 600px) { section.card { padding: 16px 14px; } }  /* phones get tighter card padding so text has room */
+h2 { margin: 0 0 10px; font-size: 1.45rem; line-height: 1.25; }  /* problem titles */
+h2 .num { color: var(--hw); margin-right: .35em; }  /* the "Problem 3" part of a title, in the homework color */
+h3 { margin: 22px 0 8px; font-size: 1.1rem; }  /* sub-headings inside a card */
+.part-label { display: block; margin: 36px 0 12px; font-size: .8rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--hw); }  /* the "Part A" / "Part B" divider label */
+.given { background: var(--panel-2); border: 1px solid var(--line); border-left: 4px solid var(--hw); border-radius: 8px; padding: 12px 16px; margin: 12px 0; }  /* a box that holds the facts a problem gives you */
+.given > :first-child { margin-top: 0; }  /* no extra gap at the top of that box */
+.given > :last-child { margin-bottom: 0; }  /* no extra gap at the bottom either */
+.note { border-left: 4px solid var(--accent); background: var(--accent-bg); border-radius: 8px; padding: 10px 14px; margin: 12px 0; }  /* a tip */
+.caution { border-left: 4px solid var(--warn); background: var(--panel-2); border-radius: 8px; padding: 10px 14px; margin: 12px 0; }  /* a caution */
+.scroll-x { overflow-x: auto; -webkit-overflow-scrolling: touch; }  /* wide tables scroll sideways inside their own box instead of widening the page */
+table.data { border-collapse: collapse; margin: 8px 0; font-size: .95rem; }  /* a table of given facts */
+table.data th, table.data td { border: 1px solid var(--line); padding: 5px 10px; text-align: left; vertical-align: top; }  /* its cells */
+table.data th { background: var(--panel-2); font-weight: 700; }  /* its header cells */
+table.data td.mono, table.data th.mono { font-family: var(--mono); }  /* cells that hold hex values */
+.part { margin: 18px 0 0; padding-top: 14px; border-top: 1px dashed var(--line); }  /* one lettered sub-question, separated by a dashed line */
+.part .q { margin: 0 0 8px; }  /* the question text */
+.part .q b.letter { color: var(--hw); }  /* the (a), (b), (c) letter */
+.ans { margin: 6px 0 0; }  /* the space that holds an answer box */
+.ans textarea { width: 100%; min-height: 96px; resize: vertical; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--ink); font: inherit; font-size: .95rem; line-height: 1.5; padding: 9px 11px; }  /* a free-text answer box */
+.ans textarea.mono { font-size: .85rem; white-space: pre; overflow-wrap: normal; overflow-x: auto; }  /* the box for pasted program output keeps columns lined up */
+.ans textarea:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px var(--accent-bg); }  /* the box being typed in is highlighted */
+.ans .status { display: block; min-height: 1.2em; font-size: .78rem; color: var(--muted); margin-top: 2px; }  /* "saved" appears here after typing */
+.ans .status.saved { color: var(--good); }  /* the saved message is green */
+table.grid { border-collapse: collapse; margin: 6px 0; font-size: .9rem; }  /* a table of small answer boxes */
+table.grid th, table.grid td { border: 1px solid var(--line); padding: 0; }  /* grid cells: the input fills the cell, so no padding */
+table.grid th { background: var(--panel-2); padding: 5px 8px; font-weight: 700; text-align: left; white-space: nowrap; }  /* row and column labels */
+table.grid thead th { text-align: center; }  /* column labels are centered over their inputs */
+table.grid tbody th { white-space: normal; min-width: 110px; max-width: 240px; }  /* long row labels wrap onto several lines instead of pushing the inputs off a phone screen */
+table.grid td input { width: 100%; min-width: 64px; border: 0; background: var(--panel); color: var(--ink); padding: 6px 8px; font-size: .9rem; }  /* the input inside a grid cell */
+table.grid.wide td input { min-width: 150px; }  /* grids whose answers are sentences get wider cells */
+table.grid td input:focus { outline: 2px solid var(--accent); outline-offset: -2px; }  /* the focused cell is outlined */
+.sheet { display: grid; gap: 10px; }  /* the answer-sheet panel near the top of the page */
+.sheet label { font-weight: 700; font-size: .9rem; }  /* "Your name" */
+.sheet input[type=text] { width: 100%; max-width: 360px; border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; font: inherit; background: var(--panel); color: var(--ink); }  /* the name box */
+.sheet .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }  /* the row of sheet buttons */
+.sheet .msg { font-size: .88rem; color: var(--muted); min-height: 1.3em; }  /* messages such as "Loaded 38 answers" */
+ol.steps { padding-left: 1.3em; }  /* numbered setup steps */
+ol.steps > li { margin: 0 0 12px; }  /* space between steps */
+.os { display: grid; grid-template-columns: 88px 1fr; gap: 4px 10px; margin: 6px 0; align-items: baseline; }  /* "Windows: ... / macOS: ..." rows */
+.os > b { font-size: .82rem; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }  /* the operating-system name */
+@media (max-width: 520px) { .os { grid-template-columns: 1fr; } }  /* on phones the name sits above its instructions */
+.codebox { margin: 12px 0; border-radius: 10px; overflow: hidden; border: 1px solid #1e293b; }  /* a code block with its toolbar */
+.codebox .tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; background: #1e293b; color: #cbd5e1; padding: 6px 10px; font-size: .85rem; }  /* the toolbar: file name plus buttons */
+.codebox .tools .name { font-family: var(--mono); font-weight: 700; flex: 1; }  /* the file name */
+.codebox .tools button { background: #334155; border-color: #475569; color: #f1f5f9; padding: 3px 10px; font-size: .8rem; }  /* toolbar buttons */
+.codebox pre, pre.term { margin: 0; background: var(--code-bg); color: var(--code-ink); padding: 12px 14px; overflow-x: auto; font-size: .8rem; line-height: 1.5; tab-size: 4; }  /* the code itself scrolls sideways inside its box */
+.codebox pre.tall { max-height: 560px; overflow-y: auto; }  /* long files scroll inside a box instead of filling several screens */
+pre.term { border-radius: 10px; margin: 8px 0; }  /* a terminal command or output shown on its own */
+pre code { background: none; border: 0; padding: 0; font-size: inherit; color: inherit; }  /* code inside a code block must not get the inline-code pill style */
+pre .c { color: var(--code-comment); }  /* comments */
+pre .s { color: var(--code-string); }  /* strings */
+pre .k { color: var(--code-keyword); }  /* keywords */
+pre .n { color: var(--code-number); }  /* numbers */
+ul.check { list-style: none; padding-left: 0; }  /* the submission checklist */
+ul.check li { padding-left: 1.6em; position: relative; margin: 0 0 8px; }  /* each item leaves room for its box */
+ul.check li::before { content: "\2610"; position: absolute; left: 0; color: var(--hw); }  /* an empty checkbox drawn in front of each item */
+footer { color: var(--muted); font-size: .85rem; text-align: center; padding: 10px 0 40px; }  /* the small print at the very bottom */
+@media print {  /* when the page is printed or saved as a PDF */
+  nav.bar, .skip, .sheet .row, .codebox .tools button { display: none; }  /* hide things that only work on screen */
+  section.card { box-shadow: none; break-inside: avoid-page; }  /* no shadows, and try not to split a card across pages */
+  body { background: #fff; }  /* white paper */
+}  /* end of the print block */
+.answer { border-left: 4px solid var(--good); background: var(--panel-2); border-radius: 8px; padding: 10px 14px; margin: 10px 0; }  /* solutions: the final answer to a part, in a green-edged box */
+.answer > :first-child { margin-top: 0; }  /* no extra gap at the top of an answer box */
+.answer > :last-child { margin-bottom: 0; }  /* nor at the bottom */
+.mistake { border-left: 4px solid var(--warn); background: var(--panel-2); border-radius: 8px; padding: 10px 14px; margin: 10px 0; }  /* solutions: a common mistake and how to spot it */
+.mistake > :first-child { margin-top: 0; }  /* no extra gap at the top of a mistake box */
+.mistake > :last-child { margin-bottom: 0; }  /* nor at the bottom */
+</style>
+</head>
+<body data-hw="os-hw1" data-sheet="hw1-answers.html" style="--hw: #2563eb;">
+<a class="skip" href="#main">Skip to the content</a>
+<header class="hero">
+  <div class="wrap">
+    <span class="kicker">Operating Systems · Homework 1</span>
+    <h1>The Machine and Its Manager</h1>
+    <p>Chapters 1 and 2. Trace a program through the processor's registers, work out what interrupts, caches and DMA are worth in real numbers, and then look at what an operating system adds on top of the hardware. Part B has you finish a small simulator that checks your hand trace.</p>
+    <ul class="chips">
+      <li>Chapter 1: Computer System Overview</li>
+      <li>Chapter 2: Operating System Overview</li>
+      <li>Part A: 8 problems</li>
+      <li>Part B: finish a simulator in Python</li>
+    </ul>
+  </div>
+</header>
+
+<nav class="bar" aria-label="Homework sections">
+  <div class="wrap">
+    <a class="nav" href="#start">Start</a>
+    <a class="nav" href="#part-a">Part A</a>
+    <a class="nav" href="#part-b">Part B</a>
+    <a class="nav" href="#submit">Submit</a>
+    <span class="spacer"></span>
+    <span class="progress js-progress"></span>
+    <button type="button" class="js-download">Download answer sheet</button>
+  </div>
+</nav>
+
+<main id="main" class="wrap">
+
+<section class="card" id="start">
+  <h2>How this homework works</h2>
+  <p>There are two parts. <b>Part A</b> is eight problems you work out by reasoning and calculation. <b>Part B</b> is a short Python program: you finish a simulator of the chapter's small accumulator machine and use it to check your answer to Problem 1 and to watch an interrupt happen.</p>
+  <p>Every question has an answer box right under it on this page. What you type is saved automatically in this browser, so you can close the page and come back later on the same computer. When you are done, the <b>Download answer sheet</b> button saves all of your answers as one HTML file, <code>hw1-answers.html</code>. That file, together with your finished <code>machine.py</code>, goes into a GitHub repository (Part B shows you how).</p>
+  <div class="note"><b>Show your work on every calculation.</b> Write the formula, the numbers you put into it, and the result with its unit (ns, ms, %). A bare number cannot show whether you understood the idea or got lucky, and it gives nothing to go on when a small slip changes the result.</div>
+  <div class="caution"><b>Switching computers?</b> Drafts live in one browser only. Download the answer sheet, then use <b>Load a saved answer sheet</b> on the other computer to pick up where you left off.</div>
+  <h3>Your answer sheet</h3>
+  <div class="sheet">
+    <div>
+      <label for="student-name">Your name (printed at the top of the answer sheet)</label><br>
+      <input type="text" id="student-name" autocomplete="name">
+    </div>
+    <div class="row">
+      <button type="button" class="js-download">Download answer sheet</button>
+      <button type="button" class="ghost" id="sheet-load">Load a saved answer sheet</button>
+      <input type="file" id="sheet-file" accept=".html,text/html" hidden>
+      <button type="button" class="ghost" id="sheet-clear">Clear all answers</button>
+      <span class="progress js-progress"></span>
+    </div>
+    <p class="msg js-sheet-msg" aria-live="polite"></p>
+  </div>
+</section>
+
+<span class="part-label" id="part-a">Part A · Problems</span>
+
+<!-- ============================ Problem 1 ============================ -->
+<section class="card" id="p1">
+  <h2><span class="num">Problem 1</span>Trace a program through the registers</h2>
+  <p>This is the small machine from Chapter 1. It is simple enough to follow by hand, yet it has every register that matters for the instruction cycle.</p>
+  <div class="given">
+    <p><b>The machine.</b> Memory words are 16 bits. An instruction is one word: the first hex digit (4 bits) is the <b>opcode</b> and the other three hex digits (12 bits) are an <b>address</b>. The processor has a program counter (PC), an instruction register (IR), an accumulator (AC), a memory address register (MAR) and a memory buffer register (MBR).</p>
+    <p><b>Opcodes.</b> <code>1</code> = load AC from memory · <code>2</code> = store AC to memory · <code>5</code> = add to AC from memory · <code>0</code> = halt.</p>
+    <p><b>Numbers</b> use sign-magnitude: the leftmost bit is the sign and the other 15 bits are the size. So <code>0007</code> is +7 and <code>8007</code> is −7. All values below are in hex.</p>
+    <div class="scroll-x">
+      <table class="data">
+        <tr><th>Address</th><th class="mono">250</th><th class="mono">251</th><th class="mono">252</th><th class="mono">253</th><th class="mono">254</th><th class="mono">3A0</th><th class="mono">3A1</th><th class="mono">3A2</th><th class="mono">3A3</th></tr>
+        <tr><th>Contents</th><td class="mono">13A0</td><td class="mono">53A1</td><td class="mono">53A2</td><td class="mono">23A3</td><td class="mono">0000</td><td class="mono">0019</td><td class="mono">000E</td><td class="mono">8007</td><td class="mono">0000</td></tr>
+      </table>
+    </div>
+    <p><b>Start:</b> PC = <code>250</code>, AC = <code>0000</code>, and the IR, MAR and MBR all hold <code>0000</code>.</p>
+    <p><b>How each stage moves data.</b> A <i>fetch</i> copies the PC into the MAR, reads that word into the MBR, copies the MBR into the IR, and adds 1 to the PC. An <i>execute</i> that reads memory puts the operand's address in the MAR and the word it reads in the MBR. A <i>store</i> puts the address in the MAR and the AC's value in the MBR, then writes it. A register that a stage does not touch keeps its old value. Executing the halt instruction touches nothing.</p>
+  </div>
+
+  <div class="part">
+    <p class="q"><b class="letter">(a)</b> Fill in every register's value <b>after</b> each stage finishes, in hex (three digits for the PC and MAR, four for the others).</p>
+    <div class="scroll-x"><table class="grid" data-id="p1a" data-corner="Stage" data-rows="Fetch 1|Execute 1|Fetch 2|Execute 2|Fetch 3|Execute 3|Fetch 4|Execute 4|Fetch 5|Execute 5 (halt)" data-cols="PC|IR|AC|MAR|MBR" data-label="Problem 1(a) trace table"></table></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(b)</b> What does word <code>3A3</code> hold when the machine halts, in hex and in decimal? In one sentence, what calculation did the program perform?</p>
+    <div class="ans" data-id="p1b" data-rows="3" data-label="Problem 1(b)"></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(c)</b> Count the memory reads and the memory writes during the whole run, from the first fetch through the halt. Instruction fetches count as reads. Say which reads are fetches and which are operand reads.</p>
+    <div class="ans" data-id="p1c" data-rows="3" data-label="Problem 1(c)"></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(d)</b> While the first instruction is executing, the PC already holds <code>251</code>, not <code>250</code>. Explain why the processor adds 1 to the PC during the fetch rather than after the execute. Then name one situation in which the value the PC was given during the fetch gets replaced before the next fetch.</p>
+    <div class="ans" data-id="p1d" data-rows="4" data-label="Problem 1(d)"></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(e)</b> A redesigned machine uses 24-bit words, with a 6-bit opcode and an 18-bit address in every instruction. How many different opcodes can it have, and how many memory words can one instruction name directly? Show the powers of two.</p>
+    <div class="ans" data-id="p1e" data-rows="3" data-label="Problem 1(e)"></div>
+  </div>
+</section>
+
+<!-- ============================ Problem 2 ============================ -->
+<section class="card" id="p2">
+  <h2><span class="num">Problem 2</span>What interrupts buy, and what they cannot</h2>
+  <div class="given">
+    <p>A program runs a loop <b>12 times</b>. Each time around, it computes for <b>6 ms</b> and then sends one record to a printer. Starting a print takes no measurable processor time; the printer then works on its own for <b>4 ms</b> per record. This is the only program in memory.</p>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(a)</b> <b>Programmed I/O.</b> After starting each print, the processor checks the printer's status over and over until the record is done, and only then continues. How long does the whole run take, from the start until the 12th record has printed? What percentage of that time does the processor spend waiting?</p>
+    <div class="ans" data-id="p2a" data-rows="4" data-label="Problem 2(a)"></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(b)</b> <b>Interrupt-driven I/O.</b> After starting a print, the program goes straight back to computing. When the printer finishes, it sends an interrupt; the handler uses <b>0.5 ms</b> of processor time and then the interrupted computation carries on. Because 4 ms is less than 6 ms, each print finishes during the next round of computing, so the program never waits. How long until the 12th record has printed <i>and</i> its interrupt has been handled? Hint: first work out the time between the start of one print and the start of the next.</p>
+    <div class="ans" data-id="p2b" data-rows="5" data-label="Problem 2(b)"></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(c)</b> Now the printer is slower: <b>9 ms</b> per record. Still using interrupts, a new print cannot start until the previous record has finished and its interrupt has been handled, so the program sometimes has to wait. What is the time between the starts of two prints now? In a typical loop (any loop except the last), how long does the processor sit with nothing to do? How long does the whole run take, until the 12th record has printed and its interrupt has been handled,, and how does that compare with programmed I/O on this slower printer?</p>
+    <div class="ans" data-id="p2c" data-rows="5" data-label="Problem 2(c)"></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(d)</b> In part (c) the processor still sits idle every loop, even with interrupts. Name the technique from Chapter 2 that puts that idle time to use, and explain in two or three sentences how it would do so in this situation.</p>
+    <div class="ans" data-id="p2d" data-rows="4" data-label="Problem 2(d)"></div>
+  </div>
+</section>
+
+<!-- ============================ Problem 3 ============================ -->
+<section class="card" id="p3">
+  <h2><span class="num">Problem 3</span>How fast is memory, really?</h2>
+  <div class="given">
+    <p>In every part, the processor looks in the fastest level first. On a miss it pays that level's access time <i>and then</i> tries the next level, so a miss costs the time of every level it visited.</p>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(a)</b> A two-level memory has a cache with an access time of <b>2 ns</b> and a main memory with an access time of <b>50 ns</b>. Find the average access time when the cache hit ratio is 0.80, when it is 0.95 and when it is 0.99.</p>
+    <div class="ans" data-id="p3a" data-rows="4" data-label="Problem 3(a)"></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(b)</b> For the same two-level memory, what is the lowest hit ratio that brings the average access time down to <b>3 ns</b>? Show the algebra.</p>
+    <div class="ans" data-id="p3b" data-rows="3" data-label="Problem 3(b)"></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(c)</b> A three-level system has an L1 cache (<b>1 ns</b>, hit ratio <b>0.90</b>), an L2 cache (<b>8 ns</b>, which finds <b>75%</b> of the words that L1 misses) and main memory (<b>60 ns</b>, which always has the word). Find the average access time. Then find it again for the same system with the L2 cache removed, and say how many times faster the version with L2 is.</p>
+    <div class="ans" data-id="p3c" data-rows="5" data-label="Problem 3(c)"></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(d)</b> Real programs routinely reach hit ratios above 0.9, even though the cache holds only a tiny fraction of memory. Name the property of programs that makes this possible, name its two kinds, and give an example of each from ordinary code (a loop, an array, a variable, a function call).</p>
+    <div class="ans" data-id="p3d" data-rows="4" data-label="Problem 3(d)"></div>
+  </div>
+</section>
+
+<!-- ============================ Problem 4 ============================ -->
+<section class="card" id="p4">
+  <h2><span class="num">Problem 4</span>Inside a direct-mapped cache</h2>
+  <div class="given">
+    <p>Main memory holds 64K words, so addresses are <b>16 bits</b>. Memory is divided into blocks of <b>8 words</b>. The cache has <b>32 slots</b> (lines) and uses <b>direct mapping</b>: block number <i>b</i> may only go in slot <i>b</i> mod 32. The address is split into three fields, from left to right: <b>tag</b>, <b>slot</b>, <b>word</b>.</p>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(a)</b> How many bits are in the word field, the slot field and the tag field? Explain where each width comes from.</p>
+    <div class="ans" data-id="p4a" data-rows="4" data-label="Problem 4(a)"></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(b)</b> The cache starts empty and the processor reads these addresses (hex) in this order. For each, give the word, slot and tag fields (in decimal) and say whether the read is a hit or a miss.</p>
+    <div class="scroll-x"><table class="grid" data-id="p4b" data-corner="Address" data-rows="04A0|04A7|14A2|04A1|14A3" data-cols="Word|Slot|Tag|Hit or miss" data-label="Problem 4(b) table"></table></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(c)</b> How many of the five reads hit under direct mapping? If the same cache were <b>fully associative</b> with <b>LRU</b> replacement, how many would hit? Explain the difference in terms of which slots the blocks are allowed to use.</p>
+    <div class="ans" data-id="p4c" data-rows="4" data-label="Problem 4(c)"></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(d)</b> A program updates two different words of the same cached block 200 times each, and then the block is evicted. How many times is main memory written for that block under <b>write-through</b>, and how many under <b>write-back</b>? Then suppose that, under write-back and <i>before</i> the eviction, a DMA module reads that block straight from main memory. What does it get, and why is that a problem?</p>
+    <div class="ans" data-id="p4d" data-rows="5" data-label="Problem 4(d)"></div>
+  </div>
+</section>
+
+<!-- ============================ Problem 5 ============================ -->
+<section class="card" id="p5">
+  <h2><span class="num">Problem 5</span>Three ways to move a block of data</h2>
+  <div class="given">
+    <p>A device delivers a block of <b>4,096 words</b> into main memory, one word every <b>2 µs</b>, so the transfer itself lasts 8,192 µs no matter how it is handled. Compare how much <b>processor time</b> each technique uses up.</p>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(a)</b> <b>Programmed I/O:</b> the processor waits for each word, reads it from the I/O module and writes it to memory itself. How much processor time does the transfer use?</p>
+    <div class="ans" data-id="p5a" data-rows="3" data-label="Problem 5(a)"></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(b)</b> <b>Interrupt-driven I/O:</b> the device interrupts once per word, and each interrupt costs <b>0.6 µs</b> of processor time (save state, move the word, restore state). How much processor time does the transfer use, and what percentage of the 8,192 µs is that?</p>
+    <div class="ans" data-id="p5b" data-rows="3" data-label="Problem 5(b)"></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(c)</b> <b>DMA:</b> the processor spends <b>10 µs</b> programming the DMA module and <b>5 µs</b> in the one completion interrupt. How much processor time does the transfer use? The DMA module also borrows the bus for <b>0.05 µs</b> per word (cycle stealing). What is the most that cycle stealing can delay the processor over the whole transfer, and why is a stolen cycle not the same thing as an interrupt?</p>
+    <div class="ans" data-id="p5c" data-rows="5" data-label="Problem 5(c)"></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(d)</b> Pick the most sensible technique for each device and give a one-line reason: a keyboard on a laptop; copying a 4 GB video file from an SSD; a toaster's temperature sensor read by a tiny processor that has no other work to do.</p>
+    <div class="ans" data-id="p5d" data-rows="4" data-label="Problem 5(d)"></div>
+  </div>
+</section>
+
+<!-- ============================ Problem 6 ============================ -->
+<section class="card" id="p6">
+  <h2><span class="num">Problem 6</span>Keeping the processor busy</h2>
+  <div class="part">
+    <p class="q"><b class="letter">(a)</b> Suppose every program spends <b>75%</b> of its time waiting for I/O, and the waits of different programs are independent. With <i>n</i> programs in memory, the processor is idle only when all <i>n</i> are waiting at once, so utilization = 1 − 0.75<sup><i>n</i></sup>. Find the utilization for <i>n</i> = 1, 2 and 4. Then find the smallest <i>n</i> that reaches at least 90%, and check your answer by computing the utilization for that <i>n</i> and for <i>n</i> − 1. Give utilizations to two decimal places and do not round before comparing with 90%.</p>
+    <div class="ans" data-id="p6a" data-rows="5" data-label="Problem 6(a)"></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(b)</b> Three jobs are submitted at time 0.</p>
+    <div class="given">
+      <div class="scroll-x">
+        <table class="data">
+          <tr><th>Job</th><th>Run time on its own</th><th>Share of that time using the processor</th><th>Other resources</th></tr>
+          <tr><td>A</td><td>6 min</td><td>60%</td><td>none</td></tr>
+          <tr><td>B</td><td>12 min</td><td>10%</td><td>a terminal</td></tr>
+          <tr><td>C</td><td>9 min</td><td>20%</td><td>a disk</td></tr>
+        </table>
+      </div>
+      <p>Under <b>uniprogramming</b> the jobs run one at a time: A, then B, then C. Under <b>multiprogramming</b> all three run at once, and (to keep the arithmetic clean) assume they never slow each other down. <i>Response time</i> means the time from 0 until that job finishes. <i>Utilization</i> means processor-busy time divided by elapsed time.</p>
+    </div>
+    <div class="scroll-x"><table class="grid wide" data-id="p6b" data-rows="Uniprogramming|Multiprogramming" data-cols="Elapsed time|Mean response time|Throughput (jobs per hour)|Processor utilization" data-label="Problem 6(b) table"></table></div>
+    <div class="ans" data-id="p6b-work" data-rows="5" data-label="Problem 6(b) work" data-placeholder="Show how you got each number in the table."></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(c)</b> Multiprogramming only works safely and efficiently because of hardware features covered in Chapters 1 and 2. Name two of them and explain in a sentence each what that feature does for a multiprogrammed operating system.</p>
+    <div class="ans" data-id="p6c" data-rows="4" data-label="Problem 6(c)"></div>
+  </div>
+</section>
+
+<!-- ============================ Problem 7 ============================ -->
+<section class="card" id="p7">
+  <h2><span class="num">Problem 7</span>How available is the service?</h2>
+  <div class="given">
+    <p>A web server has a mean time to failure (MTTF) of <b>1,500 hours</b> and a mean time to repair (MTTR) of <b>5 hours</b>. Availability = MTTF / (MTTF + MTTR). Use 8,760 hours per year.</p>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(a)</b> What is the server's availability, as a percentage to three decimal places?</p>
+    <div class="ans" data-id="p7a" data-rows="2" data-label="Problem 7(a)"></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(b)</b> How many hours per year can users expect the server to be down?</p>
+    <div class="ans" data-id="p7b" data-rows="2" data-label="Problem 7(b)"></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(c)</b> Keeping the same MTTF, what is the longest MTTR that still reaches "four nines" (99.99%)? Give it in minutes.</p>
+    <div class="ans" data-id="p7c" data-rows="3" data-label="Problem 7(c)"></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(d)</b> The company runs two identical servers, and the service stays up as long as at least one of them works. If failures are independent, the pair's availability is 1 − (1 − A)<sup>2</sup>. Compute it as a percentage to four decimal places. Which of the three kinds of redundancy is this?</p>
+    <div class="ans" data-id="p7d" data-rows="3" data-label="Problem 7(d)"></div>
+  </div>
+</section>
+
+<!-- ============================ Problem 8 ============================ -->
+<section class="card" id="p8">
+  <h2><span class="num">Problem 8</span>The operating system's powers and its shape</h2>
+  <div class="part">
+    <p class="q"><b class="letter">(a)</b> Which of these instructions must be <b>privileged</b>, so that they run only in kernel mode? For each one, answer yes or no, and give the reason: for a yes, what could an ordinary program do with it; for a no, why it is safe or even necessary for ordinary programs.</p>
+    <div class="scroll-x"><table class="grid wide" data-id="p8a" data-corner="Instruction" data-rows="Set the timer's countdown value|Read the time-of-day clock|Disable interrupts|Load the memory-protection (bounds) registers|Start an I/O operation on the disk|Add two registers|Make a system call (trap into the OS)" data-cols="Privileged? (yes / no)|Reason" data-label="Problem 8(a) table"></table></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(b)</b> Each complaint below comes from users of one era of operating-system history. Name the era it comes from and the development that fixed it.</p>
+    <ol>
+      <li>"I booked the computer for an hour. My program failed after ten minutes, so the machine sat unused for the rest of my slot."</li>
+      <li>"A monitor program now loads jobs one after another automatically, but the processor still sits idle whenever the current job is waiting for its tape."</li>
+      <li>"The machine is busy all the time now, but I hand in my job and get the output back hours later. I cannot fix a typo and try again while I am sitting there."</li>
+    </ol>
+    <div class="scroll-x"><table class="grid wide" data-id="p8b" data-corner="Complaint" data-rows="1|2|3" data-cols="Era|What fixed it" data-label="Problem 8(b) table"></table></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(c)</b> A bug in a printer driver makes it write over memory it does not own. On a system with a <b>monolithic kernel</b>, the whole operating system crashes. Would the same bug crash a <b>microkernel</b> system? Explain what the microkernel design does differently, and name one cost of that design.</p>
+    <div class="ans" data-id="p8c" data-rows="4" data-label="Problem 8(c)"></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(d)</b> On a multicore computer, two cores become free at the same instant and both run the scheduler, which takes the first process off one shared ready queue. What can go wrong? Which of the design issues for multiprocessor and multicore operating systems does this show? Say what the operating system must do about it.</p>
+    <div class="ans" data-id="p8d" data-rows="4" data-label="Problem 8(d)"></div>
+  </div>
+</section>
+
+<span class="part-label" id="part-b">Part B · Finish the machine simulator</span>
+
+<section class="card" id="b-setup">
+  <h2><span class="num">B1</span>Set up your computer and repository</h2>
+  <p>You need three things: <b>Python</b> to run the program, <b>Git</b> to track your files, and a free <b>GitHub</b> account to hold your repository online. If you already have one of them, check it with the command shown and skip ahead.</p>
+  <p>Every command below is typed into a <b>terminal</b>: on Windows open <b>PowerShell</b> (Start menu, type "PowerShell"); on macOS open <b>Terminal</b> (press <kbd>⌘</kbd> + <kbd>Space</kbd>, type "Terminal"). Type a command, then press <kbd>Enter</kbd>.</p>
+  <ol class="steps">
+    <li><b>Install Python 3</b> from <a href="https://www.python.org/downloads/">python.org/downloads</a> (any version 3.10 or newer).
+      <div class="os"><b>Windows</b><span>On the installer's first screen, tick <b>"Add python.exe to PATH"</b> before clicking Install. Check it afterwards with <code>python --version</code>.</span></div>
+      <div class="os"><b>macOS</b><span>Run the downloaded installer. Check it with <code>python3 --version</code>.</span></div>
+      <p>On macOS and Linux the command is <code>python3</code> everywhere this page says <code>python</code>.</p>
+    </li>
+    <li><b>Install Git.</b>
+      <div class="os"><b>Windows</b><span>Download it from <a href="https://git-scm.com/downloads">git-scm.com/downloads</a> and accept the installer's defaults. Close and reopen PowerShell, then check with <code>git --version</code>.</span></div>
+      <div class="os"><b>macOS</b><span>Type <code>git --version</code>. If Git is missing, macOS offers to install the command-line developer tools; accept, wait for it to finish, and run the command again.</span></div>
+    </li>
+    <li><b>Tell Git who you are</b> (once per computer; use your own name and the email of your GitHub account):
+      <pre class="term">git config --global user.name "Your Name"
+git config --global user.email "you@example.com"</pre>
+    </li>
+    <li><b>Create the repository on GitHub.</b> Sign in at <a href="https://github.com">github.com</a> (create a free account if you have none), click <b>+</b> at the top right, then <b>New repository</b>. Name it <code>os-hw1</code>, tick <b>Add a README file</b>, and click <b>Create repository</b>.</li>
+    <li><b>Copy the repository to your computer.</b> On the repository's page, click the green <b>Code</b> button and copy the HTTPS address. Then, in the terminal:
+      <pre class="term">cd ~
+git clone https://github.com/YOUR-USERNAME/os-hw1.git
+cd os-hw1</pre>
+      <code>cd ~</code> moves the terminal into your home folder; <code>git clone</code> downloads the repository into a new folder there called <code>os-hw1</code>. From now on, run every command from inside that folder.</li>
+    <li><b>Get the starter file.</b> Click <b>Download</b> on the code box in B2 and move <code>machine.py</code> into the <code>os-hw1</code> folder (in your home folder). Check that the name ends in <code>.py</code>, not <code>.py.txt</code>. (Or create an empty file with that name in any code editor, such as VS Code, and paste in what <b>Copy</b> gives you.)</li>
+    <li><b>Run it once before changing anything:</b>
+      <pre class="term">python machine.py</pre>
+      It prints the first few stages of Problem 1's program and then stops with <code>Stopped: TODO 2: ADD (opcode 5) is not written yet</code>. That message means your setup works: the starter deliberately stops at the first piece you have to write.</li>
+  </ol>
+</section>
+
+<section class="card" id="b-code">
+  <h2><span class="num">B2</span>The starter program</h2>
+  <p>Read the program from top to bottom before writing anything; every line carries a comment that explains it. The parts in order:</p>
+  <ul>
+    <li><b>The machine's fixed facts:</b> memory size, the opcodes, and where the interrupt handler lives.</li>
+    <li><b><code>to_int</code> and <code>to_word</code>:</b> convert between a 16-bit sign-magnitude word (such as <code>8007</code>) and an ordinary number (such as −7). Use them; do not re-invent them.</li>
+    <li><b>The <code>Machine</code> class:</b> the registers, plus <code>read</code> and <code>write</code> (which always set the MAR and MBR the way the chapter describes), <code>fetch</code>, <code>execute</code>, <code>interrupt_stage</code> and <code>run</code>. <code>run</code> is the instruction cycle itself: fetch, execute, check for an interrupt, repeat.</li>
+    <li><b>The programs:</b> Problem 1's program, two interrupt handlers (one careful, one careless) and a small self-check program.</li>
+  </ul>
+  <div class="codebox" data-file="machine.py"><div class="tools"><span class="name">machine.py</span><button type="button" class="js-copy">Copy</button><button type="button" class="js-save">Download</button></div><pre class="tall"><code><span class="s">"""machine.py: a register-level simulator of the small 16-bit accumulator machine.
+
+Run it from a terminal in the folder that holds this file:
+    python machine.py            (Windows)   or   python3 machine.py   (macOS / Linux)
+    python machine.py --check    runs the built-in self-test
+    python machine.py --broken   runs the interrupt demo with a handler that forgets to save the AC
+
+Your work is marked with TODO. Everything else already works: run the file before you change
+anything and it will stop at the first TODO it reaches and tell you which one it is.
+"""</span>
+
+<span class="k">import</span> sys  <span class="c"># sys gives us the command-line words (sys.argv) and a clean way to stop the program (sys.exit)</span>
+
+<span class="c"># ---------------------------------------------------------------------------</span>
+<span class="c"># 1. The machine's fixed facts</span>
+<span class="c"># ---------------------------------------------------------------------------</span>
+MEMORY_WORDS = <span class="n">4096</span>  <span class="c"># a 12-bit address field can name 2**12 = 4,096 different words, so memory has exactly that many</span>
+WORD_MASK = <span class="n">0xFFFF</span>  <span class="c"># every word is 16 bits wide; AND-ing with 0xFFFF throws away anything above bit 15</span>
+SIGN_BIT = <span class="n">0x8000</span>  <span class="c"># in sign-magnitude, the leftmost bit (bit 15) is the sign: 0 means positive, 1 means negative</span>
+MAGNITUDE_MASK = <span class="n">0x7FFF</span>  <span class="c"># the other 15 bits hold the size of the number, so the largest magnitude is 32,767</span>
+
+OP_HALT = <span class="n">0x0</span>  <span class="c"># opcode 0000: stop the machine (a stop code added for this simulator)</span>
+OP_LOAD = <span class="n">0x1</span>  <span class="c"># opcode 0001: load the AC from memory</span>
+OP_STORE = <span class="n">0x2</span>  <span class="c"># opcode 0010: store the AC to memory</span>
+OP_ADD = <span class="n">0x5</span>  <span class="c"># opcode 0101: add a word from memory to the AC</span>
+OP_IRET = <span class="n">0xF</span>  <span class="c"># opcode 1111: return from interrupt (PC comes back from the save word; interrupts turn back on)</span>
+
+SAVE_WORD = <span class="n">0x000</span>  <span class="c"># when an interrupt is accepted, the hardware saves the PC here (a one-word stand-in for the control stack)</span>
+HANDLER_START = <span class="n">0x100</span>  <span class="c"># the hardware then jumps here, where the interrupt handler's first instruction lives</span>
+MAX_STEPS = <span class="n">200</span>  <span class="c"># a safety net: if a buggy program never halts, the simulator stops after this many instructions</span>
+
+
+<span class="k">class</span> NotWrittenYet(Exception):  <span class="c"># a custom error the starter raises wherever a TODO has not been written yet</span>
+    <span class="k">pass</span>  <span class="c"># it needs no extra behavior; its name and message say everything</span>
+
+
+<span class="c"># ---------------------------------------------------------------------------</span>
+<span class="c"># 2. Sign-magnitude helpers: turn a 16-bit word into a Python int and back</span>
+<span class="c"># ---------------------------------------------------------------------------</span>
+<span class="k">def</span> to_int(word):  <span class="c"># word: a 16-bit pattern read from memory, such as 0x8007</span>
+    magnitude = word &amp; MAGNITUDE_MASK  <span class="c"># keep only the low 15 bits: how big the number is</span>
+    <span class="k">if</span> word &amp; SIGN_BIT:  <span class="c"># if the sign bit is 1 the number is negative</span>
+        <span class="k">return</span> -magnitude  <span class="c"># so 0x8007 becomes -7</span>
+    <span class="k">return</span> magnitude  <span class="c"># otherwise it is positive, so 0x0019 becomes 25</span>
+
+
+<span class="k">def</span> to_word(value):  <span class="c"># value: an ordinary Python int such as -7 or 32</span>
+    <span class="k">if</span> abs(value) &gt; MAGNITUDE_MASK:  <span class="c"># a result that needs more than 15 bits cannot be stored</span>
+        <span class="k">raise</span> OverflowError(<span class="s">f"{value} does not fit in 15 bits plus a sign bit"</span>)  <span class="c"># stop loudly instead of storing a wrong number</span>
+    <span class="k">if</span> value &lt; <span class="n">0</span>:  <span class="c"># negative numbers get the sign bit switched on</span>
+        <span class="k">return</span> SIGN_BIT | (-value)  <span class="c"># -7 becomes 0x8000 | 0x0007 = 0x8007</span>
+    <span class="k">return</span> value  <span class="c"># zero and positive numbers are stored as they are</span>
+
+
+<span class="k">def</span> hex4(value):  <span class="c"># formats a word as exactly four hex digits, the way the chapter writes words</span>
+    <span class="k">return</span> <span class="s">f"{value &amp; WORD_MASK:04X}"</span>  <span class="c"># 32 becomes "0020"</span>
+
+
+<span class="k">def</span> hex3(value):  <span class="c"># formats an address as exactly three hex digits</span>
+    <span class="k">return</span> <span class="s">f"{value &amp; 0xFFF:03X}"</span>  <span class="c"># 0x250 becomes "250"</span>
+
+
+<span class="c"># ---------------------------------------------------------------------------</span>
+<span class="c"># 3. The machine itself</span>
+<span class="c"># ---------------------------------------------------------------------------</span>
+<span class="k">class</span> Machine:  <span class="c"># one object of this class is one complete computer: memory plus processor registers</span>
+
+    <span class="k">def</span> __init__(self, program, start):  <span class="c"># program: {address: word}; start: the address of the first instruction</span>
+        self.memory = [<span class="n">0</span>] * MEMORY_WORDS  <span class="c"># every word starts as 0000 before the program is loaded</span>
+        <span class="k">for</span> address, word <span class="k">in</span> program.items():  <span class="c"># copy each (address, word) pair of the program into memory</span>
+            self.memory[address] = word &amp; WORD_MASK  <span class="c"># &amp; WORD_MASK guarantees nothing wider than 16 bits gets in</span>
+        self.pc = start  <span class="c"># program counter: the address of the NEXT instruction to fetch</span>
+        self.ir = <span class="n">0</span>  <span class="c"># instruction register: holds the instruction currently being executed</span>
+        self.ac = <span class="n">0</span>  <span class="c"># accumulator: the one data register this machine has</span>
+        self.mar = <span class="n">0</span>  <span class="c"># memory address register: the address sent to memory for the next read or write</span>
+        self.mbr = <span class="n">0</span>  <span class="c"># memory buffer register: the word just read from memory, or about to be written to it</span>
+        self.halted = <span class="k">False</span>  <span class="c"># becomes True when a HALT instruction executes</span>
+        self.interrupts_enabled = <span class="k">True</span>  <span class="c"># the hardware accepts interrupts only while this is True</span>
+        self.pending_interrupt = <span class="k">False</span>  <span class="c"># set to True when a device (here, a timer) raises an interrupt</span>
+        self.interrupt_after = set()  <span class="c"># instruction counts after which the timer raises an interrupt, e.g. {2}</span>
+        self.executed = <span class="n">0</span>  <span class="c"># how many instructions have finished their execute stage so far</span>
+        self.reads = <span class="n">0</span>  <span class="c"># how many memory reads have happened (fetches count too)</span>
+        self.writes = <span class="n">0</span>  <span class="c"># how many memory writes have happened</span>
+        self.rows = []  <span class="c"># the trace: one row per stage, saved so it can be printed or checked later</span>
+
+    <span class="k">def</span> read(self, address):  <span class="c"># every memory read goes through here so it is always done the same way</span>
+        self.mar = address  <span class="c"># the processor puts the address in the MAR</span>
+        self.mbr = self.memory[address]  <span class="c"># memory answers by placing that word in the MBR</span>
+        self.reads += <span class="n">1</span>  <span class="c"># count it</span>
+        <span class="k">return</span> self.mbr  <span class="c"># hand the word back to whoever asked</span>
+
+    <span class="k">def</span> write(self, address, word):  <span class="c"># every memory write goes through here</span>
+        self.mar = address  <span class="c"># the address goes in the MAR</span>
+        self.mbr = word &amp; WORD_MASK  <span class="c"># the data goes in the MBR</span>
+        self.memory[address] = self.mbr  <span class="c"># memory copies the MBR into that word</span>
+        self.writes += <span class="n">1</span>  <span class="c"># count it</span>
+
+    <span class="k">def</span> record(self, stage):  <span class="c"># saves one trace row showing every register after a stage</span>
+        self.rows.append((stage, hex3(self.pc), hex4(self.ir), hex4(self.ac), hex3(self.mar), hex4(self.mbr)))  <span class="c"># a tuple of formatted strings</span>
+
+    <span class="k">def</span> fetch(self):  <span class="c"># the fetch stage: bring the next instruction into the IR</span>
+        self.ir = self.read(self.pc)  <span class="c"># MAR &lt;- PC, MBR &lt;- memory[PC], then IR &lt;- MBR</span>
+        self.pc = (self.pc + <span class="n">1</span>) &amp; <span class="n">0xFFF</span>  <span class="c"># the PC moves on at once, so during execute it already names the next instruction</span>
+        self.record(<span class="s">"fetch"</span>)  <span class="c"># save the registers as they stand after the fetch</span>
+
+    <span class="k">def</span> execute(self):  <span class="c"># the execute stage: decode the IR and do what it says</span>
+        opcode = self.ir &gt;&gt; <span class="n">12</span>  <span class="c"># the top 4 bits of the 16-bit instruction are the opcode</span>
+        address = self.ir &amp; <span class="n">0xFFF</span>  <span class="c"># the low 12 bits are the address the instruction refers to</span>
+        <span class="k">if</span> opcode == OP_LOAD:  <span class="c"># 0001: load AC from memory</span>
+            self.ac = self.read(address)  <span class="c"># MAR &lt;- address, MBR &lt;- memory[address], AC &lt;- MBR</span>
+        <span class="k">elif</span> opcode == OP_STORE:  <span class="c"># 0010: store AC to memory</span>
+            <span class="c"># TODO 1: the AC's value must end up in memory at `address`. Use self.write (it sets the MAR and MBR for you).</span>
+            <span class="k">raise</span> NotWrittenYet(<span class="s">"TODO 1: STORE (opcode 2) is not written yet"</span>)  <span class="c"># delete this line once your code is in place</span>
+        <span class="k">elif</span> opcode == OP_ADD:  <span class="c"># 0101: add memory to AC</span>
+            <span class="c"># TODO 2: read the operand with self.read, add it to the AC as SIGNED numbers (to_int turns a word into an int),</span>
+            <span class="c">#         then turn the sum back into a 16-bit word (to_word) and put it in self.ac.</span>
+            <span class="k">raise</span> NotWrittenYet(<span class="s">"TODO 2: ADD (opcode 5) is not written yet"</span>)  <span class="c"># delete this line once your code is in place</span>
+        <span class="k">elif</span> opcode == OP_HALT:  <span class="c"># 0000: stop</span>
+            <span class="c"># TODO 3: tell the run loop to stop (look at what run() checks).</span>
+            <span class="k">raise</span> NotWrittenYet(<span class="s">"TODO 3: HALT (opcode 0) is not written yet"</span>)  <span class="c"># delete this line once your code is in place</span>
+        <span class="k">elif</span> opcode == OP_IRET:  <span class="c"># 1111: return from interrupt</span>
+            <span class="c"># TODO 5: put back the PC that the interrupt stage saved in memory word SAVE_WORD (use self.read), then turn interrupts back on.</span>
+            <span class="k">raise</span> NotWrittenYet(<span class="s">"TODO 5: IRET (opcode F) is not written yet"</span>)  <span class="c"># delete this line once your code is in place</span>
+        <span class="k">else</span>:  <span class="c"># any other opcode is not part of this machine</span>
+            <span class="k">raise</span> ValueError(<span class="s">f"unknown opcode {opcode:X} in instruction {hex4(self.ir)}"</span>)  <span class="c"># stop with a clear message</span>
+        self.executed += <span class="n">1</span>  <span class="c"># one more instruction has completed</span>
+        self.record(<span class="s">"execute"</span>)  <span class="c"># save the registers as they stand after the execute</span>
+        <span class="k">if</span> self.executed <span class="k">in</span> self.interrupt_after:  <span class="c"># the timer is set to go off after this instruction</span>
+            self.pending_interrupt = <span class="k">True</span>  <span class="c"># raise the interrupt; it is noticed in the interrupt stage below</span>
+
+    <span class="k">def</span> interrupt_stage(self):  <span class="c"># runs after every execute: is there an interrupt to accept?</span>
+        <span class="k">if</span> <span class="k">not</span> (self.pending_interrupt <span class="k">and</span> self.interrupts_enabled <span class="k">and</span> <span class="k">not</span> self.halted):  <span class="c"># nothing waiting, or interrupts are off</span>
+            <span class="k">return</span>  <span class="c"># so the processor simply goes on to the next fetch</span>
+        <span class="c"># TODO 4: accept the interrupt. In order:</span>
+        <span class="c">#   (a) it is no longer pending;  (b) turn interrupts off so the handler cannot itself be interrupted;</span>
+        <span class="c">#   (c) save the PC into memory word SAVE_WORD (use self.write);  (d) load the PC with HANDLER_START;</span>
+        <span class="c">#   (e) call self.record("interrupt") so the trace shows this stage.</span>
+        <span class="k">raise</span> NotWrittenYet(<span class="s">"TODO 4: the interrupt stage is not written yet"</span>)  <span class="c"># delete this line once your code is in place</span>
+
+    <span class="k">def</span> run(self):  <span class="c"># the instruction cycle: fetch, execute, check for interrupts, repeat</span>
+        <span class="k">while</span> <span class="k">not</span> self.halted:  <span class="c"># keep cycling until a HALT executes</span>
+            <span class="k">if</span> self.executed &gt;= MAX_STEPS:  <span class="c"># safety net for programs that never halt</span>
+                <span class="k">raise</span> RuntimeError(<span class="s">"the program did not halt; is a HALT (0000) missing?"</span>)  <span class="c"># stop instead of looping forever</span>
+            self.fetch()  <span class="c"># stage 1</span>
+            self.execute()  <span class="c"># stage 2</span>
+            self.interrupt_stage()  <span class="c"># stage 3 (does nothing when no interrupt is waiting)</span>
+        <span class="k">return</span> self  <span class="c"># returning the machine lets a caller write Machine(...).run().memory</span>
+
+    <span class="k">def</span> print_trace(self):  <span class="c"># prints the trace as a table the answer sheet can hold</span>
+        print(<span class="s">f"{'step':&gt;4}  {'stage':&lt;9} {'PC':&gt;3}  {'IR':&gt;4}  {'AC':&gt;4}  {'MAR':&gt;3}  {'MBR':&gt;4}"</span>)  <span class="c"># the header row</span>
+        <span class="k">for</span> number, (stage, pc, ir, ac, mar, mbr) <span class="k">in</span> enumerate(self.rows, start=<span class="n">1</span>):  <span class="c"># number every row from 1</span>
+            print(<span class="s">f"{number:&gt;4}  {stage:&lt;9} {pc:&gt;3}  {ir:&gt;4}  {ac:&gt;4}  {mar:&gt;3}  {mbr:&gt;4}"</span>)  <span class="c"># one aligned row per stage</span>
+        print(<span class="s">f"memory reads: {self.reads}   memory writes: {self.writes}"</span>)  <span class="c"># the totals Problem 1 asks about</span>
+
+
+<span class="c"># ---------------------------------------------------------------------------</span>
+<span class="c"># 4. Programs</span>
+<span class="c"># ---------------------------------------------------------------------------</span>
+PROBLEM_1 = {  <span class="c"># the program from Problem 1 of the written part</span>
+    <span class="n">0x250</span>: <span class="n">0x13A0</span>,  <span class="c"># load AC from 3A0</span>
+    <span class="n">0x251</span>: <span class="n">0x53A1</span>,  <span class="c"># add word 3A1 to AC</span>
+    <span class="n">0x252</span>: <span class="n">0x53A2</span>,  <span class="c"># add word 3A2 to AC</span>
+    <span class="n">0x253</span>: <span class="n">0x23A3</span>,  <span class="c"># store AC to 3A3</span>
+    <span class="n">0x254</span>: <span class="n">0x0000</span>,  <span class="c"># halt</span>
+    <span class="n">0x3A0</span>: <span class="n">0x0019</span>,  <span class="c"># data: +25</span>
+    <span class="n">0x3A1</span>: <span class="n">0x000E</span>,  <span class="c"># data: +14</span>
+    <span class="n">0x3A2</span>: <span class="n">0x8007</span>,  <span class="c"># data: -7 in sign-magnitude</span>
+    <span class="n">0x3A3</span>: <span class="n">0x0000</span>,  <span class="c"># the result goes here</span>
+}  <span class="c"># end of PROBLEM_1</span>
+
+HANDLER_SAFE = {  <span class="c"># an interrupt handler that counts timer ticks and protects the AC</span>
+    <span class="n">0x100</span>: <span class="n">0x2001</span>,  <span class="c"># store AC to 001: save the interrupted program's AC before using the AC</span>
+    <span class="n">0x101</span>: <span class="n">0x10F0</span>,  <span class="c"># load AC from 0F0: the tick counter</span>
+    <span class="n">0x102</span>: <span class="n">0x50F1</span>,  <span class="c"># add 0F1: the constant 1</span>
+    <span class="n">0x103</span>: <span class="n">0x20F0</span>,  <span class="c"># store AC to 0F0: counter + 1</span>
+    <span class="n">0x104</span>: <span class="n">0x1001</span>,  <span class="c"># load AC from 001: put the interrupted program's AC back</span>
+    <span class="n">0x105</span>: <span class="n">0xF000</span>,  <span class="c"># IRET: return to the interrupted program</span>
+    <span class="n">0x0F0</span>: <span class="n">0x0000</span>,  <span class="c"># the tick counter starts at 0</span>
+    <span class="n">0x0F1</span>: <span class="n">0x0001</span>,  <span class="c"># the constant 1</span>
+}  <span class="c"># end of HANDLER_SAFE</span>
+
+HANDLER_BROKEN = {  <span class="c"># the same handler with the save and restore removed</span>
+    <span class="n">0x100</span>: <span class="n">0x10F0</span>,  <span class="c"># load AC from 0F0: this overwrites the interrupted program's AC!</span>
+    <span class="n">0x101</span>: <span class="n">0x50F1</span>,  <span class="c"># add the constant 1</span>
+    <span class="n">0x102</span>: <span class="n">0x20F0</span>,  <span class="c"># store the new count</span>
+    <span class="n">0x103</span>: <span class="n">0xF000</span>,  <span class="c"># IRET</span>
+    <span class="n">0x0F0</span>: <span class="n">0x0000</span>,  <span class="c"># the tick counter starts at 0</span>
+    <span class="n">0x0F1</span>: <span class="n">0x0001</span>,  <span class="c"># the constant 1</span>
+}  <span class="c"># end of HANDLER_BROKEN</span>
+
+CHECK_PROGRAM = {  <span class="c"># a small program with known answers, used only by --check</span>
+    <span class="n">0x010</span>: <span class="n">0x1020</span>,  <span class="c"># load AC from 020 (+9)</span>
+    <span class="n">0x011</span>: <span class="n">0x5021</span>,  <span class="c"># add 021 (-4): AC = 5</span>
+    <span class="n">0x012</span>: <span class="n">0x2022</span>,  <span class="c"># store AC to 022</span>
+    <span class="n">0x013</span>: <span class="n">0x5023</span>,  <span class="c"># add 023 (-10): AC = -5</span>
+    <span class="n">0x014</span>: <span class="n">0x2024</span>,  <span class="c"># store AC to 024</span>
+    <span class="n">0x015</span>: <span class="n">0x0000</span>,  <span class="c"># halt</span>
+    <span class="n">0x020</span>: <span class="n">0x0009</span>,  <span class="c"># +9</span>
+    <span class="n">0x021</span>: <span class="n">0x8004</span>,  <span class="c"># -4</span>
+    <span class="n">0x022</span>: <span class="n">0x0000</span>,  <span class="c"># result 1 goes here</span>
+    <span class="n">0x023</span>: <span class="n">0x800A</span>,  <span class="c"># -10</span>
+    <span class="n">0x024</span>: <span class="n">0x0000</span>,  <span class="c"># result 2 goes here</span>
+}  <span class="c"># end of CHECK_PROGRAM</span>
+
+
+<span class="k">def</span> self_check():  <span class="c"># runs the check program with and without an interrupt and compares against known answers</span>
+    plain = Machine(CHECK_PROGRAM, start=<span class="n">0x010</span>).run()  <span class="c"># no interrupts</span>
+    <span class="k">assert</span> plain.memory[<span class="n">0x022</span>] == <span class="n">0x0005</span>, <span class="s">"word 022 should be 0005 (9 + -4)"</span>  <span class="c"># checks LOAD, ADD and STORE</span>
+    <span class="k">assert</span> plain.memory[<span class="n">0x024</span>] == <span class="n">0x8005</span>, <span class="s">"word 024 should be 8005 (5 + -10 = -5)"</span>  <span class="c"># checks a negative sign-magnitude result</span>
+    <span class="k">assert</span> plain.reads == <span class="n">9</span> <span class="k">and</span> plain.writes == <span class="n">2</span>, <span class="s">"expected 9 reads and 2 writes"</span>  <span class="c"># 6 fetches + 3 operand reads, 2 stores</span>
+    ticked = Machine({**CHECK_PROGRAM, **HANDLER_SAFE}, start=<span class="n">0x010</span>)  <span class="c"># the same program with the safe handler loaded</span>
+    ticked.interrupt_after = {<span class="n">3</span>}  <span class="c"># the timer goes off after the third instruction (the first STORE)</span>
+    ticked.run()  <span class="c"># run it</span>
+    <span class="k">assert</span> ticked.memory[<span class="n">0x0F0</span>] == <span class="n">0x0001</span>, <span class="s">"the handler should have counted exactly one tick"</span>  <span class="c"># checks the interrupt stage and IRET</span>
+    <span class="k">assert</span> ticked.memory[<span class="n">0x024</span>] == <span class="n">0x8005</span>, <span class="s">"the interrupt must not change the program's result"</span>  <span class="c"># checks the AC was protected</span>
+    print(<span class="s">"self-check passed: LOAD, ADD, STORE, HALT, the interrupt stage and IRET all behave correctly"</span>)  <span class="c"># good news</span>
+
+
+<span class="k">def</span> main():  <span class="c"># decides what to run from the command-line words</span>
+    <span class="k">try</span>:  <span class="c"># any TODO that is still missing raises NotWrittenYet; the except below turns that into a friendly message</span>
+        run_everything()  <span class="c"># the real work</span>
+    <span class="k">except</span> NotWrittenYet <span class="k">as</span> missing:  <span class="c"># a TODO was reached</span>
+        print(<span class="s">f"\nStopped: {missing}. Write that part, then run the program again."</span>)  <span class="c"># say exactly which TODO</span>
+
+
+<span class="k">def</span> run_everything():  <span class="c"># runs the self-check or the two demo runs, depending on the command-line words</span>
+    <span class="k">if</span> <span class="s">"--check"</span> <span class="k">in</span> sys.argv:  <span class="c"># python machine.py --check</span>
+        self_check()  <span class="c"># run the self-test</span>
+        <span class="k">return</span>  <span class="c"># and stop</span>
+    print(<span class="s">"Problem 1 program, no interrupts"</span>)  <span class="c"># a title for the first run</span>
+    first = Machine(PROBLEM_1, start=<span class="n">0x250</span>)  <span class="c"># build the machine and load Problem 1</span>
+    <span class="k">try</span>:  <span class="c"># run it; if a TODO is reached, still show the trace so far before stopping</span>
+        first.run()  <span class="c"># fetch, execute, interrupt check, until HALT</span>
+    <span class="k">finally</span>:  <span class="c"># runs whether or not run() raised an error</span>
+        first.print_trace()  <span class="c"># show every stage that did happen</span>
+    print(<span class="s">f"word 3A3 = {hex4(first.memory[0x3A3])} ({to_int(first.memory[0x3A3])})"</span>)  <span class="c"># the result in hex and decimal</span>
+    handler = HANDLER_BROKEN <span class="k">if</span> <span class="s">"--broken"</span> <span class="k">in</span> sys.argv <span class="k">else</span> HANDLER_SAFE  <span class="c"># pick which handler to load</span>
+    name = <span class="s">"BROKEN handler (no save/restore)"</span> <span class="k">if</span> handler <span class="k">is</span> HANDLER_BROKEN <span class="k">else</span> <span class="s">"safe handler"</span>  <span class="c"># a label for the output</span>
+    print(<span class="s">f"\nProblem 1 program, timer interrupt after instruction 2, {name}"</span>)  <span class="c"># a title for the second run</span>
+    second = Machine({**PROBLEM_1, **handler}, start=<span class="n">0x250</span>)  <span class="c"># the same program with a handler loaded beside it</span>
+    second.interrupt_after = {<span class="n">2</span>}  <span class="c"># the timer goes off after the second instruction completes</span>
+    <span class="k">try</span>:  <span class="c"># run it; if a TODO is reached, still show the trace so far</span>
+        second.run()  <span class="c"># fetch, execute, interrupt check, until HALT</span>
+    <span class="k">finally</span>:  <span class="c"># runs whether or not run() raised an error</span>
+        second.print_trace()  <span class="c"># show every stage that did happen</span>
+    print(<span class="s">f"word 3A3 = {hex4(second.memory[0x3A3])} ({to_int(second.memory[0x3A3])})   ticks counted = {to_int(second.memory[0x0F0])}"</span>)  <span class="c"># results</span>
+
+
+<span class="k">if</span> __name__ == <span class="s">"__main__"</span>:  <span class="c"># true only when this file is run directly, not when another file imports it</span>
+    main()  <span class="c"># start the program</span></code></pre></div>
+</section>
+
+<section class="card" id="b-tasks">
+  <h2><span class="num">B3</span>Write the missing pieces</h2>
+  <p>There are five places marked <code>TODO</code>. Each has a comment saying what it must do; each needs only one to five lines. Delete the <code>raise NotWrittenYet(...)</code> line of a TODO once your code replaces it.</p>
+  <ol class="steps">
+    <li><b>TODO 1 to 3 (STORE, ADD, HALT)</b> in <code>execute</code>. Model them on the LOAD branch just above them. For ADD, remember that <code>8007</code> means −7: convert both numbers with <code>to_int</code>, add, and convert back with <code>to_word</code>. Run <code>python machine.py</code>: the first run (no interrupts) should now reach the halt and print its whole trace, and the second run should stop at TODO 4.</li>
+    <li><b>TODO 4 (the interrupt stage)</b> in <code>interrupt_stage</code>. This is the hardware side of an interrupt: after the current instruction finishes, save the PC, switch interrupts off, and jump to the handler. The comment lists the steps in order.</li>
+    <li><b>TODO 5 (IRET)</b> in <code>execute</code>. The handler's last instruction puts the saved PC back and switches interrupts on again.</li>
+    <li><b>Check your work:</b>
+      <pre class="term">python machine.py --check</pre>
+      Keep fixing until it prints <code>self-check passed</code>. If an <code>AssertionError</code> appears, its message names the value that came out wrong.</li>
+    <li><b>Run the two demonstrations</b> and keep their output for the questions below:
+      <pre class="term">python machine.py
+python machine.py --broken</pre>
+      The second run of <code>python machine.py</code> is Problem 1's program again, but a timer interrupt arrives after the second instruction and a handler counts it. <code>--broken</code> does the same with a handler that forgets to protect the AC.</li>
+  </ol>
+  <p>To copy output from the terminal: on Windows, select it with the mouse and press <kbd>Enter</kbd> (or right-click); on macOS, select it and press <kbd>⌘</kbd> + <kbd>C</kbd>.</p>
+
+  <div class="part">
+    <p class="q"><b class="letter">B-a</b> Paste the output of <code>python machine.py --check</code>.</p>
+    <div class="ans" data-id="ba" data-kind="output" data-rows="2" data-label="Part B (a) check output" data-placeholder="Paste the terminal output here."></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">B-b</b> Paste the complete output of <code>python machine.py</code> (both runs).</p>
+    <div class="ans" data-id="bb" data-kind="output" data-rows="14" data-label="Part B (b) output" data-placeholder="Paste the terminal output here."></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">B-c</b> Compare the first trace with your table from Problem 1(a), row by row. If any row differs, say which row, which value was right and what the mistake was. If they all match, say which row you found hardest by hand and why. Leave your Problem 1(a) answer as you first wrote it; this is where corrections belong.</p>
+    <div class="ans" data-id="bc" data-rows="4" data-label="Part B (c)"></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">B-d</b> In the interrupt run, the interrupt stage saved <code>0252</code> into word <code>000</code>. Why <code>252</code>, and not <code>251</code>, the address of the instruction that had just finished? Then compare the memory-read and memory-write totals of the two runs: how many extra reads and writes did the one interrupt cost?</p>
+    <div class="ans" data-id="bd" data-rows="4" data-label="Part B (d)"></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">B-e</b> Paste the last line of <code>python machine.py --broken</code>. Explain step by step why word <code>3A3</code> ends up with that value instead of <code>0020</code>. Which two instructions of the careful handler prevent this, and what does this show about who is responsible for saving which registers when an interrupt happens?</p>
+    <div class="ans" data-id="be" data-rows="6" data-label="Part B (e)"></div>
+  </div>
+</section>
+
+<section class="card" id="submit">
+  <h2>Submit</h2>
+  <ol class="steps">
+    <li>Click <b>Download answer sheet</b> (in the bar at the top) after your last answer is typed. Move <code>hw1-answers.html</code> from your Downloads folder into the <code>os-hw1</code> folder. Open it in a browser once to check that every answer is there.</li>
+    <li>Send both files to GitHub from the terminal, inside the <code>os-hw1</code> folder:
+      <pre class="term">git add machine.py hw1-answers.html
+git commit -m "Homework 1"
+git push</pre>
+      <code>git add</code> picks the files to include, <code>git commit</code> records them with a message, and <code>git push</code> uploads the commit to GitHub. The first push opens a browser window to sign in (Windows) or asks for a username and password (macOS). GitHub does not accept your account password there. Instead, create a token: GitHub → Settings → Developer settings → Personal access tokens → <b>Tokens (classic)</b> → Generate new token (classic), tick the <b>repo</b> box, and generate it. Paste the token when asked for the password; nothing appears on screen while you paste, which is normal. If you would rather skip the command line, the repository page's <b>Add file → Upload files</b> button works too.</li>
+    <li>Refresh your repository's page on GitHub and check that both files are there.</li>
+  </ol>
+  <p>Your repository should contain:</p>
+  <ul class="check">
+    <li><code>machine.py</code> with all five TODOs written, so that <code>python machine.py --check</code> prints <code>self-check passed</code>.</li>
+    <li><code>hw1-answers.html</code>, downloaded from this page, with every question answered.</li>
+  </ul>
+  <p><b>Submit your GitHub repo link.</b></p>
+</section>
+
+</main>
+<footer>Operating Systems · Homework 1 · Chapters 1 and 2</footer>
+
+<script>
+(function () {  // everything lives inside this function so none of its names can clash with anything else on the page
+  'use strict';  // strict mode turns silent JavaScript mistakes into visible errors
+  var HW = document.body.getAttribute('data-hw');  // this page's short id, such as "os-hw1", written on the <body> tag
+  var SHEET_FILE = document.body.getAttribute('data-sheet');  // the answer-sheet file name, such as "hw1-answers.html"
+  var TITLE = document.title;  // the page title, reused as the answer sheet's title
+  var STORE_KEY = 'answers:' + HW;  // the name under which this page's drafts are kept in the browser
+  var answers = {};  // every answer typed so far, as { answerId: value }
+  var canSave = true;  // becomes false if this browser refuses to store anything (private windows sometimes do)
+
+  function readStore() {  // loads saved drafts from the browser, if there are any
+    try { return JSON.parse(window.localStorage.getItem(STORE_KEY) || '{}') || {}; }  // stored as JSON text; parse it back into an object
+    catch (e) { canSave = false; return {}; }  // storage blocked or the text is damaged: start empty and remember that saving is off
+  }  // end of readStore
+  function writeStore() {  // saves every answer back into the browser
+    try { window.localStorage.setItem(STORE_KEY, JSON.stringify(answers)); return true; }  // turn the object into JSON text and store it
+    catch (e) { canSave = false; return false; }  // storage blocked or full: report failure
+  }  // end of writeStore
+
+  function isFilled(value) {  // does this answer contain anything yet?
+    if (typeof value === 'string') return value.trim() !== '';  // a text answer counts once it has a non-space character
+    if (Array.isArray(value)) return value.some(function (row) { return Array.isArray(row) && row.some(function (cell) { return typeof cell === 'string' && cell.trim() !== ''; }); });  // a grid counts once any cell is filled
+    return false;  // anything else (missing, wrong type) counts as empty
+  }  // end of isFilled
+
+  function updateProgress() {  // refreshes every "n of m answered" counter on the page
+    var items = document.querySelectorAll('[data-answer]');  // every answer box and answer grid
+    var done = 0;  // how many have something in them
+    items.forEach(function (el) { if (isFilled(answers[el.getAttribute('data-id')])) done += 1; });  // count the filled ones
+    document.querySelectorAll('.js-progress').forEach(function (el) { el.textContent = done + ' of ' + items.length + ' answered'; });  // write the count
+  }  // end of updateProgress
+
+  var saveTimer = null;  // used to wait until typing pauses before saving
+  var pendingStatus = [];  // the status lines of every box edited since the last save
+  function scheduleSave(statusEl) {  // called on every keystroke; saves 400 ms after the last one
+    if (statusEl && pendingStatus.indexOf(statusEl) === -1) pendingStatus.push(statusEl);  // remember this box so its status is updated too
+    clearTimeout(saveTimer);  // cancel the save that was waiting, because another key arrived
+    saveTimer = setTimeout(function () {  // start a fresh 400 ms wait
+      var ok = writeStore();  // save everything (all boxes at once)
+      pendingStatus.forEach(function (el) {  // every box edited since the last save
+        el.textContent = ok ? 'Saved in this browser' : 'Not saved: this browser blocks storage. Download your answer sheet before closing the page.';  // say what happened
+        el.className = ok ? 'status saved' : 'status';  // green when saved
+      });  // end of status updates
+      pendingStatus = [];  // start a fresh list for the next round of typing
+      updateProgress();  // the counter may have changed
+    }, 400);  // 400 milliseconds
+  }  // end of scheduleSave
+
+  function buildTextBox(holder) {  // turns an empty <div class="ans" data-id="..."> into a working answer box
+    var id = holder.getAttribute('data-id');  // this answer's id, such as "p3b"
+    var box = document.createElement('textarea');  // the box itself
+    box.rows = Number(holder.getAttribute('data-rows') || 4);  // starting height, in lines
+    box.setAttribute('aria-label', holder.getAttribute('data-label') || id);  // what a screen reader announces for this box
+    box.spellcheck = holder.getAttribute('data-kind') !== 'output';  // no red squiggles under pasted program output
+    if (holder.getAttribute('data-kind') === 'output') box.className = 'mono';  // program output keeps its columns in a fixed-width face
+    box.placeholder = holder.getAttribute('data-placeholder') || 'Type your answer here.';  // grey hint text shown while empty
+    var status = document.createElement('span');  // the small "Saved" line under the box
+    status.className = 'status';  // styled grey until something is saved
+    status.setAttribute('aria-live', 'polite');  // screen readers announce the saved message without interrupting
+    box.value = typeof answers[id] === 'string' ? answers[id] : '';  // restore a saved draft, if there is one
+    box.addEventListener('input', function () { answers[id] = box.value; scheduleSave(status); });  // keep the answer object up to date and save soon
+    holder.setAttribute('data-answer', '');  // mark it as an answer for the progress counter
+    holder.appendChild(box);  // put the box on the page
+    holder.appendChild(status);  // and its status line under it
+  }  // end of buildTextBox
+
+  function splitList(text, sep) {  // "PC|IR|AC" becomes ["PC", "IR", "AC"]
+    return (text || '').split(sep || '|').map(function (s) { return s.trim(); });  // split on the separator (a bar unless the grid names another) and trim spaces
+  }  // end of splitList
+
+  function buildGrid(table) {  // turns <table class="grid" data-rows="..." data-cols="..."> into a table of small inputs
+    var id = table.getAttribute('data-id');  // this grid's id
+    var rows = splitList(table.getAttribute('data-rows'), table.getAttribute('data-sep'));  // the row labels (a grid whose labels contain "|" names another separator in data-sep)
+    var cols = splitList(table.getAttribute('data-cols'), table.getAttribute('data-sep'));  // the column labels
+    var saved = Array.isArray(answers[id]) ? answers[id] : [];  // a saved draft, if there is one
+    var head = document.createElement('thead');  // the header row
+    var headRow = document.createElement('tr');  // one row inside it
+    var corner = document.createElement('th');  // the top-left corner cell
+    corner.textContent = table.getAttribute('data-corner') || '';  // an optional label for the row-label column
+    headRow.appendChild(corner);  // add the corner
+    cols.forEach(function (c) { var th = document.createElement('th'); th.scope = 'col'; th.textContent = c; headRow.appendChild(th); });  // one header cell per column
+    head.appendChild(headRow);  // finish the header
+    var body = document.createElement('tbody');  // the input rows
+    var status = document.createElement('span');  // the "Saved" line under the grid
+    status.className = 'status';  // grey until something is saved
+    status.setAttribute('aria-live', 'polite');  // announced politely to screen readers
+    rows.forEach(function (r, ri) {  // one table row per row label
+      var tr = document.createElement('tr');  // the row
+      var th = document.createElement('th');  // its label cell
+      th.scope = 'row';  // tells screen readers this cell labels the row
+      th.textContent = r;  // the label text
+      tr.appendChild(th);  // add the label
+      cols.forEach(function (c, ci) {  // one input per column
+        var td = document.createElement('td');  // the cell
+        var input = document.createElement('input');  // the input inside it
+        input.type = 'text';  // plain text, so hex values like 13A0 are allowed
+        input.autocomplete = 'off';  // no browser suggestions from other sites
+        input.spellcheck = false;  // hex values are not words
+        input.setAttribute('aria-label', r + ', ' + c);  // e.g. "Fetch 1, PC"
+        input.value = (Array.isArray(saved[ri]) && typeof saved[ri][ci] === 'string') ? saved[ri][ci] : '';  // restore a saved value
+        input.addEventListener('input', function () {  // on every change to this cell...
+          if (!Array.isArray(answers[id])) answers[id] = rows.map(function () { return cols.map(function () { return ''; }); });  // ...make sure a full empty grid exists...
+          if (!Array.isArray(answers[id][ri])) answers[id][ri] = cols.map(function () { return ''; });  // ...including this row...
+          answers[id][ri][ci] = input.value;  // ...store the new value...
+          scheduleSave(status);  // ...and save soon
+        });  // end of the input listener
+        td.appendChild(input);  // put the input in the cell
+        tr.appendChild(td);  // and the cell in the row
+      });  // end of the columns
+      body.appendChild(tr);  // add the finished row
+    });  // end of the rows
+    table.appendChild(head);  // attach the header
+    table.appendChild(body);  // attach the body
+    table.setAttribute('data-answer', '');  // mark it as an answer for the progress counter
+    var wrapper = table.parentNode;  // grids sit inside a sideways-scrolling wrapper
+    wrapper.parentNode.insertBefore(status, wrapper.nextSibling);  // the status line goes just below that wrapper
+  }  // end of buildGrid
+
+  function fillAll() {  // puts the values in `answers` back into every box and grid (used after loading a sheet)
+    document.querySelectorAll('.ans[data-id]').forEach(function (holder) {  // each text box
+      var box = holder.querySelector('textarea');  // the box inside the holder
+      var v = answers[holder.getAttribute('data-id')];  // its value
+      box.value = typeof v === 'string' ? v : '';  // write it (or clear it)
+    });  // end of text boxes
+    document.querySelectorAll('table.grid[data-id]').forEach(function (table) {  // each grid
+      var v = answers[table.getAttribute('data-id')];  // its value: an array of rows
+      table.querySelectorAll('tbody tr').forEach(function (tr, ri) {  // each row
+        tr.querySelectorAll('input').forEach(function (input, ci) {  // each cell
+          input.value = (Array.isArray(v) && Array.isArray(v[ri]) && typeof v[ri][ci] === 'string') ? v[ri][ci] : '';  // write it (or clear it)
+        });  // end of cells
+      });  // end of rows
+    });  // end of grids
+    var name = document.getElementById('student-name');  // the name box
+    if (name) name.value = typeof answers.__name === 'string' ? answers.__name : '';  // restore the name
+    updateProgress();  // the counter changed
+  }  // end of fillAll
+
+  function esc(text) {  // makes any text safe to put inside HTML: < > & " ' become harmless codes
+    return String(text).replace(/[&<>"']/g, function (ch) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]; });  // one replacement per dangerous character
+  }  // end of esc
+
+  function questionFor(el) {  // finds the question text that belongs to an answer box or grid
+    var part = el.closest('.part');  // the lettered sub-question that holds it
+    var q = part ? part.querySelector('.q') : null;  // its question paragraph
+    return q ? q.textContent.replace(/\s+/g, ' ').trim() : (el.getAttribute('data-label') || '');  // its text, squeezed onto one line
+  }  // end of questionFor
+
+  function buildSheet() {  // writes the whole answer sheet as one standalone HTML document (a string)
+    var name = (answers.__name || '').trim() || '(no name entered)';  // the student's name
+    var when = new Date().toLocaleString();  // the date and time the sheet was made
+    var html = [];  // the sheet is built up as a list of pieces, joined at the end
+    var lastProblem = '';  // remembers which problem heading was printed last
+    document.querySelectorAll('[data-answer]').forEach(function (el) {  // every answer in page order
+      var id = el.getAttribute('data-id');  // its id
+      var card = el.closest('section');  // the card (problem) it sits in
+      var heading = card && card.querySelector('h2') ? card.querySelector('h2').textContent.trim() : '';  // that problem's title
+      if (heading !== lastProblem) { html.push('<h2>' + esc(heading) + '</h2>'); lastProblem = heading; }  // print the title once per problem
+      html.push('<div class="a"><p class="q">' + esc(questionFor(el)) + '</p>');  // the question
+      var v = answers[id];  // the answer
+      if (el.tagName === 'TABLE') {  // a grid: rebuild it as a plain table
+        var rows = splitList(el.getAttribute('data-rows'), el.getAttribute('data-sep'));  // row labels
+        var cols = splitList(el.getAttribute('data-cols'), el.getAttribute('data-sep'));  // column labels
+        html.push('<table><tr><th></th>' + cols.map(function (c) { return '<th>' + esc(c) + '</th>'; }).join('') + '</tr>');  // header row
+        rows.forEach(function (r, ri) {  // one row per label
+          html.push('<tr><th>' + esc(r) + '</th>' + cols.map(function (c, ci) { var cell = (Array.isArray(v) && Array.isArray(v[ri]) && typeof v[ri][ci] === 'string') ? v[ri][ci] : ''; return '<td>' + esc(cell) + '</td>'; }).join('') + '</tr>');  // its cells
+        });  // end of rows
+        html.push('</table>');  // close the table
+      } else {  // a text answer
+        html.push(isFilled(v) ? '<pre>' + esc(v) + '</pre>' : '<p class="empty">(no answer)</p>');  // the answer exactly as typed, or a visible gap
+      }  // end of the answer kinds
+      html.push('</div>');  // close this answer
+    });  // end of every answer
+    var data = JSON.stringify({ hw: HW, answers: answers }).replace(/</g, '\\u003c');  // the raw answers, so this page can load the sheet back; < is escaped so the text can never end the script tag
+    var css = 'body{font:15px/1.55 system-ui,sans-serif;max-width:860px;margin:24px auto;padding:0 16px;color:#151c2c;background:#fff}h1{font-size:1.5rem;margin:0 0 4px}h2{font-size:1.15rem;margin:28px 0 8px;border-bottom:2px solid #d9deea;padding-bottom:4px}.meta{color:#69738c;margin:0 0 16px}.a{margin:0 0 14px}.q{margin:0 0 4px;color:#3d4760;font-size:.92rem}pre{white-space:pre-wrap;word-wrap:break-word;font:13px/1.5 ui-monospace,Menlo,Consolas,monospace;background:#f5f7fb;border:1px solid #d9deea;border-radius:6px;padding:8px 10px;margin:0}.empty{color:#b45309;margin:0}table{border-collapse:collapse;font:13px ui-monospace,Menlo,Consolas,monospace}th,td{border:1px solid #d9deea;padding:4px 8px;text-align:left}th{background:#f5f7fb}';  // a small built-in stylesheet so the sheet looks tidy on its own
+    return '<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n<title>' + esc(TITLE + ': answers of ' + name) + '</title>\n<style>' + css + '</style>\n</head>\n<body>\n<h1>' + esc(TITLE) + '</h1>\n<p class="meta">Answers of <b>' + esc(name) + '</b> · saved ' + esc(when) + '</p>\n' + html.join('\n') + '\n<script type="application/json" id="answer-data">' + data + '<\/script>\n</body>\n</html>\n';  // the finished document
+  }  // end of buildSheet
+
+  function download(filename, text, type) {  // hands the browser a file to save, made from text in memory
+    var blob = new Blob([text], { type: type });  // wrap the text as a file-like object
+    var url = URL.createObjectURL(blob);  // a temporary address for it
+    var a = document.createElement('a');  // an invisible link...
+    a.href = url;  // ...pointing at that address...
+    a.download = filename;  // ...that saves instead of opening...
+    document.body.appendChild(a);  // (some browsers need it on the page)
+    a.click();  // ...clicked by the script
+    setTimeout(function () { URL.revokeObjectURL(url); a.remove(); }, 1000);  // tidy up a second later
+  }  // end of download
+
+  function setMsg(text) {  // shows a message in every answer-sheet panel
+    document.querySelectorAll('.js-sheet-msg').forEach(function (el) { el.textContent = text; });  // write it
+  }  // end of setMsg
+
+  function loadSheet(file) {  // reads an answer sheet the student saved earlier and puts its answers back
+    var reader = new FileReader();  // the browser's tool for reading a chosen file
+    reader.onload = function () {  // runs once the file has been read
+      try {  // anything wrong with the file ends up in the catch below
+        var doc = new DOMParser().parseFromString(String(reader.result), 'text/html');  // parse it as HTML without running any of it
+        var tag = doc.getElementById('answer-data');  // the data block that buildSheet wrote
+        if (!tag) throw new Error('This file is not an answer sheet saved from this page.');  // some other file was chosen
+        var data = JSON.parse(tag.textContent);  // the saved answers
+        if (!data || data.hw !== HW || typeof data.answers !== 'object') throw new Error('This answer sheet belongs to a different homework.');  // wrong homework
+        var clean = {};  // only well-formed answers for boxes that exist on this page are accepted
+        var known = {};  // the ids that exist on this page
+        document.querySelectorAll('[data-answer]').forEach(function (el) { known[el.getAttribute('data-id')] = el.tagName; });  // collect them
+        Object.keys(data.answers).forEach(function (id) {  // look at each saved answer
+          var v = data.answers[id];  // its value
+          if (id === '__name' && typeof v === 'string') clean.__name = v.slice(0, 200);  // the name: text only, and not absurdly long
+          else if (known[id] === 'DIV' && typeof v === 'string') clean[id] = v.slice(0, 20000);  // a text answer: text only
+          else if (known[id] === 'TABLE' && Array.isArray(v)) clean[id] = v.map(function (row) { return Array.isArray(row) ? row.map(function (c) { return typeof c === 'string' ? c.slice(0, 500) : ''; }) : []; });  // a grid: rows of text only
+        });  // end of the saved answers
+        answers = clean;  // replace the current answers with the loaded ones
+        writeStore();  // save them in this browser too
+        fillAll();  // show them on the page
+        setMsg('Loaded ' + Object.keys(clean).filter(function (k) { return k !== '__name'; }).length + ' answers from ' + file.name + '.');  // confirm
+      } catch (e) {  // the file could not be used
+        setMsg('Could not load that file: ' + e.message);  // say why
+      }  // end of try/catch
+    };  // end of onload
+    reader.readAsText(file);  // start reading
+  }  // end of loadSheet
+
+  function wireSheetPanel() {  // connects the name box and the Download / Load / Clear buttons
+    var name = document.getElementById('student-name');  // the name box
+    if (name) {  // it exists on this page
+      name.value = typeof answers.__name === 'string' ? answers.__name : '';  // restore a saved name
+      name.addEventListener('input', function () { answers.__name = name.value; scheduleSave(null); });  // save it as it is typed
+    }  // end of the name box
+    document.querySelectorAll('.js-download').forEach(function (btn) {  // every Download button (there is one in the bar and one in the panel)
+      btn.addEventListener('click', function () {  // on click...
+        download(SHEET_FILE, buildSheet(), 'text/html');  // ...build the sheet and save it
+        setMsg('Saved ' + SHEET_FILE + ' to your Downloads folder. Put that file in your repository.');  // say where it went
+      });  // end of the click handler
+    });  // end of Download buttons
+    var picker = document.getElementById('sheet-file');  // the hidden file chooser
+    var loadBtn = document.getElementById('sheet-load');  // the visible "Load" button
+    if (picker && loadBtn) {  // both exist
+      loadBtn.addEventListener('click', function () { picker.click(); });  // the button opens the chooser
+      picker.addEventListener('change', function () { if (picker.files[0]) loadSheet(picker.files[0]); picker.value = ''; });  // read the chosen file, then reset the chooser
+    }  // end of Load
+    var clearBtn = document.getElementById('sheet-clear');  // the Clear button
+    var armed = null;  // the timer of a pending "click again to confirm"
+    if (clearBtn) clearBtn.addEventListener('click', function () {  // on click...
+      if (!armed) {  // first click: ask for a second one instead of clearing at once
+        clearBtn.textContent = 'Click again to erase every answer';  // the warning
+        armed = setTimeout(function () { clearBtn.textContent = 'Clear all answers'; armed = null; }, 4000);  // it disarms itself after 4 seconds
+        return;  // nothing erased yet
+      }  // end of the first click
+      clearTimeout(armed);  // second click within 4 seconds: stop the disarm timer
+      armed = null;  // back to the unarmed state
+      clearBtn.textContent = 'Clear all answers';  // restore the label
+      answers = {};  // forget every answer
+      writeStore();  // save the empty set
+      fillAll();  // empty every box on the page
+      setMsg('All answers erased from this page and this browser.');  // confirm
+    });  // end of Clear
+    if (!canSave) setMsg('This browser is not saving drafts. Download your answer sheet before you close the page, and load it back next time.');  // warn early if storage is blocked
+  }  // end of wireSheetPanel
+
+  function wireCode() {  // connects the Copy and Download buttons on every code block
+    document.querySelectorAll('.codebox').forEach(function (box) {  // each block
+      var code = box.querySelector('pre');  // the code itself
+      var file = box.getAttribute('data-file');  // its file name
+      var copy = box.querySelector('.js-copy');  // its Copy button
+      var save = box.querySelector('.js-save');  // its Download button
+      if (copy) copy.addEventListener('click', function () {  // Copy: put the code on the clipboard
+        var text = code.textContent;  // the plain code, without any coloring
+        var done = function () { copy.textContent = 'Copied'; setTimeout(function () { copy.textContent = 'Copy'; }, 1500); };  // brief confirmation
+        if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(text).then(done, function () { fallbackCopy(text); done(); });  // the modern way
+        else { fallbackCopy(text); done(); }  // the older way, for pages opened straight from a file
+      });  // end of Copy
+      if (save && file) save.addEventListener('click', function () { download(file, code.textContent.replace(/\s*$/, '\n'), 'application/octet-stream'); });  // Download: save the code as its own file, ending with one newline; the generic type stops browsers adding .txt to the name
+    });  // end of each block
+  }  // end of wireCode
+
+  function fallbackCopy(text) {  // copies text in browsers that do not offer navigator.clipboard here
+    var t = document.createElement('textarea');  // a temporary box...
+    t.value = text;  // ...holding the text...
+    t.style.position = 'fixed';  // ...kept out of the page flow...
+    t.style.opacity = '0';  // ...and invisible
+    document.body.appendChild(t);  // add it
+    t.select();  // select its contents
+    try { document.execCommand('copy'); } catch (e) { /* nothing more can be done; the student can still select the code by hand */ }  // copy the selection
+    t.remove();  // remove the temporary box
+  }  // end of fallbackCopy
+
+  answers = readStore();  // 1. load any saved drafts
+  document.querySelectorAll('.ans[data-id]').forEach(buildTextBox);  // 2. build every text box
+  document.querySelectorAll('table.grid[data-id]').forEach(buildGrid);  // 3. build every grid
+  wireSheetPanel();  // 4. connect the answer-sheet panel
+  wireCode();  // 5. connect the code blocks
+  updateProgress();  // 6. show the starting count
+})();  // run the function immediately
+</script>
+</body>
+</html>

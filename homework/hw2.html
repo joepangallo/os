@@ -1,0 +1,1013 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Chapters 3 and 4: process states, dispatching, mode and process switches, process control blocks, fork(), user-level and kernel-level threads, Amdahl&#x27;s law and threads in real systems, plus a Python experiment comparing processes and threads.">
+<title>Homework 2: Processes and Threads</title>
+<style>
+:root {  /* design tokens: every color and size the page uses is named once here */
+  --font: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;  /* the reading typeface: whatever system font the computer already has */
+  --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;  /* a fixed-width typeface for code, registers and hex values */
+  --bg: #eef1f7;  /* the pale blue-grey page background behind the cards */
+  --panel: #ffffff;  /* white, the fill for cards and answer boxes */
+  --panel-2: #f5f7fb;  /* a slightly tinted white for boxes nested inside cards */
+  --ink: #151c2c;  /* the main text color, a very dark blue */
+  --ink-2: #3d4760;  /* a lighter text color for secondary text */
+  --muted: #69738c;  /* grey text for hints and small print */
+  --line: #d9deea;  /* the thin border color around panels and table cells */
+  --accent: #4f46e5;  /* indigo, for buttons, links and focus rings */
+  --accent-bg: #e8e7fd;  /* a pale indigo fill behind highlighted items */
+  --accent-ink: #ffffff;  /* text placed on top of the accent color */
+  --hw: #2563eb;  /* this homework's own color; each page overrides it in its body tag */
+  --good: #15803d;  /* green, for "saved" and success messages */
+  --warn: #b45309;  /* amber, for cautions */
+  --code-bg: #0f172a;  /* the dark background of code blocks */
+  --code-ink: #e2e8f0;  /* the light text inside code blocks */
+  --code-comment: #94a3b8;  /* comments inside code, dimmer than the code itself */
+  --code-string: #fbbf24;  /* strings inside code */
+  --code-keyword: #c4b5fd;  /* Python keywords inside code */
+  --code-number: #7dd3fc;  /* numbers inside code */
+  --radius: 12px;  /* the corner rounding used by cards and boxes */
+  --shadow: 0 1px 2px rgba(20, 28, 48, .06), 0 6px 18px rgba(20, 28, 48, .06);  /* a soft shadow that lifts cards off the page */
+}  /* end of the light-theme tokens */
+@media (prefers-color-scheme: dark) {  /* when the computer is set to dark mode... */
+  :root {  /* ...swap the tokens for darker ones; every rule below uses the tokens, so nothing else changes */
+    --bg: #0d1220;  /* near-black blue page */
+    --panel: #151c2e;  /* dark cards */
+    --panel-2: #1b2438;  /* slightly lighter nested boxes */
+    --ink: #e7ebf5;  /* light main text */
+    --ink-2: #c3cadb;  /* light secondary text */
+    --muted: #8f99b3;  /* grey hints that still read on dark */
+    --line: #2b3550;  /* dark borders */
+    --accent: #8b85ff;  /* a lighter indigo that stays readable on dark */
+    --accent-bg: #25234d;  /* dark indigo fill */
+    --accent-ink: #0d1220;  /* dark text on the light-indigo buttons */
+    --good: #4ade80;  /* lighter green */
+    --warn: #fbbf24;  /* lighter amber */
+    --shadow: 0 1px 2px rgba(0, 0, 0, .4);  /* shadows barely show on dark, so keep them small */
+  }  /* end of the dark tokens */
+}  /* end of the dark-mode block */
+*, *::before, *::after { box-sizing: border-box; }  /* widths include padding and border, which makes layouts predictable */
+html { scroll-behavior: smooth; scroll-padding-top: 76px; }  /* in-page links glide, and stop below the sticky bar instead of under it */
+body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.6 var(--font); -webkit-font-smoothing: antialiased; }  /* base page: background, text color, size and line spacing */
+a { color: var(--accent); }  /* links use the accent color */
+code, kbd, pre, textarea.mono, .grid input { font-family: var(--mono); }  /* code and hex values use the fixed-width face */
+code { background: var(--panel-2); border: 1px solid var(--line); border-radius: 5px; padding: 0 .3em; font-size: .92em; }  /* inline code gets a small tinted pill */
+kbd { border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; padding: 0 .35em; font-size: .88em; background: var(--panel); }  /* a key on the keyboard */
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }  /* a clear ring shows where keyboard focus is */
+.wrap { width: min(920px, calc(100% - 32px)); margin: 0 auto; }  /* the reading column: at most 920px wide, 16px gutter each side on phones */
+.skip { position: absolute; left: 12px; top: -60px; z-index: 50; padding: 8px 12px; background: var(--ink); color: var(--bg); border-radius: 8px; }  /* "skip to content" link, hidden above the page... */
+.skip:focus { top: 8px; }  /* ...until a keyboard user tabs onto it */
+header.hero { background: linear-gradient(135deg, var(--hw), #1e1b4b); color: #fff; padding: 40px 0 34px; }  /* the colored title band at the top */
+.hero .kicker { display: block; font-size: .78rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; opacity: .85; }  /* the small label above the title */
+.hero h1 { margin: 6px 0 10px; font-size: clamp(1.9rem, 5vw, 2.9rem); line-height: 1.15; letter-spacing: -.02em; }  /* the title grows with the screen but never overflows a phone */
+.hero p { margin: 0; max-width: 62ch; font-size: 1.06rem; opacity: .95; }  /* the one-paragraph summary under the title */
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; padding: 0; list-style: none; }  /* a row of small labels that wraps on phones */
+.chips li { border: 1px solid rgba(255, 255, 255, .35); border-radius: 999px; padding: 3px 11px; font-size: .8rem; font-weight: 700; background: rgba(255, 255, 255, .1); }  /* one pill-shaped label */
+nav.bar { position: sticky; top: 0; z-index: 20; background: var(--panel); border-bottom: 1px solid var(--line); box-shadow: var(--shadow); }  /* the navigation bar that stays at the top while scrolling */
+.bar .wrap { display: flex; align-items: center; gap: 6px 14px; flex-wrap: wrap; padding: 8px 0; }  /* bar contents sit in one row and wrap onto two on phones */
+.bar a.nav { color: var(--ink-2); text-decoration: none; font-weight: 650; font-size: .9rem; padding: 4px 2px; }  /* each section link */
+.bar a.nav:hover { color: var(--accent); }  /* links light up under the mouse */
+.bar .spacer { flex: 1; }  /* pushes the progress counter and button to the right-hand end */
+.bar .progress { font-size: .85rem; color: var(--muted); white-space: nowrap; }  /* "7 of 40 answered" */
+button, .btn { font: inherit; font-size: .9rem; font-weight: 700; border: 1px solid var(--accent); background: var(--accent); color: var(--accent-ink); border-radius: 8px; padding: 6px 12px; cursor: pointer; }  /* the main button style */
+button.ghost { background: transparent; color: var(--accent); }  /* a quieter outline button for secondary actions */
+button:hover { filter: brightness(1.08); }  /* buttons brighten slightly under the mouse */
+main { padding: 26px 0 60px; }  /* space above and below the main content */
+section.card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 22px 24px; margin: 0 0 22px; }  /* one white card per problem or topic */
+@media (max-width: 600px) { section.card { padding: 16px 14px; } }  /* phones get tighter card padding so text has room */
+h2 { margin: 0 0 10px; font-size: 1.45rem; line-height: 1.25; }  /* problem titles */
+h2 .num { color: var(--hw); margin-right: .35em; }  /* the "Problem 3" part of a title, in the homework color */
+h3 { margin: 22px 0 8px; font-size: 1.1rem; }  /* sub-headings inside a card */
+.part-label { display: block; margin: 36px 0 12px; font-size: .8rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--hw); }  /* the "Part A" / "Part B" divider label */
+.given { background: var(--panel-2); border: 1px solid var(--line); border-left: 4px solid var(--hw); border-radius: 8px; padding: 12px 16px; margin: 12px 0; }  /* a box that holds the facts a problem gives you */
+.given > :first-child { margin-top: 0; }  /* no extra gap at the top of that box */
+.given > :last-child { margin-bottom: 0; }  /* no extra gap at the bottom either */
+.note { border-left: 4px solid var(--accent); background: var(--accent-bg); border-radius: 8px; padding: 10px 14px; margin: 12px 0; }  /* a tip */
+.caution { border-left: 4px solid var(--warn); background: var(--panel-2); border-radius: 8px; padding: 10px 14px; margin: 12px 0; }  /* a caution */
+.scroll-x { overflow-x: auto; -webkit-overflow-scrolling: touch; }  /* wide tables scroll sideways inside their own box instead of widening the page */
+table.data { border-collapse: collapse; margin: 8px 0; font-size: .95rem; }  /* a table of given facts */
+table.data th, table.data td { border: 1px solid var(--line); padding: 5px 10px; text-align: left; vertical-align: top; }  /* its cells */
+table.data th { background: var(--panel-2); font-weight: 700; }  /* its header cells */
+table.data td.mono, table.data th.mono { font-family: var(--mono); }  /* cells that hold hex values */
+.part { margin: 18px 0 0; padding-top: 14px; border-top: 1px dashed var(--line); }  /* one lettered sub-question, separated by a dashed line */
+.part .q { margin: 0 0 8px; }  /* the question text */
+.part .q b.letter { color: var(--hw); }  /* the (a), (b), (c) letter */
+.ans { margin: 6px 0 0; }  /* the space that holds an answer box */
+.ans textarea { width: 100%; min-height: 96px; resize: vertical; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--ink); font: inherit; font-size: .95rem; line-height: 1.5; padding: 9px 11px; }  /* a free-text answer box */
+.ans textarea.mono { font-size: .85rem; white-space: pre; overflow-wrap: normal; overflow-x: auto; }  /* the box for pasted program output keeps columns lined up */
+.ans textarea:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px var(--accent-bg); }  /* the box being typed in is highlighted */
+.ans .status { display: block; min-height: 1.2em; font-size: .78rem; color: var(--muted); margin-top: 2px; }  /* "saved" appears here after typing */
+.ans .status.saved { color: var(--good); }  /* the saved message is green */
+table.grid { border-collapse: collapse; margin: 6px 0; font-size: .9rem; }  /* a table of small answer boxes */
+table.grid th, table.grid td { border: 1px solid var(--line); padding: 0; }  /* grid cells: the input fills the cell, so no padding */
+table.grid th { background: var(--panel-2); padding: 5px 8px; font-weight: 700; text-align: left; white-space: nowrap; }  /* row and column labels */
+table.grid thead th { text-align: center; }  /* column labels are centered over their inputs */
+table.grid tbody th { white-space: normal; min-width: 110px; max-width: 240px; }  /* long row labels wrap onto several lines instead of pushing the inputs off a phone screen */
+table.grid td input { width: 100%; min-width: 64px; border: 0; background: var(--panel); color: var(--ink); padding: 6px 8px; font-size: .9rem; }  /* the input inside a grid cell */
+table.grid.wide td input { min-width: 150px; }  /* grids whose answers are sentences get wider cells */
+table.grid td input:focus { outline: 2px solid var(--accent); outline-offset: -2px; }  /* the focused cell is outlined */
+.sheet { display: grid; gap: 10px; }  /* the answer-sheet panel near the top of the page */
+.sheet label { font-weight: 700; font-size: .9rem; }  /* "Your name" */
+.sheet input[type=text] { width: 100%; max-width: 360px; border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; font: inherit; background: var(--panel); color: var(--ink); }  /* the name box */
+.sheet .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }  /* the row of sheet buttons */
+.sheet .msg { font-size: .88rem; color: var(--muted); min-height: 1.3em; }  /* messages such as "Loaded 38 answers" */
+ol.steps { padding-left: 1.3em; }  /* numbered setup steps */
+ol.steps > li { margin: 0 0 12px; }  /* space between steps */
+.os { display: grid; grid-template-columns: 88px 1fr; gap: 4px 10px; margin: 6px 0; align-items: baseline; }  /* "Windows: ... / macOS: ..." rows */
+.os > b { font-size: .82rem; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }  /* the operating-system name */
+@media (max-width: 520px) { .os { grid-template-columns: 1fr; } }  /* on phones the name sits above its instructions */
+.codebox { margin: 12px 0; border-radius: 10px; overflow: hidden; border: 1px solid #1e293b; }  /* a code block with its toolbar */
+.codebox .tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; background: #1e293b; color: #cbd5e1; padding: 6px 10px; font-size: .85rem; }  /* the toolbar: file name plus buttons */
+.codebox .tools .name { font-family: var(--mono); font-weight: 700; flex: 1; }  /* the file name */
+.codebox .tools button { background: #334155; border-color: #475569; color: #f1f5f9; padding: 3px 10px; font-size: .8rem; }  /* toolbar buttons */
+.codebox pre, pre.term { margin: 0; background: var(--code-bg); color: var(--code-ink); padding: 12px 14px; overflow-x: auto; font-size: .8rem; line-height: 1.5; tab-size: 4; }  /* the code itself scrolls sideways inside its box */
+.codebox pre.tall { max-height: 560px; overflow-y: auto; }  /* long files scroll inside a box instead of filling several screens */
+pre.term { border-radius: 10px; margin: 8px 0; }  /* a terminal command or output shown on its own */
+pre code { background: none; border: 0; padding: 0; font-size: inherit; color: inherit; }  /* code inside a code block must not get the inline-code pill style */
+pre .c { color: var(--code-comment); }  /* comments */
+pre .s { color: var(--code-string); }  /* strings */
+pre .k { color: var(--code-keyword); }  /* keywords */
+pre .n { color: var(--code-number); }  /* numbers */
+ul.check { list-style: none; padding-left: 0; }  /* the submission checklist */
+ul.check li { padding-left: 1.6em; position: relative; margin: 0 0 8px; }  /* each item leaves room for its box */
+ul.check li::before { content: "\2610"; position: absolute; left: 0; color: var(--hw); }  /* an empty checkbox drawn in front of each item */
+footer { color: var(--muted); font-size: .85rem; text-align: center; padding: 10px 0 40px; }  /* the small print at the very bottom */
+@media print {  /* when the page is printed or saved as a PDF */
+  nav.bar, .skip, .sheet .row, .codebox .tools button { display: none; }  /* hide things that only work on screen */
+  section.card { box-shadow: none; break-inside: avoid-page; }  /* no shadows, and try not to split a card across pages */
+  body { background: #fff; }  /* white paper */
+}  /* end of the print block */
+.answer { border-left: 4px solid var(--good); background: var(--panel-2); border-radius: 8px; padding: 10px 14px; margin: 10px 0; }  /* solutions: the final answer to a part, in a green-edged box */
+.answer > :first-child { margin-top: 0; }  /* no extra gap at the top of an answer box */
+.answer > :last-child { margin-bottom: 0; }  /* nor at the bottom */
+.mistake { border-left: 4px solid var(--warn); background: var(--panel-2); border-radius: 8px; padding: 10px 14px; margin: 10px 0; }  /* solutions: a common mistake and how to spot it */
+.mistake > :first-child { margin-top: 0; }  /* no extra gap at the top of a mistake box */
+.mistake > :last-child { margin-bottom: 0; }  /* nor at the bottom */
+</style>
+</head>
+<body data-hw="os-hw2" data-sheet="hw2-answers.html" style="--hw: #db2777;">
+<a class="skip" href="#main">Skip to the content</a>
+<header class="hero">
+  <div class="wrap">
+    <span class="kicker">Operating Systems · Homework 2</span>
+    <h1>Processes and Threads</h1>
+    <p>Chapters 3 and 4. Follow processes through their states, read an interleaved trace, decide when the OS really switches processes, and predict what <code style="color:inherit;background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.3)">fork()</code> prints. Then compare threads with processes on paper and measure the difference on your own computer in Part B.</p>
+    <ul class="chips">
+      <li>Chapter 3: Process Description and Control</li>
+      <li>Chapter 4: Threads</li>
+      <li>Part A: 8 problems</li>
+      <li>Part B: measure processes vs. threads</li>
+    </ul>
+  </div>
+</header>
+
+<nav class="bar" aria-label="Homework sections">
+  <div class="wrap">
+    <a class="nav" href="#start">Start</a>
+    <a class="nav" href="#part-a">Part A</a>
+    <a class="nav" href="#part-b">Part B</a>
+    <a class="nav" href="#submit">Submit</a>
+    <span class="spacer"></span>
+    <span class="progress js-progress"></span>
+    <button type="button" class="js-download">Download answer sheet</button>
+  </div>
+</nav>
+
+<main id="main" class="wrap">
+
+<section class="card" id="start">
+  <h2>How this homework works</h2>
+  <p>There are two parts. <b>Part A</b> is eight problems about how an operating system describes, switches and creates processes, and how threads change the picture. <b>Part B</b> is a short Python program that starts real threads and real processes on your computer, so you can see which identities and memory they share and time how fast each one does the same work.</p>
+  <p>Every question has an answer box right under it. What you type is saved automatically in this browser. When you are done, <b>Download answer sheet</b> saves all of your answers as one HTML file, <code>hw2-answers.html</code>, which goes into a GitHub repository together with your finished <code>procthreads.py</code>.</p>
+  <div class="note"><b>Show your work on every calculation.</b> Write the formula, the numbers you put into it, and the result. For traces and state tables, a short note on any step you found tricky helps show your reasoning.</div>
+  <div class="caution"><b>Switching computers?</b> Drafts live in one browser only. Download the answer sheet, then use <b>Load a saved answer sheet</b> on the other computer to pick up where you left off.</div>
+  <h3>Your answer sheet</h3>
+  <div class="sheet">
+    <div>
+      <label for="student-name">Your name (printed at the top of the answer sheet)</label><br>
+      <input type="text" id="student-name" autocomplete="name">
+    </div>
+    <div class="row">
+      <button type="button" class="js-download">Download answer sheet</button>
+      <button type="button" class="ghost" id="sheet-load">Load a saved answer sheet</button>
+      <input type="file" id="sheet-file" accept=".html,text/html" hidden>
+      <button type="button" class="ghost" id="sheet-clear">Clear all answers</button>
+      <span class="progress js-progress"></span>
+    </div>
+    <p class="msg js-sheet-msg" aria-live="polite"></p>
+  </div>
+</section>
+
+<span class="part-label" id="part-a">Part A · Problems</span>
+
+<!-- ============================ Problem 1 ============================ -->
+<section class="card" id="p1">
+  <h2><span class="num">Problem 1</span>Follow five processes through the seven-state model</h2>
+  <div class="given">
+    <p>One processor. The OS uses the seven-state model: New, Ready, Running, Blocked, Ready/Suspend, Blocked/Suspend and Exit. Whenever the running process leaves Running, the dispatcher immediately runs the process at the <b>front</b> of the Ready queue. A process that becomes Ready joins the <b>back</b> of the queue.</p>
+    <div class="scroll-x">
+      <table class="data">
+        <tr><th>Time</th><th>What happens</th></tr>
+        <tr><td>0</td><td>P1 is Running. The Ready queue, front to back, is P2, P3. P4 is Blocked, waiting for a disk read. P5 has just been created and is New.</td></tr>
+        <tr><td>2</td><td>P1 asks to read input from the keyboard.</td></tr>
+        <tr><td>3</td><td>The OS admits P5 into main memory.</td></tr>
+        <tr><td>5</td><td>The disk finishes P4's read.</td></tr>
+        <tr><td>7</td><td>P2's time slice runs out.</td></tr>
+        <tr><td>8</td><td>To free main memory, the OS swaps P1 out to disk.</td></tr>
+        <tr><td>10</td><td>P3 terminates.</td></tr>
+        <tr><td>12</td><td>The user presses a key: the input P1 was waiting for arrives.</td></tr>
+        <tr><td>13</td><td>The OS swaps P1 back into main memory.</td></tr>
+        <tr><td>15</td><td>The running process asks to read from the disk.</td></tr>
+      </table>
+    </div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(a)</b> Give the state of every process at each of these times. (Nothing happens at these exact times, so there is no "just before or just after" question.)</p>
+    <div class="scroll-x"><table class="grid" data-id="p1a" data-corner="Process" data-rows="P1|P2|P3|P4|P5" data-cols="t = 4|t = 9|t = 11|t = 14|t = 16" data-label="Problem 1(a) state table"></table></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(b)</b> List every state transition P1 makes, with the time and the cause of each. Then give the Ready queue, front to back, at t = 16.</p>
+    <div class="ans" data-id="p1b" data-rows="5" data-label="Problem 1(b)"></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(c)</b> For each transition, say whether the seven-state model allows it. If it does, describe a situation in which it happens; if not, explain why it cannot happen.</p>
+    <div class="scroll-x"><table class="grid wide" data-id="p1c" data-corner="Transition" data-rows="Blocked → Running|Ready → Blocked|Blocked/Suspend → Ready/Suspend|Running → Ready/Suspend|New → Running" data-cols="Allowed? (yes / no)|Why, or when it happens" data-label="Problem 1(c) table"></table></div>
+  </div>
+</section>
+
+<!-- ============================ Problem 2 ============================ -->
+<section class="card" id="p2">
+  <h2><span class="num">Problem 2</span>Build an interleaved trace</h2>
+  <p>A trace lists the instruction addresses the processor executes, one per instruction cycle. When several processes share one processor, their traces are interleaved with the dispatcher's.</p>
+  <div class="given">
+    <ul>
+      <li><b>Process A</b> starts at address 4000 and executes 7 instructions (4000, 4001, …), then ends.</li>
+      <li><b>Process B</b> starts at 6000. Its third instruction, at 6002, requests I/O, so B blocks right after executing it. The I/O does not finish before the trace ends.</li>
+      <li><b>Process C</b> starts at 9000 and executes 10 instructions, then ends.</li>
+      <li>The <b>dispatcher</b> lives at addresses 200 to 203 and executes all four of them every time it runs. It runs between any two processes.</li>
+      <li>A process may run at most <b>5</b> instruction cycles before a time-out sends it to the back of the Ready queue.</li>
+      <li>At cycle 1, A starts running directly (no dispatcher first) and the Ready queue behind it is B, C. The trace ends when C executes its last instruction.</li>
+    </ul>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(a)</b> Write the trace as a list of segments: each row is one uninterrupted stretch of A, B, C or the dispatcher. Give the addresses and the cycle numbers of its first and last instruction. Leave any unused rows empty.</p>
+    <div class="scroll-x"><table class="grid" data-id="p2a" data-corner="Segment" data-rows="1|2|3|4|5|6|7|8|9|10" data-cols="Who (A, B, C or dispatcher)|Addresses (first to last)|Cycles (first to last)" data-label="Problem 2(a) trace table"></table></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(b)</b> In which cycle does A execute its last instruction? In which cycle does C?</p>
+    <div class="ans" data-id="p2b" data-rows="2" data-label="Problem 2(b)"></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(c)</b> What percentage of all the cycles in the trace belong to the dispatcher?</p>
+    <div class="ans" data-id="p2c" data-rows="2" data-label="Problem 2(c)"></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(d)</b> Redo the trace in your head with a limit of <b>10</b> cycles instead of 5. How many cycles does the whole trace take now, what percentage belongs to the dispatcher, and in which cycle does A finish?</p>
+    <div class="ans" data-id="p2d" data-rows="3" data-label="Problem 2(d)"></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(e)</b> The longer limit looks better on every number in (d). Give one reason an operating system would still not choose a very long limit.</p>
+    <div class="ans" data-id="p2e" data-rows="3" data-label="Problem 2(e)"></div>
+  </div>
+</section>
+
+<!-- ============================ Problem 3 ============================ -->
+<section class="card" id="p3">
+  <h2><span class="num">Problem 3</span>Mode switch or process switch?</h2>
+  <p>When a program is running in user mode, every interrupt, trap and system call causes a <b>mode switch</b> into the kernel. Only some of them end with a different process running, which is a <b>process switch</b>.</p>
+  <div class="part">
+    <p class="q"><b class="letter">(a)</b> For each event, say whether it causes only a mode switch or also a process switch, and why. Assume other processes are always waiting in the Ready queue.</p>
+    <div class="scroll-x"><table class="grid wide" data-id="p3a" data-corner="Event" data-rows="The running process calls getpid(), a system call that simply returns its own process ID|A clock interrupt arrives, and the running process still has time left in its slice|A clock interrupt arrives, and the running process has used up its slice|The running process calls read() on a file whose data must come from the disk|A disk interrupt announces that data has arrived for a different, Blocked process whose priority is lower than the running process's|The running process divides by zero, and the OS terminates it" data-cols="Mode switch only, or process switch?|Why" data-label="Problem 3(a) table"></table></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(b)</b> These are the steps of a full process switch, scrambled. Write the letters in the order the chapter lists them.</p>
+    <div class="given">
+      <p><b>A.</b> Select another process to run.<br>
+      <b>B.</b> Save the context of the processor, including the program counter and the other registers.<br>
+      <b>C.</b> Move the old process's PCB to the right queue (Ready; Blocked on some event; Ready/Suspend).<br>
+      <b>D.</b> Update the memory-management data structures as needed.<br>
+      <b>E.</b> Update the PCB of the process that was running: its new state, and why it left Running.<br>
+      <b>F.</b> Restore the processor context to what it was when the selected process last left Running.<br>
+      <b>G.</b> Update the PCB of the selected process, changing its state to Running.</p>
+    </div>
+    <div class="ans" data-id="p3b" data-rows="2" data-label="Problem 3(b)" data-placeholder="For example: A, B, C, ..."></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(c)</b> Explain in two or three sentences why a process switch costs much more time than a mode switch. Use the steps in (b).</p>
+    <div class="ans" data-id="p3c" data-rows="4" data-label="Problem 3(c)"></div>
+  </div>
+</section>
+
+<!-- ============================ Problem 4 ============================ -->
+<section class="card" id="p4">
+  <h2><span class="num">Problem 4</span>What goes in a process control block?</h2>
+  <div class="part">
+    <p class="q"><b class="letter">(a)</b> Put each item into one of the three categories of PCB contents: <b>process identification</b>, <b>processor state information</b> or <b>process control information</b>.</p>
+    <div class="scroll-x"><table class="grid wide" data-id="p4a" data-corner="Item" data-rows="Process ID|Parent's process ID|User ID|Program counter|Stack pointer|General-purpose registers|Program status word (condition codes, interrupt-enable bit, mode bit)|Process state (Ready, Blocked, ...)|Scheduling priority|The event the process is waiting for|Pointer to the next PCB in the same queue|List of open files|Pointers to the process's memory tables|Privileges (which memory and instructions it may use)" data-cols="Category" data-label="Problem 4(a) table"></table></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(b)</b> Which category must the OS copy out of the processor every single time the process stops running, and why? What would go wrong for the process if the OS skipped that step once?</p>
+    <div class="ans" data-id="p4b" data-rows="4" data-label="Problem 4(b)"></div>
+  </div>
+</section>
+
+<!-- ============================ Problem 5 ============================ -->
+<section class="card" id="p5">
+  <h2><span class="num">Problem 5</span>Predict what fork() prints</h2>
+  <div class="given">
+    <p>On UNIX systems, <code>fork()</code> creates a new process (the child) that is a copy of the calling process (the parent), including a copy of all of its memory. Both processes continue from the instruction right after the call. In the child, <code>fork()</code> returns <b>0</b>; in the parent it returns the <b>child's process ID</b>, which is never 0. <code>wait(NULL)</code> makes a process wait until one of its children has ended. You do not need to run these programs; predict their behavior from those rules.</p>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(a)</b> What does Program A print, in what order? Why does the parent print 7 rather than 12, even though the child added 5 first?</p>
+    <div class="codebox" data-file="program-a.c"><div class="tools"><span class="name">program-a.c</span><button type="button" class="js-copy">Copy</button></div><pre><code>#include &lt;stdio.h&gt;                      <span class="c">// printf</span>
+#include &lt;unistd.h&gt;                     <span class="c">// fork</span>
+#include &lt;sys/wait.h&gt;                   <span class="c">// wait</span>
+
+int main(void) {                        <span class="c">// the program starts here, in one process</span>
+    int x = 10;                         <span class="c">// one variable, set before the fork</span>
+    pid_t pid = fork();                 <span class="c">// from here on, two processes run this code</span>
+    if (pid == 0) {                     <span class="c">// fork() returned 0: this copy is the child</span>
+        x = x + 5;                      <span class="c">// the child changes its x</span>
+        printf(<span class="s">"child: x = %d\n"</span>, x);   <span class="c">// the child prints its x</span>
+        return 0;                       <span class="c">// the child ends here</span>
+    }                                   <span class="c">// end of the child's part</span>
+    wait(NULL);                         <span class="c">// the parent waits until its child has ended</span>
+    x = x - 3;                          <span class="c">// the parent changes its x</span>
+    printf(<span class="s">"parent: x = %d\n"</span>, x);      <span class="c">// the parent prints its x</span>
+    return 0;                           <span class="c">// the parent ends here</span>
+}                                       <span class="c">// end of main</span></code></pre></div>
+    <div class="ans" data-id="p5a" data-rows="4" data-label="Problem 5(a)"></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(b)</b> For Program B: how many processes exist in total by the end (count the original), how many times is <code>fork()</code> called in total, and how many lines does it print? Explain how the count doubles.</p>
+    <div class="codebox" data-file="program-b.c"><div class="tools"><span class="name">program-b.c</span><button type="button" class="js-copy">Copy</button></div><pre><code>#include &lt;stdio.h&gt;                      <span class="c">// printf</span>
+#include &lt;unistd.h&gt;                     <span class="c">// fork</span>
+
+int main(void) {                        <span class="c">// the program starts here, in one process</span>
+    for (int i = 0; i &lt; 3; i++) {       <span class="c">// the loop body runs three times in the original program</span>
+        fork();                         <span class="c">// every process that reaches this line splits in two</span>
+    }                                   <span class="c">// end of the loop</span>
+    printf(<span class="s">"hello\n"</span>);                  <span class="c">// every process that exists after the loop prints once</span>
+    return 0;                           <span class="c">// each process ends here</span>
+}                                       <span class="c">// end of main</span></code></pre></div>
+    <div class="ans" data-id="p5b" data-rows="4" data-label="Problem 5(b)"></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(c)</b> What does Program C print, and in what order? Is that order guaranteed every run? Describe the family: which process is the parent of which, and which one prints each letter.</p>
+    <div class="codebox" data-file="program-c.c"><div class="tools"><span class="name">program-c.c</span><button type="button" class="js-copy">Copy</button></div><pre><code>#include &lt;stdio.h&gt;                      <span class="c">// printf</span>
+#include &lt;unistd.h&gt;                     <span class="c">// fork</span>
+#include &lt;sys/wait.h&gt;                   <span class="c">// wait</span>
+
+int main(void) {                        <span class="c">// the program starts here, in one process</span>
+    pid_t a = fork();                   <span class="c">// first fork</span>
+    if (a == 0) {                       <span class="c">// only the process for which this fork returned 0 enters here</span>
+        pid_t b = fork();               <span class="c">// second fork</span>
+        if (b == 0) {                   <span class="c">// only the process for which the second fork returned 0</span>
+            printf(<span class="s">"C\n"</span>);              <span class="c">// prints one line</span>
+            return 0;                   <span class="c">// and ends</span>
+        }                               <span class="c">// end of the innermost part</span>
+        wait(NULL);                     <span class="c">// wait for the child made by the second fork</span>
+        printf(<span class="s">"B\n"</span>);                  <span class="c">// prints one line</span>
+        return 0;                       <span class="c">// and ends</span>
+    }                                   <span class="c">// end of the middle part</span>
+    wait(NULL);                         <span class="c">// wait for the child made by the first fork</span>
+    printf(<span class="s">"A\n"</span>);                      <span class="c">// prints one line</span>
+    return 0;                           <span class="c">// and ends</span>
+}                                       <span class="c">// end of main</span></code></pre></div>
+    <div class="ans" data-id="p5c" data-rows="5" data-label="Problem 5(c)"></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(d)</b> Suppose Program A's parent did <b>not</b> call <code>wait(NULL)</code> and instead kept computing for an hour, while the child ended within a millisecond. What state is the child in during that hour, what does the kernel still keep about it, and why does the kernel keep it?</p>
+    <div class="ans" data-id="p5d" data-rows="4" data-label="Problem 5(d)"></div>
+  </div>
+</section>
+
+<!-- ============================ Problem 6 ============================ -->
+<section class="card" id="p6">
+  <h2><span class="num">Problem 6</span>User-level threads versus kernel-level threads</h2>
+  <div class="given">
+    <p>A process has four threads, T1 to T4, and runs on a computer with <b>two</b> cores. Compare a pure <b>user-level thread</b> (ULT) implementation, where a threads library inside the process manages all four threads and the kernel sees only the process, with a pure <b>kernel-level thread</b> (KLT) implementation, where the kernel knows and schedules every thread.</p>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(a)</b> Fill in the table.</p>
+    <div class="scroll-x"><table class="grid wide" data-id="p6a" data-corner="Implementation" data-rows="Pure ULT|Pure KLT" data-cols="T1 calls a blocking read(): what happens to T2, T3 and T4?|Most threads running at the same instant|Who performs a switch between two of these threads?" data-label="Problem 6(a) table"></table></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(b)</b> On a test machine, creating a user-level thread takes <b>3 µs</b>, creating a kernel-level thread takes <b>45 µs</b> and creating a process takes <b>700 µs</b>. A server creates one new worker for each request and receives <b>1,500 requests per second</b>. For each of the three kinds of worker, how much processor time per second goes to creating workers, and what percentage of one core is that? Which option cannot work on a single core at all?</p>
+    <div class="ans" data-id="p6b" data-rows="5" data-label="Problem 6(b)"></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(c)</b> What is <b>jacketing</b>, and which weakness of user-level threads does it work around?</p>
+    <div class="ans" data-id="p6c" data-rows="3" data-label="Problem 6(c)"></div>
+  </div>
+</section>
+
+<!-- ============================ Problem 7 ============================ -->
+<section class="card" id="p7">
+  <h2><span class="num">Problem 7</span>Amdahl's law</h2>
+  <div class="given">
+    <p>If a fraction <i>f</i> of a program's work can be spread perfectly over <i>N</i> cores and the rest (1 − <i>f</i>) must run on one core, the best possible speedup is: speedup = 1 / ((1 − <i>f</i>) + <i>f</i> / <i>N</i>). Efficiency = speedup / <i>N</i>.</p>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(a)</b> A program has <i>f</i> = 0.85. Fill in the speedup and efficiency (two decimal places for speedup, a percentage for efficiency). For the unlimited row, give the limit the speedup approaches and leave efficiency empty.</p>
+    <div class="scroll-x"><table class="grid" data-id="p7a" data-corner="Cores (N)" data-rows="2|4|8|16|Unlimited" data-cols="Speedup|Efficiency" data-label="Problem 7(a) table"></table></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(b)</b> A team measures a speedup of <b>3.0 on 4 cores</b> for another program. Solve Amdahl's law for <i>f</i>, and keep it as an exact fraction (rounding it can move a borderline answer). Using that <i>f</i>, predict the speedup on 12 cores, and find the smallest number of cores that gives a speedup of at least 5.</p>
+    <div class="ans" data-id="p7b" data-rows="6" data-label="Problem 7(b)"></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(c)</b> The program from (a) runs on 16 cores. Option X doubles the hardware to 32 cores. Option Y keeps 16 cores but rewrites the code so the serial part shrinks from 15% to 7.5%. Compute the speedup of each option. Which helps more, and what does that say about where to spend effort?</p>
+    <div class="ans" data-id="p7c" data-rows="4" data-label="Problem 7(c)"></div>
+  </div>
+</section>
+
+<!-- ============================ Problem 8 ============================ -->
+<section class="card" id="p8">
+  <h2><span class="num">Problem 8</span>Threads in real systems</h2>
+  <div class="part">
+    <p class="q"><b class="letter">(a)</b> Linux creates both processes and threads with one system call, <code>clone()</code>, whose flags choose what the new task shares with its creator: <code>CLONE_VM</code> shares the address space (memory), <code>CLONE_FS</code> the current directory and file-system information, <code>CLONE_FILES</code> the table of open files, <code>CLONE_SIGHAND</code> the signal handlers, and <code>CLONE_THREAD</code> puts the new task in the creator's thread group (the same process, as far as <code>getpid()</code> is concerned). <code>SIGCHLD</code> is not a sharing flag; it only asks for a signal to the parent when the child ends. The calls below show only the flags (the real call also takes a function to run, a stack and an argument). For each call, answer yes or no.</p>
+    <div class="scroll-x"><table class="grid" data-id="p8a" data-corner="Call" data-sep=";" data-rows="clone(SIGCHLD);clone(CLONE_VM | CLONE_FS | CLONE_FILES | CLONE_SIGHAND | CLONE_THREAD);clone(CLONE_FILES | SIGCHLD)" data-cols="Shares memory?;Shares the open-file table?;Same process (thread group)?" data-label="Problem 8(a) table"></table></div>
+    <div class="ans" data-id="p8a-note" data-rows="3" data-label="Problem 8(a) note" data-placeholder="Which of the three calls behaves like fork(), and which creates what we would call a thread? What does Linux call a process or thread internally?"></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(b)</b> An Android phone runs low on memory. Using the chapter's five importance levels, number these five processes in the order Android kills them, 1 for the first to go and 5 for the last.</p>
+    <div class="scroll-x"><table class="grid wide" data-id="p8b" data-corner="Process" data-rows="A mail app the user is typing a message into right now|A photo-backup app that started a service to upload photos and shows nothing on screen|A game the user left ten minutes ago; its activity is stopped|A process that holds no app components at all, kept only so the next launch is faster|A map app still partly visible behind a small dialog box" data-cols="Kill order (1 = first)|Its importance level" data-label="Problem 8(b) table"></table></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(c)</b> Grand Central Dispatch (macOS and iOS) lets programmers get concurrency without creating threads themselves. Explain how: what the programmer writes, where it goes, and who runs it. Why is this cheaper than creating one new thread per task?</p>
+    <div class="ans" data-id="p8c" data-rows="4" data-label="Problem 8(c)"></div>
+  </div>
+</section>
+
+<span class="part-label" id="part-b">Part B · Measure processes against threads</span>
+
+<section class="card" id="b-setup">
+  <h2><span class="num">B1</span>Set up your computer and repository</h2>
+  <p>You need <b>Python</b> to run the program, <b>Git</b> to track your files and a free <b>GitHub</b> account to hold the repository. If you set these up for Homework 1, check them with <code>python --version</code> (macOS: <code>python3 --version</code>) and <code>git --version</code>, then start at step 4.</p>
+  <p>Every command below is typed into a <b>terminal</b>: on Windows open <b>PowerShell</b> (Start menu, type "PowerShell"); on macOS open <b>Terminal</b> (press <kbd>⌘</kbd> + <kbd>Space</kbd>, type "Terminal"). Type a command, then press <kbd>Enter</kbd>.</p>
+  <ol class="steps">
+    <li><b>Install Python 3</b> from <a href="https://www.python.org/downloads/">python.org/downloads</a> (any version 3.10 or newer; use the standard installer).
+      <div class="os"><b>Windows</b><span>On the installer's first screen, tick <b>"Add python.exe to PATH"</b> before clicking Install. Check it with <code>python --version</code>.</span></div>
+      <div class="os"><b>macOS</b><span>Run the downloaded installer. Check it with <code>python3 --version</code>.</span></div>
+      <p>On macOS and Linux the command is <code>python3</code> everywhere this page says <code>python</code>.</p>
+    </li>
+    <li><b>Install Git.</b>
+      <div class="os"><b>Windows</b><span>Download it from <a href="https://git-scm.com/downloads">git-scm.com/downloads</a> and accept the installer's defaults. Close and reopen PowerShell, then check with <code>git --version</code>.</span></div>
+      <div class="os"><b>macOS</b><span>Type <code>git --version</code>. If Git is missing, macOS offers to install the command-line developer tools; accept, wait, and run the command again.</span></div>
+    </li>
+    <li><b>Tell Git who you are</b> (once per computer):
+      <pre class="term">git config --global user.name "Your Name"
+git config --global user.email "you@example.com"</pre>
+    </li>
+    <li><b>Create the repository on GitHub.</b> Sign in at <a href="https://github.com">github.com</a>, click <b>+</b> at the top right, then <b>New repository</b>. Name it <code>os-hw2</code>, tick <b>Add a README file</b>, and click <b>Create repository</b>.</li>
+    <li><b>Copy it to your computer.</b> Click the green <b>Code</b> button, copy the HTTPS address, then:
+      <pre class="term">cd ~
+git clone https://github.com/YOUR-USERNAME/os-hw2.git
+cd os-hw2</pre>
+      <code>cd ~</code> moves the terminal into your home folder, where the repository is created. Run every later command from inside the <code>os-hw2</code> folder.</li>
+    <li><b>Get the starter file.</b> Click <b>Download</b> on the code box in B2 and move <code>procthreads.py</code> into the <code>os-hw2</code> folder (check that the name ends in <code>.py</code>, not <code>.py.txt</code>) (or create the file in a code editor such as VS Code and paste in what <b>Copy</b> gives you).</li>
+    <li><b>Run it once before changing anything:</b>
+      <pre class="term">python procthreads.py</pre>
+      The threads in Experiment 1 report in, and each experiment that reaches an unwritten TODO prints <code>-&gt; stopped here: TODO ...</code>. Experiment 4 already works. Seeing that output means your setup is correct. The program needs roughly half a minute when it is complete; if your computer is slow, <code>python procthreads.py --quick</code> uses smaller tasks.</li>
+  </ol>
+</section>
+
+<section class="card" id="b-code">
+  <h2><span class="num">B2</span>The starter program</h2>
+  <p>Read it from top to bottom first; every line carries a comment. It runs four experiments, plus a fifth on request:</p>
+  <ol>
+    <li><b>Identity:</b> three threads and three processes each print their process ID (pid), their parent's process ID (ppid) and their thread ID.</li>
+    <li><b>Sharing:</b> a thread and a process each add a marker to the same global list, and the main program then prints the list.</li>
+    <li><b>CPU-bound work:</b> the same calculation, split into 8 equal tasks, run by 1, 2, 4 and 8 threads and then by 1, 2, 4 and 8 processes. It prints each time and the speedup over one worker, then applies Amdahl's law.</li>
+    <li><b>I/O-bound work:</b> 8 tasks that only wait (a stand-in for waiting on a disk or network), run by 1 thread and by 8 threads.</li>
+    <li><b>Thread count</b> (<code>--pause</code>): keeps five threads alive and tells you how to count them with your operating system's own tools.</li>
+  </ol>
+  <div class="note">Why the program begins its real work under <code>if __name__ == "__main__":</code> — on Windows and macOS, Python starts each new process by running this file again from the top. The check keeps those new processes from launching the experiments all over again.</div>
+  <div class="codebox" data-file="procthreads.py"><div class="tools"><span class="name">procthreads.py</span><button type="button" class="js-copy">Copy</button><button type="button" class="js-save">Download</button></div><pre class="tall"><code><span class="s">"""procthreads.py: processes versus threads, observed and measured.
+
+Run it from a terminal in the folder that holds this file:
+    python procthreads.py           (Windows)   or   python3 procthreads.py   (macOS / Linux)
+    python procthreads.py --quick   uses smaller tasks, for slow computers
+    python procthreads.py --pause   keeps five threads alive so you can count them with an OS tool
+
+Your work is marked with TODO. Everything else already works: run the file before you change
+anything; each experiment that reaches an unwritten TODO says which one and the rest still run.
+"""</span>
+
+<span class="k">import</span> multiprocessing  <span class="c"># starts real, separate operating-system processes</span>
+<span class="k">import</span> os  <span class="c"># asks the OS for process IDs: os.getpid() and os.getppid()</span>
+<span class="k">import</span> sys  <span class="c"># reads the command-line words and the interpreter's details</span>
+<span class="k">import</span> threading  <span class="c"># starts extra threads inside this one process</span>
+<span class="k">import</span> time  <span class="c"># measures elapsed time and lets a task sleep</span>
+<span class="k">from</span> concurrent.futures <span class="k">import</span> ProcessPoolExecutor, ThreadPoolExecutor  <span class="c"># ready-made pools of worker processes and worker threads</span>
+
+SHARED = []  <span class="c"># a global list: the experiment checks who can see changes made to it</span>
+TASKS = <span class="n">8</span>  <span class="c"># the CPU experiment always splits the same total work into 8 equal tasks</span>
+TASK_SIZE = <span class="n">1_200_000</span> <span class="k">if</span> <span class="s">"--quick"</span> <span class="k">in</span> sys.argv <span class="k">else</span> <span class="n">6_000_000</span>  <span class="c"># loop iterations per task; --quick makes each task 5 times smaller</span>
+WORKER_COUNTS = (<span class="n">1</span>, <span class="n">2</span>, <span class="n">4</span>, <span class="n">8</span>)  <span class="c"># the pool sizes the experiments try</span>
+
+
+<span class="k">class</span> NotWrittenYet(Exception):  <span class="c"># a custom error the starter raises wherever a TODO has not been written yet</span>
+    <span class="k">pass</span>  <span class="c"># it needs no extra behavior; its name and message say everything</span>
+
+
+<span class="c"># ---------------------------------------------------------------------------</span>
+<span class="c"># Experiment 1: who am I? (process ID, parent ID, thread ID)</span>
+<span class="c"># ---------------------------------------------------------------------------</span>
+<span class="k">def</span> report_identity(kind, number):  <span class="c"># runs inside each new thread or process and prints its identity</span>
+    print(<span class="s">f"  {kind} {number}: pid={os.getpid()}  ppid={os.getppid()}  thread id={threading.get_native_id()}"</span>, flush=<span class="k">True</span>)  <span class="c"># flush: print now, not later</span>
+
+
+<span class="k">def</span> experiment_identity():  <span class="c"># starts three threads and three processes that each report who they are</span>
+    print(<span class="s">"Experiment 1: identity"</span>)  <span class="c"># a title</span>
+    report_identity(<span class="s">"main"</span>, <span class="n">0</span>)  <span class="c"># the main thread of the original process goes first</span>
+    threads = [threading.Thread(target=report_identity, args=(<span class="s">"thread"</span>, i)) <span class="k">for</span> i <span class="k">in</span> range(<span class="n">1</span>, <span class="n">4</span>)]  <span class="c"># three thread objects (not running yet)</span>
+    <span class="k">for</span> t <span class="k">in</span> threads:  <span class="c"># start each one</span>
+        t.start()  <span class="c"># the OS now has a new thread in this same process</span>
+    <span class="k">for</span> t <span class="k">in</span> threads:  <span class="c"># wait for each one</span>
+        t.join()  <span class="c"># join() returns only when that thread has finished</span>
+    <span class="c"># TODO 1: do the same with three PROCESSES. multiprocessing.Process takes the same target= and args= as threading.Thread,</span>
+    <span class="c">#         and has the same start() and join(). Label them ("process", 1), ("process", 2), ("process", 3).</span>
+    <span class="k">raise</span> NotWrittenYet(<span class="s">"TODO 1: the three processes are not written yet"</span>)  <span class="c"># delete this line once your code is in place</span>
+
+
+<span class="c"># ---------------------------------------------------------------------------</span>
+<span class="c"># Experiment 2: who can see my memory?</span>
+<span class="c"># ---------------------------------------------------------------------------</span>
+<span class="k">def</span> add_marker(label):  <span class="c"># runs inside a new thread or a new process</span>
+    SHARED.append(label)  <span class="c"># change the global list...</span>
+    print(<span class="s">f"  inside the {label}: SHARED = {SHARED}"</span>, flush=<span class="k">True</span>)  <span class="c"># ...and show what this worker sees</span>
+
+
+<span class="k">def</span> experiment_sharing():  <span class="c"># one thread and one process each try to change the global list</span>
+    print(<span class="s">f"\nExperiment 2: sharing   (process start method: {multiprocessing.get_start_method()})"</span>)  <span class="c"># a title plus how new processes are made</span>
+    SHARED.clear()  <span class="c"># start from an empty list in case this function runs twice</span>
+    SHARED.append(<span class="s">"main"</span>)  <span class="c"># the main thread adds its own marker first</span>
+    <span class="c"># TODO 2: create ONE thread that runs add_marker("thread"), start it and join it.</span>
+    <span class="c">#         Then create ONE process that runs add_marker("process"), start it and join it.</span>
+    <span class="k">raise</span> NotWrittenYet(<span class="s">"TODO 2: the sharing experiment is not written yet"</span>)  <span class="c"># delete this line once your code is in place</span>
+    print(<span class="s">f"  back in main: SHARED = {SHARED}"</span>)  <span class="c"># what the main thread sees after both workers finished</span>
+
+
+<span class="c"># ---------------------------------------------------------------------------</span>
+<span class="c"># Experiments 3 and 4: how long does the same work take?</span>
+<span class="c"># ---------------------------------------------------------------------------</span>
+<span class="k">def</span> busy_work(n):  <span class="c"># CPU-bound: pure calculation, no waiting at all</span>
+    total = <span class="n">0</span>  <span class="c"># running total</span>
+    <span class="k">for</span> i <span class="k">in</span> range(n):  <span class="c"># n trips around the loop</span>
+        total += i * i % <span class="n">7</span>  <span class="c"># a little arithmetic, just to keep the processor busy</span>
+    <span class="k">return</span> total  <span class="c"># the answer (the experiments only care how long it took)</span>
+
+
+<span class="k">def</span> sleepy_work(seconds):  <span class="c"># I/O-bound stand-in: the task spends its whole life waiting</span>
+    time.sleep(seconds)  <span class="c"># the thread blocks, exactly as if it were waiting for a disk or the network</span>
+    <span class="k">return</span> seconds  <span class="c"># nothing useful to return</span>
+
+
+<span class="k">def</span> run_with_threads(workers, func, tasks):  <span class="c"># runs func on every task using a pool of threads; returns seconds taken</span>
+    start = time.perf_counter()  <span class="c"># a high-resolution clock reading</span>
+    <span class="k">with</span> ThreadPoolExecutor(max_workers=workers) <span class="k">as</span> pool:  <span class="c"># creates `workers` threads inside this process</span>
+        list(pool.map(func, tasks))  <span class="c"># hands out the tasks and waits for all results</span>
+    <span class="k">return</span> time.perf_counter() - start  <span class="c"># elapsed seconds, pool start-up included</span>
+
+
+<span class="k">def</span> run_with_processes(workers, func, tasks):  <span class="c"># the same, using a pool of separate processes</span>
+    <span class="c"># TODO 3: copy the body of run_with_threads, but use ProcessPoolExecutor instead of ThreadPoolExecutor.</span>
+    <span class="k">raise</span> NotWrittenYet(<span class="s">"TODO 3: run_with_processes is not written yet"</span>)  <span class="c"># delete this line once your code is in place</span>
+
+
+<span class="k">def</span> amdahl_fraction(speedup, n):  <span class="c"># solves Amdahl's law for f, the parallel fraction, given a measured speedup on n cores</span>
+    <span class="c"># TODO 4b: solve speedup = 1 / ((1 - f) + f / n) for f and return it. (Do it on paper first; Problem 7 practises this.)</span>
+    <span class="k">raise</span> NotWrittenYet(<span class="s">"TODO 4b: amdahl_fraction is not written yet"</span>)  <span class="c"># delete this line once your code is in place</span>
+
+
+<span class="k">def</span> amdahl_speedup(f, n):  <span class="c"># Amdahl's law: the best speedup on n cores when a fraction f of the work is parallel</span>
+    <span class="c"># TODO 4a: return Amdahl's speedup for parallel fraction f on n cores.</span>
+    <span class="k">raise</span> NotWrittenYet(<span class="s">"TODO 4a: amdahl_speedup is not written yet"</span>)  <span class="c"># delete this line once your code is in place</span>
+
+
+<span class="k">def</span> experiment_cpu():  <span class="c"># the same CPU-bound work with more and more workers</span>
+    print(<span class="s">f"\nExperiment 3: CPU-bound work ({TASKS} tasks x {TASK_SIZE:,} loop steps)"</span>)  <span class="c"># a title</span>
+    gil = getattr(sys, <span class="s">"_is_gil_enabled"</span>, <span class="k">lambda</span>: <span class="k">True</span>)()  <span class="c"># newer Pythons can report whether the global interpreter lock is on</span>
+    print(<span class="s">f"  Python {sys.version.split()[0]}, global interpreter lock enabled: {gil}, logical CPUs: {os.cpu_count()}"</span>)  <span class="c"># the facts behind the numbers</span>
+    speedups = {}  <span class="c"># remembers the process speedups for the Amdahl calculation</span>
+    <span class="k">for</span> kind, runner <span class="k">in</span> ((<span class="s">"threads"</span>, run_with_threads), (<span class="s">"processes"</span>, run_with_processes)):  <span class="c"># try both kinds of worker</span>
+        base = <span class="k">None</span>  <span class="c"># the one-worker time, measured first</span>
+        <span class="k">for</span> workers <span class="k">in</span> WORKER_COUNTS:  <span class="c"># 1, 2, 4, 8 workers</span>
+            seconds = runner(workers, busy_work, [TASK_SIZE] * TASKS)  <span class="c"># run the whole job</span>
+            base = base <span class="k">or</span> seconds  <span class="c"># the first run (1 worker) becomes the baseline</span>
+            speedup = base / seconds  <span class="c"># how many times faster than one worker</span>
+            <span class="k">if</span> kind == <span class="s">"processes"</span>:  <span class="c"># keep the process speedups</span>
+                speedups[workers] = speedup  <span class="c"># for Amdahl below</span>
+            print(<span class="s">f"  {kind:&lt;10} workers={workers}  time={seconds:6.2f} s  speedup={speedup:5.2f}"</span>)  <span class="c"># one row of the table</span>
+    f = amdahl_fraction(speedups[<span class="n">4</span>], <span class="n">4</span>)  <span class="c"># the parallel fraction implied by the 4-worker speedup</span>
+    print(<span class="s">f"  Amdahl: f from the 4-process speedup = {f:.3f}; predicted 8-process speedup = {amdahl_speedup(f, 8):.2f}; measured = {speedups[8]:.2f}"</span>)  <span class="c"># prediction vs reality</span>
+
+
+<span class="k">def</span> experiment_io():  <span class="c"># the same waiting-bound work with 1 thread and with 8 threads</span>
+    print(<span class="s">"\nExperiment 4: I/O-bound work (8 tasks, each waits 0.25 s)"</span>)  <span class="c"># a title</span>
+    <span class="k">for</span> workers <span class="k">in</span> (<span class="n">1</span>, <span class="n">8</span>):  <span class="c"># one thread, then eight</span>
+        seconds = run_with_threads(workers, sleepy_work, [<span class="n">0.25</span>] * <span class="n">8</span>)  <span class="c"># run the eight waiting tasks</span>
+        print(<span class="s">f"  threads    workers={workers}  time={seconds:6.2f} s"</span>)  <span class="c"># one row</span>
+
+
+<span class="c"># ---------------------------------------------------------------------------</span>
+<span class="c"># Experiment 5 (--pause): count the threads with an operating-system tool</span>
+<span class="c"># ---------------------------------------------------------------------------</span>
+<span class="k">def</span> experiment_pause():  <span class="c"># keeps four extra threads alive so the OS can be asked about them</span>
+    stop = threading.Event()  <span class="c"># a flag the extra threads wait on</span>
+    extra = [threading.Thread(target=stop.wait, daemon=<span class="k">True</span>) <span class="k">for</span> _ <span class="k">in</span> range(<span class="n">4</span>)]  <span class="c"># four threads that simply wait</span>
+    <span class="k">for</span> t <span class="k">in</span> extra:  <span class="c"># start them</span>
+        t.start()  <span class="c"># each one is now a real thread, blocked on the event</span>
+    pid = os.getpid()  <span class="c"># this process's ID, needed by the OS tools</span>
+    print(<span class="s">f"\nExperiment 5: this process (pid {pid}) now has the main thread plus 4 waiting threads."</span>)  <span class="c"># what to look for</span>
+    print(<span class="s">f"  macOS:   ps -M -p {pid}   (count the lines below the header)"</span>)  <span class="c"># macOS lists one line per thread</span>
+    print(<span class="s">f"  Linux:   ps -o nlwp= -p {pid}"</span>)  <span class="c"># nlwp = number of lightweight processes (threads)</span>
+    print(<span class="s">f"  Windows: (Get-Process -Id {pid}).Threads.Count   (in a second PowerShell window)"</span>)  <span class="c"># PowerShell counts them directly</span>
+    input(<span class="s">"  Press Enter here when you have counted them... "</span>)  <span class="c"># waits for the student</span>
+    stop.set()  <span class="c"># release the four threads so they finish</span>
+
+
+<span class="k">def</span> main():  <span class="c"># runs the experiments in order</span>
+    <span class="k">if</span> <span class="s">"--pause"</span> <span class="k">in</span> sys.argv:  <span class="c"># python procthreads.py --pause</span>
+        experiment_pause()  <span class="c"># only the thread-counting experiment</span>
+        <span class="k">return</span>  <span class="c"># and stop</span>
+    <span class="k">for</span> experiment <span class="k">in</span> (experiment_identity, experiment_sharing, experiment_cpu, experiment_io):  <span class="c"># 1, 2, 3, 4 in order</span>
+        <span class="k">try</span>:  <span class="c"># run one experiment</span>
+            experiment()  <span class="c"># if it reaches an unwritten TODO, NotWrittenYet jumps to the except below</span>
+        <span class="k">except</span> NotWrittenYet <span class="k">as</span> missing:  <span class="c"># a TODO was reached</span>
+            print(<span class="s">f"  -&gt; stopped here: {missing}"</span>)  <span class="c"># say which one, then carry on with the next experiment</span>
+
+
+<span class="k">if</span> __name__ == <span class="s">"__main__"</span>:  <span class="c"># true only in the original process; new processes on macOS and Windows re-import this file and skip this block</span>
+    main()  <span class="c"># start the program</span></code></pre></div>
+</section>
+
+<section class="card" id="b-tasks">
+  <h2><span class="num">B3</span>Write the missing pieces, run, and explain</h2>
+  <ol class="steps">
+    <li><b>TODO 1</b> (in <code>experiment_identity</code>): start three processes and wait for them, the same way the code just above it starts three threads.</li>
+    <li><b>TODO 2</b> (in <code>experiment_sharing</code>): one thread, then one process, each running <code>add_marker</code>, each started and waited for.</li>
+    <li><b>TODO 3</b>: <code>run_with_processes</code>, a copy of <code>run_with_threads</code> that uses <code>ProcessPoolExecutor</code>.</li>
+    <li><b>TODO 4a and 4b</b>: Amdahl's law, and the same law solved for <i>f</i>. Problem 7 practises both on paper.</li>
+    <li>Close other heavy programs (games, video calls) so they do not distort the timings. Then run the complete program, followed by the thread-count experiment:
+      <pre class="term">python procthreads.py
+python procthreads.py --pause</pre>
+      With <code>--pause</code>, leave the program waiting, open a <b>second</b> terminal window, and type the command it prints for your operating system. Then go back to the first window and press <kbd>Enter</kbd>.</li>
+  </ol>
+  <p>Your numbers will not match anyone else's; they depend on your processor, how many cores it has and your Python version. That is expected. The explanations are what matter.</p>
+
+  <div class="part">
+    <p class="q"><b class="letter">B-a</b> Paste the complete output of <code>python procthreads.py</code>.</p>
+    <div class="ans" data-id="ba" data-kind="output" data-rows="16" data-label="Part B (a) output" data-placeholder="Paste the terminal output here."></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">B-b</b> <b>Experiment 1.</b> Which of pid, ppid and thread ID are the same for the three threads, and which differ? Answer the same for the three processes, and say whose pid each process shows as its ppid. (With Python 3.14 or newer on Linux, new processes are started by a small helper process called the fork server, so their ppid is that helper's pid; say so if that is what you see.) Connect what you see to the idea that the process is the unit of resource ownership and the thread is the unit of dispatching.</p>
+    <div class="ans" data-id="bb" data-rows="5" data-label="Part B (b)"></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">B-c</b> <b>Experiment 2.</b> Why does <code>'thread'</code> appear in the main program's list afterwards while <code>'process'</code> never does? What did the process print as <i>its</i> list, and why does it look like that? (The heading of Experiment 2 names the "start method" your system used to create the process: <code>spawn</code> and <code>forkserver</code> start the new process from a fresh copy of the program, while <code>fork</code> copies the parent's memory, as in Problem 5.)</p>
+    <div class="ans" data-id="bc" data-rows="5" data-label="Part B (c)"></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">B-d</b> <b>Experiment 3.</b> Copy your times and speedups into the table.</p>
+    <div class="scroll-x"><table class="grid" data-id="bd" data-corner="Workers" data-rows="Threads, 1|Threads, 2|Threads, 4|Threads, 8|Processes, 1|Processes, 2|Processes, 4|Processes, 8" data-cols="Time (s)|Speedup" data-label="Part B (d) table"></table></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">B-e</b> Explain the difference between the thread rows and the process rows. The program printed whether Python's <b>global interpreter lock</b> (GIL) is enabled: with the GIL on, only one thread of a process can execute Python code at any instant, although Python threads are real kernel-level threads. Which thread model from Problem 6 does that behavior resemble for CPU-bound work, and why do processes escape the limit?</p>
+    <div class="ans" data-id="be" data-rows="5" data-label="Part B (e)"></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">B-f</b> Using <b>your</b> 4-process speedup, solve Amdahl's law for <i>f</i> by hand (show the numbers), predict the 8-process speedup, and compare it with what you measured. If they differ noticeably, in either direction, give two reasons that could explain it. Think about how many cores your computer has (and whether some are slower "efficiency" cores), about work that happens only once, such as starting the pool, and about how much one noisy measurement moves <i>f</i>.</p>
+    <div class="ans" data-id="bf" data-rows="6" data-label="Part B (f)"></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">B-g</b> <b>Experiment 4.</b> Eight threads finished the waiting tasks much faster than one thread, even though threads did not help in Experiment 3. Why? What is a waiting thread doing, and what does the kernel do with the other threads meanwhile?</p>
+    <div class="ans" data-id="bg" data-rows="4" data-label="Part B (g)"></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">B-h</b> <b>Experiment 5.</b> Paste the command you used and what it printed. How many threads did your operating system report for the process? The program started four extra threads beside its main thread; if the count is different, suggest where the extra threads could come from.</p>
+    <div class="ans" data-id="bh" data-rows="4" data-label="Part B (h)"></div>
+  </div>
+</section>
+
+<section class="card" id="submit">
+  <h2>Submit</h2>
+  <ol class="steps">
+    <li>Click <b>Download answer sheet</b> (in the bar at the top) after your last answer is typed. Move <code>hw2-answers.html</code> from your Downloads folder into the <code>os-hw2</code> folder, and open it once in a browser to check that every answer is there.</li>
+    <li>Send both files to GitHub, from inside the <code>os-hw2</code> folder:
+      <pre class="term">git add procthreads.py hw2-answers.html
+git commit -m "Homework 2"
+git push</pre>
+      The first push opens a browser window to sign in (Windows) or asks for a username and password (macOS). GitHub does not accept your account password there. Instead, create a token: GitHub → Settings → Developer settings → Personal access tokens → <b>Tokens (classic)</b> → Generate new token (classic), tick the <b>repo</b> box, and generate it. Paste the token when asked for the password; nothing appears on screen while you paste, which is normal. If you would rather skip the command line, the repository page's <b>Add file → Upload files</b> button works too.</li>
+    <li>Refresh your repository's page on GitHub and check that both files are there.</li>
+  </ol>
+  <p>Your repository should contain:</p>
+  <ul class="check">
+    <li><code>procthreads.py</code> with every TODO written, so that all four experiments run to the end without a "stopped here" line.</li>
+    <li><code>hw2-answers.html</code>, downloaded from this page, with every question answered.</li>
+  </ul>
+  <p><b>Submit your GitHub repo link.</b></p>
+</section>
+
+</main>
+<footer>Operating Systems · Homework 2 · Chapters 3 and 4</footer>
+
+<script>
+(function () {  // everything lives inside this function so none of its names can clash with anything else on the page
+  'use strict';  // strict mode turns silent JavaScript mistakes into visible errors
+  var HW = document.body.getAttribute('data-hw');  // this page's short id, such as "os-hw1", written on the <body> tag
+  var SHEET_FILE = document.body.getAttribute('data-sheet');  // the answer-sheet file name, such as "hw1-answers.html"
+  var TITLE = document.title;  // the page title, reused as the answer sheet's title
+  var STORE_KEY = 'answers:' + HW;  // the name under which this page's drafts are kept in the browser
+  var answers = {};  // every answer typed so far, as { answerId: value }
+  var canSave = true;  // becomes false if this browser refuses to store anything (private windows sometimes do)
+
+  function readStore() {  // loads saved drafts from the browser, if there are any
+    try { return JSON.parse(window.localStorage.getItem(STORE_KEY) || '{}') || {}; }  // stored as JSON text; parse it back into an object
+    catch (e) { canSave = false; return {}; }  // storage blocked or the text is damaged: start empty and remember that saving is off
+  }  // end of readStore
+  function writeStore() {  // saves every answer back into the browser
+    try { window.localStorage.setItem(STORE_KEY, JSON.stringify(answers)); return true; }  // turn the object into JSON text and store it
+    catch (e) { canSave = false; return false; }  // storage blocked or full: report failure
+  }  // end of writeStore
+
+  function isFilled(value) {  // does this answer contain anything yet?
+    if (typeof value === 'string') return value.trim() !== '';  // a text answer counts once it has a non-space character
+    if (Array.isArray(value)) return value.some(function (row) { return Array.isArray(row) && row.some(function (cell) { return typeof cell === 'string' && cell.trim() !== ''; }); });  // a grid counts once any cell is filled
+    return false;  // anything else (missing, wrong type) counts as empty
+  }  // end of isFilled
+
+  function updateProgress() {  // refreshes every "n of m answered" counter on the page
+    var items = document.querySelectorAll('[data-answer]');  // every answer box and answer grid
+    var done = 0;  // how many have something in them
+    items.forEach(function (el) { if (isFilled(answers[el.getAttribute('data-id')])) done += 1; });  // count the filled ones
+    document.querySelectorAll('.js-progress').forEach(function (el) { el.textContent = done + ' of ' + items.length + ' answered'; });  // write the count
+  }  // end of updateProgress
+
+  var saveTimer = null;  // used to wait until typing pauses before saving
+  var pendingStatus = [];  // the status lines of every box edited since the last save
+  function scheduleSave(statusEl) {  // called on every keystroke; saves 400 ms after the last one
+    if (statusEl && pendingStatus.indexOf(statusEl) === -1) pendingStatus.push(statusEl);  // remember this box so its status is updated too
+    clearTimeout(saveTimer);  // cancel the save that was waiting, because another key arrived
+    saveTimer = setTimeout(function () {  // start a fresh 400 ms wait
+      var ok = writeStore();  // save everything (all boxes at once)
+      pendingStatus.forEach(function (el) {  // every box edited since the last save
+        el.textContent = ok ? 'Saved in this browser' : 'Not saved: this browser blocks storage. Download your answer sheet before closing the page.';  // say what happened
+        el.className = ok ? 'status saved' : 'status';  // green when saved
+      });  // end of status updates
+      pendingStatus = [];  // start a fresh list for the next round of typing
+      updateProgress();  // the counter may have changed
+    }, 400);  // 400 milliseconds
+  }  // end of scheduleSave
+
+  function buildTextBox(holder) {  // turns an empty <div class="ans" data-id="..."> into a working answer box
+    var id = holder.getAttribute('data-id');  // this answer's id, such as "p3b"
+    var box = document.createElement('textarea');  // the box itself
+    box.rows = Number(holder.getAttribute('data-rows') || 4);  // starting height, in lines
+    box.setAttribute('aria-label', holder.getAttribute('data-label') || id);  // what a screen reader announces for this box
+    box.spellcheck = holder.getAttribute('data-kind') !== 'output';  // no red squiggles under pasted program output
+    if (holder.getAttribute('data-kind') === 'output') box.className = 'mono';  // program output keeps its columns in a fixed-width face
+    box.placeholder = holder.getAttribute('data-placeholder') || 'Type your answer here.';  // grey hint text shown while empty
+    var status = document.createElement('span');  // the small "Saved" line under the box
+    status.className = 'status';  // styled grey until something is saved
+    status.setAttribute('aria-live', 'polite');  // screen readers announce the saved message without interrupting
+    box.value = typeof answers[id] === 'string' ? answers[id] : '';  // restore a saved draft, if there is one
+    box.addEventListener('input', function () { answers[id] = box.value; scheduleSave(status); });  // keep the answer object up to date and save soon
+    holder.setAttribute('data-answer', '');  // mark it as an answer for the progress counter
+    holder.appendChild(box);  // put the box on the page
+    holder.appendChild(status);  // and its status line under it
+  }  // end of buildTextBox
+
+  function splitList(text, sep) {  // "PC|IR|AC" becomes ["PC", "IR", "AC"]
+    return (text || '').split(sep || '|').map(function (s) { return s.trim(); });  // split on the separator (a bar unless the grid names another) and trim spaces
+  }  // end of splitList
+
+  function buildGrid(table) {  // turns <table class="grid" data-rows="..." data-cols="..."> into a table of small inputs
+    var id = table.getAttribute('data-id');  // this grid's id
+    var rows = splitList(table.getAttribute('data-rows'), table.getAttribute('data-sep'));  // the row labels (a grid whose labels contain "|" names another separator in data-sep)
+    var cols = splitList(table.getAttribute('data-cols'), table.getAttribute('data-sep'));  // the column labels
+    var saved = Array.isArray(answers[id]) ? answers[id] : [];  // a saved draft, if there is one
+    var head = document.createElement('thead');  // the header row
+    var headRow = document.createElement('tr');  // one row inside it
+    var corner = document.createElement('th');  // the top-left corner cell
+    corner.textContent = table.getAttribute('data-corner') || '';  // an optional label for the row-label column
+    headRow.appendChild(corner);  // add the corner
+    cols.forEach(function (c) { var th = document.createElement('th'); th.scope = 'col'; th.textContent = c; headRow.appendChild(th); });  // one header cell per column
+    head.appendChild(headRow);  // finish the header
+    var body = document.createElement('tbody');  // the input rows
+    var status = document.createElement('span');  // the "Saved" line under the grid
+    status.className = 'status';  // grey until something is saved
+    status.setAttribute('aria-live', 'polite');  // announced politely to screen readers
+    rows.forEach(function (r, ri) {  // one table row per row label
+      var tr = document.createElement('tr');  // the row
+      var th = document.createElement('th');  // its label cell
+      th.scope = 'row';  // tells screen readers this cell labels the row
+      th.textContent = r;  // the label text
+      tr.appendChild(th);  // add the label
+      cols.forEach(function (c, ci) {  // one input per column
+        var td = document.createElement('td');  // the cell
+        var input = document.createElement('input');  // the input inside it
+        input.type = 'text';  // plain text, so hex values like 13A0 are allowed
+        input.autocomplete = 'off';  // no browser suggestions from other sites
+        input.spellcheck = false;  // hex values are not words
+        input.setAttribute('aria-label', r + ', ' + c);  // e.g. "Fetch 1, PC"
+        input.value = (Array.isArray(saved[ri]) && typeof saved[ri][ci] === 'string') ? saved[ri][ci] : '';  // restore a saved value
+        input.addEventListener('input', function () {  // on every change to this cell...
+          if (!Array.isArray(answers[id])) answers[id] = rows.map(function () { return cols.map(function () { return ''; }); });  // ...make sure a full empty grid exists...
+          if (!Array.isArray(answers[id][ri])) answers[id][ri] = cols.map(function () { return ''; });  // ...including this row...
+          answers[id][ri][ci] = input.value;  // ...store the new value...
+          scheduleSave(status);  // ...and save soon
+        });  // end of the input listener
+        td.appendChild(input);  // put the input in the cell
+        tr.appendChild(td);  // and the cell in the row
+      });  // end of the columns
+      body.appendChild(tr);  // add the finished row
+    });  // end of the rows
+    table.appendChild(head);  // attach the header
+    table.appendChild(body);  // attach the body
+    table.setAttribute('data-answer', '');  // mark it as an answer for the progress counter
+    var wrapper = table.parentNode;  // grids sit inside a sideways-scrolling wrapper
+    wrapper.parentNode.insertBefore(status, wrapper.nextSibling);  // the status line goes just below that wrapper
+  }  // end of buildGrid
+
+  function fillAll() {  // puts the values in `answers` back into every box and grid (used after loading a sheet)
+    document.querySelectorAll('.ans[data-id]').forEach(function (holder) {  // each text box
+      var box = holder.querySelector('textarea');  // the box inside the holder
+      var v = answers[holder.getAttribute('data-id')];  // its value
+      box.value = typeof v === 'string' ? v : '';  // write it (or clear it)
+    });  // end of text boxes
+    document.querySelectorAll('table.grid[data-id]').forEach(function (table) {  // each grid
+      var v = answers[table.getAttribute('data-id')];  // its value: an array of rows
+      table.querySelectorAll('tbody tr').forEach(function (tr, ri) {  // each row
+        tr.querySelectorAll('input').forEach(function (input, ci) {  // each cell
+          input.value = (Array.isArray(v) && Array.isArray(v[ri]) && typeof v[ri][ci] === 'string') ? v[ri][ci] : '';  // write it (or clear it)
+        });  // end of cells
+      });  // end of rows
+    });  // end of grids
+    var name = document.getElementById('student-name');  // the name box
+    if (name) name.value = typeof answers.__name === 'string' ? answers.__name : '';  // restore the name
+    updateProgress();  // the counter changed
+  }  // end of fillAll
+
+  function esc(text) {  // makes any text safe to put inside HTML: < > & " ' become harmless codes
+    return String(text).replace(/[&<>"']/g, function (ch) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]; });  // one replacement per dangerous character
+  }  // end of esc
+
+  function questionFor(el) {  // finds the question text that belongs to an answer box or grid
+    var part = el.closest('.part');  // the lettered sub-question that holds it
+    var q = part ? part.querySelector('.q') : null;  // its question paragraph
+    return q ? q.textContent.replace(/\s+/g, ' ').trim() : (el.getAttribute('data-label') || '');  // its text, squeezed onto one line
+  }  // end of questionFor
+
+  function buildSheet() {  // writes the whole answer sheet as one standalone HTML document (a string)
+    var name = (answers.__name || '').trim() || '(no name entered)';  // the student's name
+    var when = new Date().toLocaleString();  // the date and time the sheet was made
+    var html = [];  // the sheet is built up as a list of pieces, joined at the end
+    var lastProblem = '';  // remembers which problem heading was printed last
+    document.querySelectorAll('[data-answer]').forEach(function (el) {  // every answer in page order
+      var id = el.getAttribute('data-id');  // its id
+      var card = el.closest('section');  // the card (problem) it sits in
+      var heading = card && card.querySelector('h2') ? card.querySelector('h2').textContent.trim() : '';  // that problem's title
+      if (heading !== lastProblem) { html.push('<h2>' + esc(heading) + '</h2>'); lastProblem = heading; }  // print the title once per problem
+      html.push('<div class="a"><p class="q">' + esc(questionFor(el)) + '</p>');  // the question
+      var v = answers[id];  // the answer
+      if (el.tagName === 'TABLE') {  // a grid: rebuild it as a plain table
+        var rows = splitList(el.getAttribute('data-rows'), el.getAttribute('data-sep'));  // row labels
+        var cols = splitList(el.getAttribute('data-cols'), el.getAttribute('data-sep'));  // column labels
+        html.push('<table><tr><th></th>' + cols.map(function (c) { return '<th>' + esc(c) + '</th>'; }).join('') + '</tr>');  // header row
+        rows.forEach(function (r, ri) {  // one row per label
+          html.push('<tr><th>' + esc(r) + '</th>' + cols.map(function (c, ci) { var cell = (Array.isArray(v) && Array.isArray(v[ri]) && typeof v[ri][ci] === 'string') ? v[ri][ci] : ''; return '<td>' + esc(cell) + '</td>'; }).join('') + '</tr>');  // its cells
+        });  // end of rows
+        html.push('</table>');  // close the table
+      } else {  // a text answer
+        html.push(isFilled(v) ? '<pre>' + esc(v) + '</pre>' : '<p class="empty">(no answer)</p>');  // the answer exactly as typed, or a visible gap
+      }  // end of the answer kinds
+      html.push('</div>');  // close this answer
+    });  // end of every answer
+    var data = JSON.stringify({ hw: HW, answers: answers }).replace(/</g, '\\u003c');  // the raw answers, so this page can load the sheet back; < is escaped so the text can never end the script tag
+    var css = 'body{font:15px/1.55 system-ui,sans-serif;max-width:860px;margin:24px auto;padding:0 16px;color:#151c2c;background:#fff}h1{font-size:1.5rem;margin:0 0 4px}h2{font-size:1.15rem;margin:28px 0 8px;border-bottom:2px solid #d9deea;padding-bottom:4px}.meta{color:#69738c;margin:0 0 16px}.a{margin:0 0 14px}.q{margin:0 0 4px;color:#3d4760;font-size:.92rem}pre{white-space:pre-wrap;word-wrap:break-word;font:13px/1.5 ui-monospace,Menlo,Consolas,monospace;background:#f5f7fb;border:1px solid #d9deea;border-radius:6px;padding:8px 10px;margin:0}.empty{color:#b45309;margin:0}table{border-collapse:collapse;font:13px ui-monospace,Menlo,Consolas,monospace}th,td{border:1px solid #d9deea;padding:4px 8px;text-align:left}th{background:#f5f7fb}';  // a small built-in stylesheet so the sheet looks tidy on its own
+    return '<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n<title>' + esc(TITLE + ': answers of ' + name) + '</title>\n<style>' + css + '</style>\n</head>\n<body>\n<h1>' + esc(TITLE) + '</h1>\n<p class="meta">Answers of <b>' + esc(name) + '</b> · saved ' + esc(when) + '</p>\n' + html.join('\n') + '\n<script type="application/json" id="answer-data">' + data + '<\/script>\n</body>\n</html>\n';  // the finished document
+  }  // end of buildSheet
+
+  function download(filename, text, type) {  // hands the browser a file to save, made from text in memory
+    var blob = new Blob([text], { type: type });  // wrap the text as a file-like object
+    var url = URL.createObjectURL(blob);  // a temporary address for it
+    var a = document.createElement('a');  // an invisible link...
+    a.href = url;  // ...pointing at that address...
+    a.download = filename;  // ...that saves instead of opening...
+    document.body.appendChild(a);  // (some browsers need it on the page)
+    a.click();  // ...clicked by the script
+    setTimeout(function () { URL.revokeObjectURL(url); a.remove(); }, 1000);  // tidy up a second later
+  }  // end of download
+
+  function setMsg(text) {  // shows a message in every answer-sheet panel
+    document.querySelectorAll('.js-sheet-msg').forEach(function (el) { el.textContent = text; });  // write it
+  }  // end of setMsg
+
+  function loadSheet(file) {  // reads an answer sheet the student saved earlier and puts its answers back
+    var reader = new FileReader();  // the browser's tool for reading a chosen file
+    reader.onload = function () {  // runs once the file has been read
+      try {  // anything wrong with the file ends up in the catch below
+        var doc = new DOMParser().parseFromString(String(reader.result), 'text/html');  // parse it as HTML without running any of it
+        var tag = doc.getElementById('answer-data');  // the data block that buildSheet wrote
+        if (!tag) throw new Error('This file is not an answer sheet saved from this page.');  // some other file was chosen
+        var data = JSON.parse(tag.textContent);  // the saved answers
+        if (!data || data.hw !== HW || typeof data.answers !== 'object') throw new Error('This answer sheet belongs to a different homework.');  // wrong homework
+        var clean = {};  // only well-formed answers for boxes that exist on this page are accepted
+        var known = {};  // the ids that exist on this page
+        document.querySelectorAll('[data-answer]').forEach(function (el) { known[el.getAttribute('data-id')] = el.tagName; });  // collect them
+        Object.keys(data.answers).forEach(function (id) {  // look at each saved answer
+          var v = data.answers[id];  // its value
+          if (id === '__name' && typeof v === 'string') clean.__name = v.slice(0, 200);  // the name: text only, and not absurdly long
+          else if (known[id] === 'DIV' && typeof v === 'string') clean[id] = v.slice(0, 20000);  // a text answer: text only
+          else if (known[id] === 'TABLE' && Array.isArray(v)) clean[id] = v.map(function (row) { return Array.isArray(row) ? row.map(function (c) { return typeof c === 'string' ? c.slice(0, 500) : ''; }) : []; });  // a grid: rows of text only
+        });  // end of the saved answers
+        answers = clean;  // replace the current answers with the loaded ones
+        writeStore();  // save them in this browser too
+        fillAll();  // show them on the page
+        setMsg('Loaded ' + Object.keys(clean).filter(function (k) { return k !== '__name'; }).length + ' answers from ' + file.name + '.');  // confirm
+      } catch (e) {  // the file could not be used
+        setMsg('Could not load that file: ' + e.message);  // say why
+      }  // end of try/catch
+    };  // end of onload
+    reader.readAsText(file);  // start reading
+  }  // end of loadSheet
+
+  function wireSheetPanel() {  // connects the name box and the Download / Load / Clear buttons
+    var name = document.getElementById('student-name');  // the name box
+    if (name) {  // it exists on this page
+      name.value = typeof answers.__name === 'string' ? answers.__name : '';  // restore a saved name
+      name.addEventListener('input', function () { answers.__name = name.value; scheduleSave(null); });  // save it as it is typed
+    }  // end of the name box
+    document.querySelectorAll('.js-download').forEach(function (btn) {  // every Download button (there is one in the bar and one in the panel)
+      btn.addEventListener('click', function () {  // on click...
+        download(SHEET_FILE, buildSheet(), 'text/html');  // ...build the sheet and save it
+        setMsg('Saved ' + SHEET_FILE + ' to your Downloads folder. Put that file in your repository.');  // say where it went
+      });  // end of the click handler
+    });  // end of Download buttons
+    var picker = document.getElementById('sheet-file');  // the hidden file chooser
+    var loadBtn = document.getElementById('sheet-load');  // the visible "Load" button
+    if (picker && loadBtn) {  // both exist
+      loadBtn.addEventListener('click', function () { picker.click(); });  // the button opens the chooser
+      picker.addEventListener('change', function () { if (picker.files[0]) loadSheet(picker.files[0]); picker.value = ''; });  // read the chosen file, then reset the chooser
+    }  // end of Load
+    var clearBtn = document.getElementById('sheet-clear');  // the Clear button
+    var armed = null;  // the timer of a pending "click again to confirm"
+    if (clearBtn) clearBtn.addEventListener('click', function () {  // on click...
+      if (!armed) {  // first click: ask for a second one instead of clearing at once
+        clearBtn.textContent = 'Click again to erase every answer';  // the warning
+        armed = setTimeout(function () { clearBtn.textContent = 'Clear all answers'; armed = null; }, 4000);  // it disarms itself after 4 seconds
+        return;  // nothing erased yet
+      }  // end of the first click
+      clearTimeout(armed);  // second click within 4 seconds: stop the disarm timer
+      armed = null;  // back to the unarmed state
+      clearBtn.textContent = 'Clear all answers';  // restore the label
+      answers = {};  // forget every answer
+      writeStore();  // save the empty set
+      fillAll();  // empty every box on the page
+      setMsg('All answers erased from this page and this browser.');  // confirm
+    });  // end of Clear
+    if (!canSave) setMsg('This browser is not saving drafts. Download your answer sheet before you close the page, and load it back next time.');  // warn early if storage is blocked
+  }  // end of wireSheetPanel
+
+  function wireCode() {  // connects the Copy and Download buttons on every code block
+    document.querySelectorAll('.codebox').forEach(function (box) {  // each block
+      var code = box.querySelector('pre');  // the code itself
+      var file = box.getAttribute('data-file');  // its file name
+      var copy = box.querySelector('.js-copy');  // its Copy button
+      var save = box.querySelector('.js-save');  // its Download button
+      if (copy) copy.addEventListener('click', function () {  // Copy: put the code on the clipboard
+        var text = code.textContent;  // the plain code, without any coloring
+        var done = function () { copy.textContent = 'Copied'; setTimeout(function () { copy.textContent = 'Copy'; }, 1500); };  // brief confirmation
+        if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(text).then(done, function () { fallbackCopy(text); done(); });  // the modern way
+        else { fallbackCopy(text); done(); }  // the older way, for pages opened straight from a file
+      });  // end of Copy
+      if (save && file) save.addEventListener('click', function () { download(file, code.textContent.replace(/\s*$/, '\n'), 'application/octet-stream'); });  // Download: save the code as its own file, ending with one newline; the generic type stops browsers adding .txt to the name
+    });  // end of each block
+  }  // end of wireCode
+
+  function fallbackCopy(text) {  // copies text in browsers that do not offer navigator.clipboard here
+    var t = document.createElement('textarea');  // a temporary box...
+    t.value = text;  // ...holding the text...
+    t.style.position = 'fixed';  // ...kept out of the page flow...
+    t.style.opacity = '0';  // ...and invisible
+    document.body.appendChild(t);  // add it
+    t.select();  // select its contents
+    try { document.execCommand('copy'); } catch (e) { /* nothing more can be done; the student can still select the code by hand */ }  // copy the selection
+    t.remove();  // remove the temporary box
+  }  // end of fallbackCopy
+
+  answers = readStore();  // 1. load any saved drafts
+  document.querySelectorAll('.ans[data-id]').forEach(buildTextBox);  // 2. build every text box
+  document.querySelectorAll('table.grid[data-id]').forEach(buildGrid);  // 3. build every grid
+  wireSheetPanel();  // 4. connect the answer-sheet panel
+  wireCode();  // 5. connect the code blocks
+  updateProgress();  // 6. show the starting count
+})();  // run the function immediately
+</script>
+</body>
+</html>

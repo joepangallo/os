@@ -1,0 +1,4 @@
+# Solutions are embargoed. Answer files must never reach the student-facing repo.
+# Everything in this folder is ignored except this file itself.
+*
+!.gitignore
