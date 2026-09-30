@@ -677,20 +677,24 @@ python procthreads.py --pause</pre>
     <div class="scroll-x"><table class="grid" data-id="bd" data-corner="Workers" data-rows="Threads, 1|Threads, 2|Threads, 4|Threads, 8|Processes, 1|Processes, 2|Processes, 4|Processes, 8" data-cols="Time (s)|Speedup" data-label="Part B (d) table"></table></div>
   </div>
   <div class="part">
-    <p class="q"><b class="letter">B-e</b> Explain the difference between the thread rows and the process rows. The program printed whether Python's <b>global interpreter lock</b> (GIL) is enabled: with the GIL on, only one thread of a process can execute Python code at any instant, although Python threads are real kernel-level threads. Which thread model from Problem 6 does that behavior resemble for CPU-bound work, and why do processes escape the limit?</p>
+    <p class="q"><b class="letter">B-e</b> Compare the thread rows with the process rows and explain what <b>you</b> measured. The program printed whether Python's <b>global interpreter lock</b> (GIL) is enabled. With the GIL on, only one thread of a process can execute Python code at any instant, although Python threads are real kernel-level threads; with it off (a "free-threaded" Python build), threads can compute on several cores at once. Say which case your run was and whether your thread rows sped up. Then: which thread model from Problem 6 does a GIL-limited process resemble for CPU-bound work, and why can separate processes use several cores either way?</p>
     <div class="ans" data-id="be" data-rows="5" data-label="Part B (e)"></div>
   </div>
   <div class="part">
-    <p class="q"><b class="letter">B-f</b> Using <b>your</b> 4-process speedup, solve Amdahl's law for <i>f</i> by hand (show the numbers), predict the 8-process speedup, and compare it with what you measured. If they differ noticeably, in either direction, give two reasons that could explain it. Think about how many cores your computer has (and whether some are slower "efficiency" cores), about work that happens only once, such as starting the pool, and about how much one noisy measurement moves <i>f</i>.</p>
+    <p class="q"><b class="letter">B-f</b> Using <b>your</b> 4-process speedup, solve Amdahl's law for <i>f</i> by hand (show the numbers), predict the 8-process speedup, and compare it with what you measured. If they differ noticeably, in either direction, give two reasons that could explain it. If your <i>f</i> comes out above 1 or below 0, do not force it into range: say what that means about your measurements (for example, a 4-worker speedup greater than 4) and which assumption of Amdahl's law they broke. Think about how many cores your computer has (and whether some are slower "efficiency" cores), about work that happens only once, such as starting the pool, and about how much one noisy measurement moves <i>f</i>.</p>
     <div class="ans" data-id="bf" data-rows="6" data-label="Part B (f)"></div>
   </div>
   <div class="part">
-    <p class="q"><b class="letter">B-g</b> <b>Experiment 4.</b> Eight threads finished the waiting tasks much faster than one thread, even though threads did not help in Experiment 3. Why? What is a waiting thread doing, and what does the kernel do with the other threads meanwhile?</p>
+    <p class="q"><b class="letter">B-g</b> <b>Experiment 4.</b> Compare your 1-thread and 8-thread times. What is a waiting thread doing, and what does the kernel do with the other threads meanwhile? Use that to explain your result, and contrast it with what threads did (or did not do) for the CPU-bound work in Experiment 3. If eight threads were not clearly faster, suggest what on your computer could have caused it.</p>
     <div class="ans" data-id="bg" data-rows="4" data-label="Part B (g)"></div>
   </div>
   <div class="part">
     <p class="q"><b class="letter">B-h</b> <b>Experiment 5.</b> Paste the command you used and what it printed. How many threads did your operating system report for the process? The program started four extra threads beside its main thread; if the count is different, suggest where the extra threads could come from.</p>
     <div class="ans" data-id="bh" data-rows="4" data-label="Part B (h)"></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">B-i</b> <b>Your own experiment.</b> Change one thing in <code>procthreads.py</code> to test an idea of your own, and mark the changed line with a comment that starts <code># B-i</code>. Some starting points: add 16 to <code>WORKER_COUNTS</code>; change <code>TASKS</code> from 8 to 3 or 24; make each CPU task also sleep for part of its time; give the tasks unequal sizes. <b>Before running it</b>, write down the change, what you predict will happen and why (use the chapter's ideas and your earlier results). Then run it, paste the relevant lines of output, and say whether your prediction held and what explains any surprise.</p>
+    <div class="ans" data-id="bi" data-rows="8" data-label="Part B (i)" data-placeholder="Change: ...&#10;Prediction and reason (written before running): ...&#10;Output: ...&#10;Did it hold? Why or why not: ..."></div>
   </div>
 </section>
 
@@ -707,7 +711,7 @@ git push</pre>
   </ol>
   <p>Your repository should contain:</p>
   <ul class="check">
-    <li><code>procthreads.py</code> with every TODO written, so that all four experiments run to the end without a "stopped here" line.</li>
+    <li><code>procthreads.py</code> with every TODO written, so that all four experiments run to the end without a "stopped here" line, and your B-i change marked with <code># B-i</code>.</li>
     <li><code>hw2-answers.html</code>, downloaded from this page, with every question answered.</li>
   </ul>
   <p><b>Submit your GitHub repo link.</b></p>
