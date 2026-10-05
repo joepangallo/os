@@ -1,0 +1,61 @@
+Alex: Welcome back to the Operating Systems Audio Course. I am Alex, with Jordan. Quick look back. Last time we opened up the process: a program in execution, remembered by the operating system in a process control block holding its identifier, its state, its saved registers, everything needed to pause it and resume it later. We walked one process from New to Ready to Running to Blocked and out through Exit, and we saw why a process switch costs so much more than a mode switch. Today, chapter four splits that idea in two.
+
+Jordan: I am Jordan. So the process was doing two jobs at once, and now we separate them.
+
+Alex: Exactly. Here is the hook. A process, as chapter three described it, bundles two completely separate ideas. One: owning resources, the address space, the files, the devices, the permissions. Two: being scheduled and running, the actual path of execution moving through code. Threads pull those two ideas apart. The process keeps owning everything. The thread becomes the thing that runs. One process, several paths of execution, all sharing the same office.
+
+Jordan: One process, several threads. Like a company with several employees sharing one office.
+
+Alex: That is the picture. All the threads in a process run the same program code, but each one can be at a different place in it at the same moment. They share the code, the data, the heap, the open files, the whole address space. If one thread opens a file, every thread can read it. If one thread writes a global variable, every thread sees it. No asking the operating system, no slow inter-process machinery. Just memory.
+
+Jordan: And what does each thread keep private?
+
+Alex: Whatever it needs to keep its own place in the program. Its own program counter, because each thread is at a different instruction. Its own registers. Its own stack, because each thread calls functions on its own and needs its own return addresses and local variables. Its own execution state, Running, Ready, or Blocked. And a small record called the thread control block, the thread's version of the P C B, holding its state, its priority, and room to save its registers while it is not running.
+
+Jordan: So the rule is: what a thread needs to keep its own place is private, and everything the program owns is shared.
+
+Alex: That sentence is worth memorizing, because the whole chapter hangs on it. And sharing buys real advantages. Compared with separate processes, threads are quicker to create, quicker to finish, and quicker to switch between. They have operations of their own: spawn, block, unblock, finish. And one thread can be blocked waiting on the disk while another keeps running, because state is kept per thread.
+
+Jordan: There has to be a catch. Sharing everything sounds dangerous.
+
+Alex: It is, and the course does not hide it. Because threads share data, one thread can trample another's. Two threads updating the same variable can clash, and the result depends on timing. Keeping them in step, synchronization, is the subject of chapter five, and we will get there. But first, who manages threads? That is beat two, and there are three answers.
+
+Jordan: User-level threads, kernel-level threads, and combined. Walk me through the trade.
+
+Alex: User-level threads live in a library inside the process. The program itself does the scheduling. Switching between them needs no kernel help at all, no mode switch, so it is blazing fast. But there are two costs. If one thread makes a blocking system call, the whole process blocks, and all its threads stall with it. And user-level threads cannot run on two processors at once, because as far as the operating system knows, there is only one thing there: the process.
+
+Jordan: So it is like a team managing itself. Fast and flexible, but nobody outside the team knows the individuals exist.
+
+Alex: Nice. Kernel-level threads are the opposite. The operating system knows about each thread individually. Each one can block independently without stalling the others. Each one can run on its own processor, true parallelism. The price is a mode switch on every thread switch, because the kernel is involved, and the kernel has to keep records for every thread in the system.
+
+Jordan: And combined designs split the difference.
+
+Alex: They map many user-level threads onto a smaller or equal number of kernel-level threads. You get cheap switching most of the time, and the kernel threads give you parallelism and independent blocking. The mapping itself adds complexity, but for many workloads it is the sweet spot.
+
+Jordan: Beat three, then: what can more cores actually buy us? Amdahl's law.
+
+Alex: This is the chapter's reality check, and it is one formula you should be able to use. Amdahl's law says: if a fraction f of a program can run in parallel on N processors, the speedup is one divided by the quantity one minus f, plus f over N. In words: the serial part of your program, the part that cannot be parallelized, caps everything.
+
+Jordan: Give me the worked example from the course.
+
+Alex: Ninety percent of the program parallelizes, so f is zero point nine, and you have eight processors. Speedup equals one over zero point one plus zero point nine over eight. That is one over zero point one plus zero point one one two five, which is one over zero point two one two five, about four point seven. Eight processors, less than five times the speed. Even a small serial part caps the gain, and the course is blunt about it: throwing cores at a program with a big serial section is money poorly spent.
+
+Jordan: That is humbling. So multithreading helps, but the serial fraction is the ceiling.
+
+Alex: Always. Now the tour of real systems, sections four point four through four point eight. Each one answers the same questions differently. Windows builds processes and threads as objects and gives threads a larger set of states. Solaris layers three things: user threads on top, lightweight processes in the middle, kernel threads at the bottom. Linux takes the minimalist route: it treats processes and threads both as tasks, created by one call named clone, with flags choosing exactly what the new task shares with its parent. Want shared memory? Set the flag. Want your own? Clear it.
+
+Jordan: That is elegant. One mechanism, and the flags decide what kind of thing you get.
+
+Alex: Android organizes applications into components with a managed life cycle, and its processes come and go as the system needs memory, which is why your phone can freeze an app you have not touched in days. And Mac O S, in the chapter's telling, offers Grand Central Dispatch: instead of managing threads yourself, you submit blocks of work to queues, and the system handles the threading behind the scenes. You describe the work, it supplies the threads.
+
+Jordan: Let me try the summary. A thread is a single path of execution inside a process. Threads share the process's code, data, heap, files, and address space, and each keeps its own program counter, registers, stack, state, and thread control block.
+
+Alex: Got it.
+
+Jordan: User-level threads are fast to switch but stall together and cannot parallelize. Kernel-level threads block independently and run in parallel but cost a mode switch. Combined designs map many user threads onto fewer kernel threads. Amdahl's law says the serial fraction caps speedup, ninety percent parallel on eight cores gives about four point seven times. And real systems all answer the same questions: Windows with objects, Solaris with layers, Linux with clone and flags, Android with lifecycles, Mac with dispatch queues.
+
+Alex: That is the chapter. Here is your try-thinking-about-it moment. Think of your web browser. When you open ten tabs, is that ten processes or one process with ten threads? The answer has changed over the years, and each choice is a trade on exactly the axes we just covered: isolation and safety on one side, sharing and speed on the other. Next time you wonder why one frozen tab does or does not kill the whole browser, you will know which design decision you are looking at.
+
+Jordan: I have definitely wondered that.
+
+Alex: Next time, the price of all this sharing. Chapter four gave us many threads in progress at once, all reading and writing the same memory. Chapter five deals with what can go wrong: when the result depends on timing, you get a race condition, and the whole chapter is about making threads take turns safely, with hardware help, semaphores, monitors, and message passing. See you there.
