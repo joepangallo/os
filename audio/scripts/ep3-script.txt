@@ -1,0 +1,57 @@
+Alex: Last time we gave every program the beautiful illusion of its own private, continuous memory, with page tables quietly translating every address behind the scenes. Today we take that illusion one step further and unlock the superpower. What if a program could run with only part of itself in memory at all?
+
+Jordan: That sounds like cheating. How can a program run if half of it is not there?
+
+Alex: Because of a beautiful fact about how programs behave, called the principle of locality. Programs do not access memory at random. They work on one small neighborhood for a while: a loop runs the same instructions over and over, touching the same data. Then they move to another neighborhood. At any moment, a program only really needs a small working set of pages. So the operating system keeps just those pages in memory and leaves the rest on disk, fetching pieces on demand the moment they are touched.
+
+Jordan: And when the program touches something that is not there?
+
+Alex: That is a page fault. The hardware traps to the operating system, which finds a free frame, reads the page in from disk, updates the page table, and restarts the instruction as if nothing happened. The program never knows it was interrupted. This is virtual memory: each process sees a huge private address space, far bigger than physical memory, and the hardware plus the OS maintain the illusion.
+
+Jordan: Okay, but every memory access now needs a page table lookup, and page tables themselves can be enormous. A sixty-four-bit address space would need a table with more entries than there are atoms... well, not atoms, but you get the idea. It is huge.
+
+Alex: It is, which is why real systems never use a single flat table. They use multilevel page tables: a tree where the top level points to second-level tables, which point to the actual entries. Most of the address space is empty, so most branches of the tree simply do not exist. Only the root has to stay in memory; everything else can itself be paged in and out. Some systems use inverted tables instead: one entry per physical frame, rather than per virtual page, which stays small no matter how big the virtual space gets.
+
+Jordan: But even a tree walk is several memory accesses per translation. That would slow everything to a crawl.
+
+Alex: And that is why we have the translation lookaside buffer, the T L B: a tiny, blazing-fast cache inside the processor that remembers recent translations. Almost every address the program touches hits in the T L B, so the full table walk almost never happens. Locality saves us twice: programs reuse the same pages, so the cache that remembers recent translations is almost always right.
+
+Jordan: Quick question before we move on. Who decides the page size? Four kilobytes sounds arbitrary.
+
+Alex: It is a real engineering tradeoff, and the course calls it out. Small pages mean less wasted space inside each page: that is internal fragmentation again, the same villain from last episode. But small pages also mean more pages, which means bigger page tables and more faults to bring them all in. Big pages waste more space per page but keep tables small. Four kilobytes won historically as the sweet spot, though modern systems also support huge pages, two megabytes or even a gigabyte, for workloads like big databases where the tradeoff flips.
+
+Jordan: And when does the OS fetch pages? Only on faults?
+
+Alex: Mostly, and that policy is called demand paging: bring in exactly what is asked for, nothing more. The alternative is prepaging: when a fault happens, bring in a few neighboring pages too, betting that locality means they will be needed next. It is a gamble. Win, and you saved future faults. Lose, and you wasted disk reads and evicted something useful. Most systems today stick with demand paging and let the working set logic handle the rest.
+
+Jordan: I am sensing a theme. The whole chapter is the OS betting on locality and winning.
+
+Alex: That is exactly the theme. But here is where it gets dramatic: memory fills up. A page fault arrives and there is no free frame. Something has to be evicted to make room. Which page do you throw out? That decision is the page replacement policy, and the course lets you play all four classics.
+
+Jordan: Lay them on me.
+
+Alex: First in, first out: evict the page that has been in memory the longest. Simple, but it might evict something you are using constantly just because it arrived early. Least recently used: evict the page untouched for the longest time. It bets that the recent past predicts the near future, which locality says is a good bet, but tracking exact recency is expensive. Then the clock algorithm: the practical approximation. Imagine the pages arranged in a circle with a clock hand sweeping around. Each page has a reference bit the hardware sets whenever the page is touched. The hand clears bits as it goes, and the first page it finds with its bit still clear gets evicted. One bit per page, one sweep: cheap and good.
+
+Jordan: And the fourth?
+
+Alex: Optimal: evict the page that will not be used for the longest time in the future. It is perfect and completely impossible, because it requires knowing the future. But it is the gold standard: you simulate it to see how close the real policies come.
+
+Jordan: So FIFO is the new intern, LRU is the wise veteran, clock is the practical manager, and OPT is the oracle you can never hire.
+
+Alex: I am stealing that. Now, the nightmare scenario. What happens when the OS guesses wrong too often? Every access faults, every fault needs a disk read, the disk is a million times slower than memory, and the whole system spends all its time swapping pages instead of doing work. Throughput collapses. That is thrashing, and it is as dramatic as it sounds.
+
+Jordan: How do you avoid it?
+
+Alex: With the working set idea. The OS tracks the set of pages each process has actually used recently — its working set — and makes sure every running process gets at least that many frames. This is resident set management: deciding how many frames each process may hold. If the total demand exceeds physical memory, the OS does load control: it suspends an entire process, swaps it out whole, and gives its frames to the rest. Fewer processes running well beats many processes thrashing.
+
+Jordan: That feels like wisdom, not just engineering. Do not spread yourself thinner than your working set.
+
+Alex: There is also a lovely detail about writing pages back. When a page is evicted, if it was never modified, the OS can just drop it: the disk already has an identical copy. Only modified pages must be written back. And clever systems do cleaning in the background, writing out dirty pages during idle moments so that a burst of faults never has to wait on the disk.
+
+Jordan: Let me check my understanding. Virtual memory works because of locality: programs cluster their accesses, so keeping just the working set in memory is enough. Page faults bring in missing pieces on demand. The T L B caches translations. When memory is full, replacement policies like L R U and clock pick a victim, and OPT is the unachievable ideal. And thrashing is what happens when the working sets do not fit and the system drowns in faults.
+
+Alex: Flawless. And this is not theory: every system you use does this. Linux, Windows, Android, macOS — they all do demand paging, they all have a clock-like replacement policy, and Android will even kill background apps entirely, choosing which process dies based on how important it is, just to protect the working sets of what you are actually using.
+
+Jordan: Try-this time. Here is mine: open your system monitor and look at memory pressure while you work normally, then open something enormous. Watch the fault count climb. You are watching demand paging happen live: the OS fetching your working set piece by piece, evicting the victims it chose, and keeping the illusion alive that your program owns the whole machine.
+
+Alex: Next episode is our finale: uniprocessor scheduling. One processor, many ready processes. Who runs next decides how fast, fair, and responsive the whole system feels. We will race the classic algorithms against each other: first come first served, round robin, shortest job first, and a few exotic ones, and we will see how a 1970s UNIX scheduler kept everyone happy with a single clever formula.
