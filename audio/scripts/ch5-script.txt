@@ -1,0 +1,61 @@
+Alex: Welcome back to the Operating Systems Audio Course. I am Alex, with Jordan. Quick look back. Last time we split the process in two: the process keeps owning the resources, and the thread becomes the thing that runs. Threads share everything in the process, code, data, files, which makes them fast, and each thread keeps its own program counter, registers, and stack. We compared user-level and kernel-level threads, learned Amdahl's law, and toured how Windows, Solaris, Linux, Android, and the Mac handle threads. Today, chapter five: the price of all that sharing.
+
+Jordan: I am Jordan. So threads sharing everything is fast, and now we find out why it is terrifying.
+
+Alex: Here is the hook, and it is a small story you should carry through the whole episode. Two threads each add one to a shared counter. The counter holds five. Thread one reads five. Thread two reads five. Thread one computes six and writes six. Thread two computes six and writes six. Two additions went in. The counter went up by one. One addition has vanished. And here is the worst part: run the same program again, and with different timing the answer comes out right. The bug appears and disappears depending on who gets to the shared data first.
+
+Jordan: That is a race condition.
+
+Alex: Exactly. A race condition happens when the outcome depends on the exact timing of interleaved steps. The code that touches shared data has a name: the critical section. And the rule we need has a name too: mutual exclusion. While one process is inside its critical section for a shared resource, no other process may be inside one for that same resource. Everything in this chapter is machinery for enforcing that one sentence.
+
+Jordan: Before the machinery, the vocabulary. The course builds a whole glossary here.
+
+Alex: And it is worth it, because these words get reused everywhere. Concurrency is several processes or threads in progress at the same time, whether they take turns on one processor, which is multiprogramming and interleaving, or run at literally the same instant on several processors, which is multiprocessing and overlapping, or are spread across machines cooperating over a network, which is distributed processing. An atomic operation is one or more steps carried out as a single indivisible unit: no other process can see a halfway state or cut in partway through.
+
+Jordan: And the failure modes have names too. Deadlock, livelock, starvation.
+
+Alex: All three, and keep them straight. Deadlock: two or more processes each wait for something only another member of the group can provide, so nobody ever moves. The course's picture: one thread holds the printer and waits for the scanner, another holds the scanner and waits for the printer. Livelock: everyone stays busy but nobody makes progress. Two polite people meet in a narrow corridor, both step left, both step right, both step left again, forever. Starvation: the system keeps making progress but one process gets passed over again and again. A scheduler that always runs the shortest job next will serve a stream of short jobs while one long report waits forever.
+
+Jordan: So a careless fix for a race can trade one failure for another.
+
+Alex: That is the deep lesson of the chapter. Now, the requirements. Section five point two says any correct mutual exclusion solution must meet six requirements, and the course also names the three ways processes interact: competition for shared resources, cooperation by sharing data, and cooperation by communication. Plus the operating system's own concerns: it has to enforce all of this while itself being built from concurrent processes and threads, facing exactly the same problems as the programs it runs.
+
+Jordan: That is beat one: the problem and the vocabulary. Beat two is the early attempts, software first.
+
+Alex: Section five point one is a wonderful piece of teaching. It builds mutual exclusion out of nothing but ordinary reads and writes, through a series of flawed attempts, each one fixing the last attempt's bug and introducing a new one, until it arrives at Dekker's algorithm and Peterson's algorithm, which actually work. I will not walk the attempts line by line here, but the point is the discipline: every attempt has to guarantee mutual exclusion, let processes make progress, and bound the waiting, and each failed attempt teaches you why one more mechanism is needed.
+
+Jordan: And then hardware helps.
+
+Alex: Section five point three. On a single processor, there is a beautifully simple trick: disable interrupts while inside the critical section. No interrupt means no preemption, no preemption means no interleaving, so the critical section runs atomically. But it only works on one processor, and while interrupts are off the system cannot respond to anything, so it is a blunt instrument. On multiprocessors you need special atomic instructions built into the hardware: instructions like test and set, compare and swap, and exchange, which read a memory word, check it, and write a new value in one indivisible step. No other processor can ever catch the word after the check but before the write.
+
+Jordan: The price?
+
+Alex: Busy waiting. A process that finds the critical section occupied just spins, checking again and again, burning processor time. And there is a risk of starvation if the timing keeps going against one process. Hardware gives you the indivisible building block, but not a civilized way to wait.
+
+Jordan: Which brings beat three: the higher-level tools. Semaphores first.
+
+Alex: Section five point four. A semaphore is a counter with two atomic operations, semWait and semSignal. The beautiful idea: instead of spinning, a process that cannot proceed blocks. It goes to sleep and the processor goes to someone else, and semSignal wakes it later. That one change, blocking instead of spinning, makes semaphores practical. They solve mutual exclusion, and they also solve coordination problems like producer and consumer, where one process makes items and another consumes them and neither may get ahead of the other.
+
+Jordan: Then monitors.
+
+Alex: Section five point five. A monitor packages the shared data together with the procedures that touch it, plus condition variables for waiting and signaling, and the language or runtime guarantees mutual exclusion automatically. Only one process at a time can be executing inside the monitor's procedures. The programmer stops hand-placing locks and unlocks and lets the structure enforce the discipline. It is the same idea as the semaphore, moved up a level so it is harder to get wrong.
+
+Jordan: And message passing.
+
+Alex: Section five point six. Stop sharing data entirely. Processes communicate by send and receive instead. No shared memory means no race conditions on shared memory, and it works across machines, which shared memory cannot do. Distributed systems live on message passing. The trade is that every exchange is explicit, so fine-grained sharing gets expensive.
+
+Jordan: The chapter ends with a classic test: readers and writers.
+
+Alex: Section five point seven. Many readers may share data at once, reading harms nothing, but a writer needs exclusive access. The interesting part is the priority choice. Favor readers and writers can starve. Favor writers and readers can starve. There is no neutral choice, and that is the lesson: every synchronization policy is also a scheduling policy, and someone always pays.
+
+Jordan: Let me try the summary. A race condition is when the outcome depends on timing. The critical section is the code touching shared data, and mutual exclusion means at most one process inside it at a time, built from atomic operations.
+
+Alex: Good.
+
+Jordan: Software solutions climb from flawed attempts to Dekker's and Peterson's algorithms. Hardware helps with disabling interrupts on one processor and atomic instructions like compare and swap on many, but busy waiting wastes the processor. Semaphores block instead of spinning and solve producer and consumer. Monitors bundle data with procedures so exclusion is automatic. Message passing replaces sharing with send and receive. And readers versus writers shows every policy can starve someone.
+
+Alex: That is the chapter. Here is your try-thinking-about-it moment. A shop has one changing room and one key on a hook. Whoever holds the key is inside. Everyone else waits until the key is back on the hook. There is never more than one person inside. You have just seen a semaphore in the wild: the key is the counter, taking it is semWait, hanging it back up is semSignal, and waiting for the key is blocking instead of spinning. The operating system is full of changing-room keys.
+
+Jordan: I am going to see semaphores everywhere now.
+
+Alex: Next time, we take the tools from this chapter and watch them fail in the most dramatic way possible. Chapter six: even when every process takes turns correctly, sharing can freeze everything. Deadlock. Four conditions, three responses, the banker's algorithm, and five philosophers who cannot eat. See you there.
