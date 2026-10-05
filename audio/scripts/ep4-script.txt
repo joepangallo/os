@@ -1,0 +1,63 @@
+Alex: Last time we watched the operating system gamble on locality and win, keeping just each program's working set in memory while the disk handled the rest. Today, our finale: the processor itself. On a machine with one processor, only one process can run at a time. So who runs next? That single decision, made thousands of times per second, determines how fast, fair, and responsive the whole system feels.
+
+Jordan: It sounds like triage in an emergency room. One doctor, a waiting room full of patients.
+
+Alex: That is a great analogy, and it even captures the first big idea: there are three levels of scheduling, like three levels of triage. Long-term scheduling decides which jobs get admitted into the system at all: are we taking on this patient? Medium-term scheduling decides which admitted processes get to stay in memory versus being swapped out whole to disk: who waits in the hallway? And short-term scheduling, the one this chapter is really about, decides which ready process gets the processor right now: who sees the doctor next?
+
+Jordan: And the thing that actually hands over the processor has a name, right?
+
+Alex: The dispatcher. When the processor goes free, the short-term scheduler picks the next process and the dispatcher performs the context switch: saving the old process's registers, loading the new one's, and jumping to it. It has to be fast, because every microsecond spent dispatching is a microsecond nobody's real work gets done. That overhead even has a name: dispatch latency.
+
+Jordan: So how do we judge whether a scheduler is doing a good job? What is the scorecard?
+
+Alex: The course splits the criteria two ways. User-oriented criteria are about what people feel: response time, how fast the system answers you; turnaround time, how long from submitting a job to getting the result; deadlines met. System-oriented criteria are about what the machine achieves: throughput, how many jobs finish per hour; processor utilization, keeping the expensive hardware busy; and fairness, making sure nobody starves.
+
+Jordan: Response time versus throughput. Those can fight each other, right? Finishing lots of long jobs fast might mean interactive users wait.
+
+Alex: Exactly the tension, and every algorithm in this chapter picks its tradeoff. Let us race them. First contestant: first come, first served. The ready queue is a line at the deli counter. Whoever arrived first runs until they finish or block. Simple, fair in a naive sense, but one long job at the front makes everyone behind it wait. That even has a name: the convoy effect. A big slow truck, and a hundred cars stuck behind it.
+
+Jordan: Deli counter scheduling. I can feel the frustration already.
+
+Alex: Contestant two: round robin. Everyone gets a small slice of processor time, called a time quantum, maybe ten or twenty milliseconds, then they go to the back of the line. It is the great equalizer for interactive systems: every user gets a quick response because nobody hogs the processor for long.
+
+Jordan: What is the catch? The quantum size?
+
+Alex: You read my mind. Make the quantum too big and round robin degenerates into first come, first served. Make it too small and the system spends all its time context switching instead of working. Tuning the quantum is one of the oldest dark arts in systems.
+
+Jordan: Contestant three?
+
+Alex: Shortest process next. Look at the queue, run the job with the smallest expected run time first. It gives the best average turnaround time of any nonpreemptive policy, which is mathematically provable. But it needs to know the future: how long will this job run? The OS estimates from history, and estimates can be wrong. Worse, a steady stream of short jobs can starve a long one forever.
+
+Jordan: So we fix starvation the way chapter six taught us: aging?
+
+Alex: Or with contestant four: shortest remaining time, the preemptive version. If a new arrival has less remaining work than what is currently running, preempt: stop the current job and start the newcomer. Even better turnaround, same starvation risk. Contestant five fixes the fairness problem directly: highest response ratio next. Priority equals waiting time plus expected service time, all divided by expected service time. The longer you wait, the higher your ratio climbs, so nobody starves no matter what. Aging, built into the formula.
+
+Jordan: That is elegant. The math itself guarantees fairness.
+
+Alex: And contestant six is the one real systems actually use: feedback scheduling, also called multilevel feedback queues. Several queues with different priorities and different quanta. New processes start at the top with a short quantum. If they use it all up, down they go to a longer quantum at lower priority. Short interactive jobs finish quickly at the top; long compute jobs sink to the bottom where they can run in big peaceful slices. And to prevent starvation, processes that have waited too long get promoted back up. It adapts to each job's behavior without needing to predict anything.
+
+Jordan: So it learns. The scheduler watches what you do and sorts you accordingly.
+
+Alex: Precisely. Now, two more ideas before we close. Fair-share scheduling zooms out: instead of being fair to processes, be fair to users or groups. If you and I share a machine and you run fifty processes while I run one, per-process fairness gives you fifty times the processor. Fair-share gives each user an equal cut, then divides it among their processes. And then there is the traditional UNIX scheduler, a beautiful piece of 1970s engineering the course walks through line by line.
+
+Jordan: What made it special?
+
+Alex: One formula that balanced everything. Every second, each process's CPU usage count decayed, halving toward zero, so past greed was forgiven. While running, the count climbed. Priority was computed from a base share plus the decayed usage, so a process that had been quiet recently jumped ahead of a hog. Interactive jobs, which constantly block waiting for keystrokes, naturally floated to the top. Compute-bound jobs sank. No knobs, no tuning, just arithmetic doing the right thing. Modern schedulers are fancier, but they all wrestle with the same tradeoffs this formula named.
+
+Jordan: One thing I want to pin down: preemptive versus nonpreemptive. What is the real difference?
+
+Alex: It is about whether the operating system can interrupt a running process. Nonpreemptive means once a process starts, it runs until it finishes or voluntarily gives up the processor, like waiting for input. Simple, but one rude guest can hold the microphone all night. Preemptive means the OS can stop a running process, save its state, and hand the processor to someone else, usually when a time quantum expires or a higher-priority job arrives. Almost every interactive system you have ever used is preemptive, because responsiveness demands the right to interrupt.
+
+Jordan: So round robin, shortest remaining time, and feedback are preemptive, while first come first served and shortest process next are not.
+
+Alex: Exactly. And preemption is only possible because the context switch exists: the dispatcher can freeze a process mid-thought and thaw it later without it ever noticing. That invisible machinery is what makes your whole computer feel alive.
+
+Jordan: Let me make sure I can tell the story. Three levels: long-term admits jobs, medium-term manages who stays in memory, short-term picks who runs now via the dispatcher. We judge schedulers by response time, turnaround, throughput, utilization, and fairness. The algorithms: first come first served is simple but convoys; round robin shares fairly with a tuned quantum; shortest job first is optimal for turnaround but can starve; highest response ratio builds fairness into the math; and feedback queues adapt by watching behavior.
+
+Alex: That is the whole chapter in one breath. And here is your try-this for the finale. Open a terminal and run a command that lists processes sorted by processor usage, then start something heavy, like a big compile or a video encode, and watch. You will see the scheduler doing exactly what we described: your interactive shell stays snappy while the hog gets its fair share in the background. Priorities shifting, quanta expiring, the dispatcher handing the processor around thousands of times per second. It has been doing this, invisibly, since before you were born.
+
+Jordan: And that closes our series. Four chapters, four big ideas.
+
+Alex: Let us land the plane. Chapter six taught us that sharing creates deadlock, and that every fix has a price: prevent, avoid, or detect and recover. Chapter seven made the OS a landlord, carving memory into partitions, pages, and segments while translating every address. Chapter eight gave programs more memory than exists, betting on locality with page tables, the T L B, and replacement policies. And chapter nine put one processor in charge of everyone, scheduling with fairness you can feel. Concurrency, memory, virtual memory, scheduling: that is the beating heart of an operating system.
+
+Jordan: Thanks for listening, and good luck in class. Go crush those chapters.
