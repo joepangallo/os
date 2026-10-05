@@ -1,0 +1,89 @@
+Alex: Picture two roommates on a Friday night. There is one TV remote and one game controller. One roommate grabs the remote, the other grabs the controller, and each one says, I will hand mine over when you hand yours over. Nobody moves. The game never starts. That, in a nutshell, is a deadlock, and it can freeze an entire operating system the same way.
+
+Jordan: So it is not just things being slow. It is things being stuck forever.
+
+Alex: Exactly. A deadlock is what happens when a group of processes each holds something another one needs, and every single one of them is waiting. Since they are all asleep, nobody ever wakes anybody up. Waiting longer does not help. Only the operating system stepping in from the outside can break it.
+
+Jordan: And this really happens in real computers?
+
+Alex: All the time, whenever programs share things: printers, files, database records, chunks of memory. Chapter six is about understanding exactly how deadlocks arise, because here is the catch that makes this chapter interesting: there is no perfect fix. Every response the operating system can choose has a cost.
+
+Jordan: Okay, so what are the ingredients? How does a deadlock actually form?
+
+Alex: There are four conditions, and a deadlock needs all four at once. Think of it like a fire needing fuel, heat, oxygen, and the chain reaction. Take away any one of them and the fire goes out.
+
+Jordan: I like that. What is condition number one?
+
+Alex: Mutual exclusion. Only one process at a time can use a resource. A printer can only print one job at a time. That is just reality. Some things can be shared harmlessly, like a file that everyone only reads, and those never cause deadlocks. But anything that needs exclusive access can be part of one.
+
+Jordan: Condition two?
+
+Alex: Hold and wait. A process keeps holding the resources it already has while it waits for more. Our roommate holds the remote while waiting for the controller. If instead every process had to ask for everything it needs all at once, or give back what it holds whenever it is told to wait, this condition would break.
+
+Jordan: Third?
+
+Alex: No preemption. Nobody can snatch a resource away from whoever holds it. It only gets released voluntarily. Now, for some resources the operating system actually can take them back: the processor, whose registers can be saved, or a page of memory, which can be copied to disk and restored later. But a printer halfway through a page cannot be un-printed. The half page is wasted and the work has to be redone.
+
+Jordan: And the fourth condition?
+
+Alex: Circular wait. A closed chain of waiting. Process A waits for something B holds, B waits for something C holds, and C waits for something A holds. Around and around. The classic picture is gridlock at a four-way intersection. Four cars arrive at once. Each car going straight needs two quadrants of the crossing, one after the other. Every car enters its first quadrant, so each holds one quadrant and waits for the next one, which the next car holds. Nobody can move until an outside force, like a traffic officer, makes one car back up.
+
+Jordan: So the first three conditions are the setup, and the fourth is the trigger.
+
+Alex: That is exactly how the course puts it. The first three are policy conditions. Each one is necessary, but even all three together are not sufficient for a deadlock. The circular wait is the event that may or may not happen as programs run. All four together are necessary and sufficient. And that gives us our first big idea: ruling out any single condition makes deadlock impossible.
+
+Jordan: Which brings us to the fixes. You said there are three strategies.
+
+Alex: Right. Strategy one is prevention. Design the system, before anything runs, so that at least one condition can never hold. Make every process request all of its resources at once, and hold-and-wait becomes impossible. Or number every resource type and require processes to request them in increasing order. Then a circular wait cannot form.
+
+Jordan: Why not? Walk me through that.
+
+Alex: Suppose tape drives are number one, disks are number two, printers are number three. A process holding a disk, number two, may only ask for number three or higher. Now imagine a circular wait anyway. Each link in the chain goes from a lower number to a higher number: a is less than b is less than c, and so on around the circle. But going all the way around brings you back to a, which would mean a is less than itself. Impossible. No matter how the timing works out, the circle can never close.
+
+Jordan: That is a beautiful little proof. So prevention is airtight. What is the catch?
+
+Alex: It is conservative and wasteful. If you must ask for everything up front, you wait longer to start, resources sit allocated but idle, and sometimes you honestly do not know in advance what you will need. It depends on the input. Numbering resources forces programs to grab things in an unnatural order and hold them longer than needed. Prevention is simple to reason about and it guarantees no deadlock, but it lowers utilization and slows processes down.
+
+Jordan: Strategy two?
+
+Alex: Avoidance. Do not rule anything out in advance. Instead, check every single request against a safety test before granting it. The famous one is the banker's algorithm. Picture a banker with a fixed pile of cash, and customers who have each declared the maximum they will ever borrow. Before handing over money, the banker asks: is there some order in which every customer could still finish and pay everything back? If yes, the state is safe and the loan is granted. If not, the customer waits.
+
+Jordan: So the operating system plays out the future before saying yes.
+
+Alex: Exactly. The OS keeps track of what each process claims it might need, what it currently holds, and what is still free. On every request it simulates: can everyone still finish in some order? Safe means yes. Unsafe means the request waits, even though the resources are free right now. No preemption is ever needed, and resources get used efficiently.
+
+Jordan: The price?
+
+Alex: The OS must know each process's maximum claim in advance, which is not always realistic. And processes can end up waiting a long time for a request that looks perfectly grantable. It is the middle path: less wasteful than prevention, more cautious than doing nothing.
+
+Jordan: And strategy three is just... let it happen?
+
+Alex: Detection and recovery. The most liberal approach. Grant whatever can be granted, put no limits on anyone, and every so often run a detection algorithm over the current state to look for a cycle of waiting processes. If you find one, break it: abort a process and restart it later, losing its work, or preempt a resource and roll the victim back to an earlier checkpoint.
+
+Jordan: That is refreshingly honest. Just clean up the mess when it happens.
+
+Alex: And processes never wait unnecessarily and start immediately. The price is that recovery destroys work. Here is the real-world punchline: most general-purpose operating systems actually do very little about deadlock and leave it to careful programmers, while databases, where a transaction can be rolled back cleanly, use detection all the time. The right strategy depends on how expensive recovery is.
+
+Jordan: Okay, I want to go back to the puzzle you teased. The dining philosophers.
+
+Alex: The classic. Five philosophers sit around a table. Between each pair is a single fork, so five forks total. Each philosopher needs two forks to eat. If all five grab their left fork at the same time, nobody can get a right fork, and everyone sits there hungry forever. Deadlock, with dinner guests.
+
+Jordan: So how do you fix dinner?
+
+Alex: Every fix maps to a real strategy. Allow at most four philosophers at the table and the fifth fork is always free: that is prevention by limiting concurrency. Have everyone pick up the lower-numbered fork first: that is resource ordering. Station a waiter who only seats a philosopher when both forks are available: that is avoidance. The puzzle is beloved because each solution teaches a genuine operating system technique.
+
+Jordan: And starvation is different from deadlock, right? I want to be sure I have this straight.
+
+Alex: Very different, and the distinction matters. In a deadlock, nobody makes progress. In starvation, everyone else keeps making progress while one process gets passed over again and again. It happens with priority schemes: if high-priority processes keep arriving, a low-priority one can wait forever. The standard fix is aging: the longer a process waits, the higher its priority climbs, so eventually everyone gets served. Deadlock is a freeze; starvation is being ignored.
+
+Jordan: Let me make sure I have the big picture. Deadlock needs four conditions at once: mutual exclusion, hold and wait, no preemption, and circular wait.
+
+Alex: Got it.
+
+Jordan: The OS can prevent deadlock by ruling out one condition by design, avoid it by running the banker's safety test on every request, or detect it after the fact and recover by aborting or preempting. And the dining philosophers show all of it at one table.
+
+Alex: Perfect summary. Here is your try-this for the week. The next time you are at a four-way stop and every driver is being too polite, watch the pattern. Each driver holds their position and waits for another driver to go: that is hold and wait plus the beginnings of a circular wait, live in front of you. Then notice what breaks it. Someone waves, someone decides, an outside signal resolves it. You are watching deadlock and its resolution in the wild.
+
+Jordan: I will never look at an intersection the same way again.
+
+Alex: Next time, we move from sharing to space itself: memory management. Many programs, one physical memory. How does the operating system decide who lives where, and keep them from trampling each other? We will carve memory into partitions, meet the buddy system, and cut programs into pages and segments. See you there.
