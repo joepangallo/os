@@ -1,0 +1,65 @@
+Alex: Last time we left a table full of hungry philosophers, each holding one fork and waiting forever. That was deadlock: processes frozen because of how they share. Today we move from sharing to space itself. Every running program needs part of main memory, and there is never enough of it. So here is the question for chapter seven: many programs, one physical memory. Who lives where, and how do we keep them from trampling each other?
+
+Jordan: It sounds like being a landlord for programs.
+
+Alex: That is exactly the right image. The operating system is the landlord of main memory, and a good landlord has five jobs. The course lists them as the five requirements of memory management. Want to hear them?
+
+Jordan: Hit me.
+
+Alex: One: relocation. A program should not care where in memory it gets loaded. You should be able to move it around and it still works, because the OS might need to shuffle things. Two: protection. One program must not be able to scribble over another program's memory, or over the operating system itself. Three: sharing. Sometimes programs should share memory on purpose, like common library code, so we do not keep ten copies of the same thing. Four: logical organization. Programs think in modules: code, data, stack. Memory management should respect that structure. Five: physical organization. Underneath it all, memory is just a long row of slots, and somebody has to manage the real estate.
+
+Jordan: So relocation, protection, sharing, logical organization, physical organization. The landlord's job description.
+
+Alex: And the history of how operating systems did this job is a tour of increasingly clever ideas. The earliest approach: partitioning. Carve memory into fixed-size chunks, like cutting a parking lot into marked spaces. Simple, but if your car is small and the space is big, you waste the leftover. That waste has a name: internal fragmentation. The space inside your partition that you cannot use.
+
+Jordan: And if the spaces are all different sizes?
+
+Alex: Then you get the opposite problem. Variable-size partitions fit jobs snugly, but over time memory looks like Swiss cheese: lots of little holes, none big enough for the next job, even though the total free space would be plenty. That is external fragmentation: the free space exists but it is not contiguous.
+
+Jordan: So fixed wastes the inside, variable wastes the gaps between.
+
+Alex: Nicely put. Then comes a clever compromise: the buddy system. Start with one giant block, a power of two in size. When a request comes in, split the block in half, again and again, until you get a piece just big enough. When pieces are freed, buddies — two halves that came from the same parent — merge back together. It is fast and it fights external fragmentation, though you still get some internal waste from rounding up to powers of two.
+
+Jordan: Buddy system. I love that the halves are literally called buddies.
+
+Alex: It gets better. The real breakthrough was to stop requiring a program's memory to be contiguous at all. Cut the program into small fixed-size pieces called pages, typically four kilobytes each, and scatter them across fixed-size frames of physical memory wherever they fit. No hole is ever too small, because every hole is a whole number of frames and each page needs exactly one. External fragmentation: gone.
+
+Jordan: But then how does the program find its own pieces? If my code is scattered everywhere, how do I know where anything is?
+
+Alex: Through a page table. Every process gets its own table that translates page numbers to frame numbers. The program uses logical addresses, thinking its memory starts at zero and runs continuously. The hardware takes the page number, looks it up in the table, and swaps in the real frame number. The offset inside the page stays the same. So logical address, page five, offset two hundred, might really live in frame forty-one, offset two hundred.
+
+Jordan: So the program lives in a beautiful illusion of its own private, continuous memory, and the OS maintains the messy reality underneath.
+
+Alex: That is paging in one sentence, and it is one of the most important ideas in all of operating systems. There is a cousin called segmentation, which cuts the program along logical lines instead: one segment for code, one for data, one for the stack. Each segment gets a base address and a length, and the hardware checks every access against the length, which gives you protection for free. An address becomes a pair: segment number, offset. Later, real systems combined them: segmentation with paging underneath.
+
+Jordan: Okay, but how does a program get into memory in the first place? It starts as a file on disk.
+
+Alex: Great question, and the chapter closes with exactly that: loading and linking. First the loader has to place the program in memory. Absolute loading is the naive way: the program is built for one fixed address, take it or leave it. Relocatable loading is smarter: the program is built starting from zero and the loader adjusts every address as it places it. Dynamic loading at run time goes further: pieces are loaded only when actually called, which saves memory.
+
+Jordan: And linking? That is about combining pieces, right?
+
+Alex: Right. Your program calls library functions, and somebody has to connect those calls to the actual code. Static linking glues everything into one big executable before it ever runs. Simple, but every program carries its own copy of the library. Dynamic linking waits until run time and shares one copy of the library among all programs. That is why your system is not carrying fifty copies of the same print function in memory.
+
+Jordan: I want to go back to variable partitions for a second. When a new job arrives and there are several holes, how does the OS choose?
+
+Alex: That is the placement problem, and the course runs three classic algorithms side by side. First fit: take the first hole that is big enough. It is fast, and it tends to leave the big holes at the end untouched. Best fit: search them all and take the smallest hole that fits, to minimize leftover waste. Sounds smart, but it creates tons of tiny unusable slivers. Next fit: like first fit, but start searching from where you left off last time instead of always from the beginning, which spreads the wear around. None of them is perfect, which is exactly why paging eventually won.
+
+Jordan: Okay, back to paging. I want to make sure I really get the translation. Walk me through an actual address.
+
+Alex: Let us do it. Say pages are four kilobytes, which is two to the twelfth power bytes, so the lowest twelve bits of the address are the offset inside the page. Take logical address twenty thousand, four hundred and sixty. Divide by four thousand ninety-six: that is page four, offset two thousand and seventy-six. The hardware looks up page four in the process's page table and finds, say, frame forty-one. The physical address becomes frame forty-one times four thousand ninety-six, plus two thousand and seventy-six. The offset never changes. Only the page number gets swapped for a frame number.
+
+Jordan: So the low bits ride through untouched, and the high bits get translated. That is elegant.
+
+Alex: And it happens on every single memory access, in hardware, millions of times per second. That is why the translation has to be blindingly fast, which sets up our whole next episode on virtual memory.
+
+Jordan: One more thing on loading. You said dynamic loading only brings in pieces when called. How does the program run if half of it is missing?
+
+Alex: Because the missing half is only missing until it is needed. The loader leaves a placeholder, and the first time the program actually calls that routine, the system fetches it, links it in, and carries on. If a feature is never used, it is never loaded. Big programs with rarely touched corners, like error handlers and help screens, save a lot of memory this way.
+
+Jordan: Let me test myself. Five requirements: relocation, protection, sharing, logical organization, physical organization. Fragmentation comes in two flavors: internal is waste inside your chunk, external is free space chopped into useless holes. Paging kills external fragmentation by cutting programs into fixed-size pages mapped through a page table.
+
+Alex: And the landlord metaphor holds the whole way through. Partitioning is assigned parking spaces. The buddy system is splitting and merging lots. Paging is letting every tenant believe they have the whole building while the landlord quietly manages the real rooms.
+
+Jordan: Here is my try-this, then. Next time your computer feels sluggish with twenty browser tabs open, remember what is happening underneath. The OS is paging, translating thousands of logical addresses through page tables, protecting every process from every other one, sharing library code between all those tabs, and relocating things behind your back. And you never notice any of it. That invisibility is the whole achievement.
+
+Alex: Beautifully said. Next episode, we take paging one step further and unlock the superpower: virtual memory. What if a program could run with only part of itself in memory at all, and the OS just guessed which part you need? We will meet the translation lookaside buffer, play the page replacement game with four classic strategies, and learn why guessing wrong too often brings everything to its knees. That is called thrashing, and it is as dramatic as it sounds.
