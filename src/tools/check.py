@@ -62,6 +62,57 @@ async (maxClicks) => {
 }
 """
 
+# smallest rendered text on screen (SVG text scaled by its drawing, HTML text by the canvas zoom), in screen pixels
+TINY_TEXT_JS = r"""
+(minPx) => {
+  const body = document.querySelector('#canvas .step-body'); if (!body) return [];
+  const sc = Guide.scale || 1, out = [];
+  const seen = (el) => { const cs = getComputedStyle(el); if (cs.display === 'none' || cs.visibility === 'hidden' || +cs.opacity === 0) return false; const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
+  for (const t of body.querySelectorAll('svg text')) {
+    if (!t.textContent.trim() || !seen(t) || t.closest('.flip-face.back')) continue;
+    const m = t.getScreenCTM(); if (!m) continue;
+    const px = parseFloat(getComputedStyle(t).fontSize) * Math.hypot(m.a, m.b);
+    if (px < minPx) out.push([+px.toFixed(1), 'svg "' + t.textContent.trim().slice(0, 30) + '"']);
+  }
+  const walker = document.createTreeWalker(body, NodeFilter.SHOW_TEXT);
+  for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+    const el = n.parentElement; if (!el || !n.textContent.trim() || el.closest('svg') || el.closest('.flip-face.back') || !seen(el)) continue;
+    const px = parseFloat(getComputedStyle(el).fontSize) * sc;
+    if (px < minPx) out.push([+px.toFixed(1), el.tagName.toLowerCase() + ' "' + n.textContent.trim().slice(0, 30) + '"']);
+  }
+  out.sort((a, b) => a[0] - b[0]);
+  return out.slice(0, 6).map(([px, d]) => px + 'px ' + d);
+}
+"""
+
+# boxes whose own text runs past their bottom edge (the geometry checks only compare child ELEMENTS, so a
+# fixed-height box holding plain text that overflows is invisible to them)
+TEXT_SPILL_JS = r"""
+() => {
+  const body = document.querySelector('#canvas .step-body'); if (!body) return [];
+  const out = [], sc = Guide.scale || 1;
+  for (const el of body.querySelectorAll('*')) {
+    if (el.closest('svg') || el.closest('.no-fit-check') || el.closest('.flip')) continue;
+    const cs = getComputedStyle(el);
+    if (cs.display === 'none' || cs.display === 'inline' || cs.display === 'contents' || cs.visibility === 'hidden') continue;
+    if (!/visible/.test(cs.overflowY) || el.clientHeight === 0) continue;
+    const hasText = [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim());
+    if (!hasText) continue;
+    const r = document.createRange(); r.selectNodeContents(el);
+    const rects = [...r.getClientRects()]; if (!rects.length) continue;
+    const bottom = Math.max(...rects.map((x) => x.bottom)), box = el.getBoundingClientRect();
+    const spill = (bottom - box.bottom) / sc;
+    if (spill > 4) out.push(`${el.tagName.toLowerCase()}.${(el.getAttribute('class') || '').split(' ')[0]} "${el.textContent.trim().slice(0, 30)}" [text spills ${Math.round(spill)}px below its box]`);
+    if (out.length >= 6) break;
+  }
+  return out;
+}
+"""
+
+# inside one tab: the same fuzzer, but it leaves the tab buttons alone so the open panel is not replaced mid-walk
+FUZZ_IN_TAB_JS = FUZZ_JS.replace("'button, [role=button], .qopt, [data-click], .clickable, svg [onclick], svg .hot')]", "'button, [role=button], .qopt, [data-click], .clickable, svg [onclick], svg .hot')].filter(el => !el.closest('[role=tablist]'))")
+assert FUZZ_IN_TAB_JS != FUZZ_JS
+
 PLAYER_WALK_JS = r"""
 async () => {
   const sleep = (ms) => new Promise(r => setTimeout(r, ms));
@@ -100,6 +151,9 @@ def main():
     ap.add_argument('--all', action='store_true')
     ap.add_argument('--vp', default='1280x720,390x844')
     ap.add_argument('--fuzz', action='store_true')
+    ap.add_argument('--text-spill', action='store_true', help='also fail boxes whose own text runs past their bottom edge')
+    ap.add_argument('--min-text', type=float, default=0, help='fail a slide whose smallest visible text renders below this many screen pixels (e.g. 9)')
+    ap.add_argument('--tabs', action='store_true', help='with --fuzz: also open every tab of every tab strip, fuzz inside it and check it')
     ap.add_argument('--max-clicks', type=int, default=45)
     ap.add_argument('--no-shots', action='store_true')
     ap.add_argument('--shots', default=str(HERE / 'shots'))
@@ -125,7 +179,7 @@ def main():
                 logs = []
                 page.on('console', lambda m: logs.append((m.type, m.text)))
                 page.on('pageerror', lambda e: logs.append(('pageerror', str(e))))
-                page.add_init_script(f"try{{localStorage.setItem('os-guide-v1', JSON.stringify({{theme:'{theme}'}}))}}catch(e){{}}")
+                page.add_init_script(f"try{{['os-guide-v1','os-guide-ch6-9-v1'].forEach(k => localStorage.setItem(k, JSON.stringify({{theme:'{theme}'}})))}}catch(e){{}}")
                 page.goto(url + '#home')
                 page.wait_for_function('window.Guide && Guide.debug && document.querySelector("#canvas")', timeout=15000)
                 slides = page.evaluate('Guide.debug.slides()')
@@ -142,6 +196,8 @@ def main():
                     page.evaluate('k => Guide.debug.go(k)', s['key'])
                     page.wait_for_timeout(450)
                     m = page.evaluate('Guide.debug.metrics()') or {}
+                    tiny = page.evaluate(TINY_TEXT_JS, a.min_text) if a.min_text else []
+                    spills = page.evaluate(TEXT_SPILL_JS) if a.text_spill else []
                     shot_dir = Path(a.shots) / (s['sec'] or s['key']).replace('/', '_')
                     tag = f"{(s['step'] or 0) + 1:02d}-{w}x{h}{'-dark' if theme == 'dark' else ''}"
                     if not a.no_shots:
@@ -149,6 +205,7 @@ def main():
                         page.screenshot(path=str(shot_dir / f'{tag}.png'))
                     after = None
                     clicks = 0
+                    tab_metrics = []
                     if a.fuzz and s['type'] in ('home', 'chapter'):
                         pass  # these slides only hold navigation buttons
                     elif a.fuzz:
@@ -165,6 +222,25 @@ def main():
                         after['walk'] = walk
                         if not a.no_shots:
                             page.screenshot(path=str(shot_dir / f'{tag}-after.png'))
+                        if a.tabs:
+                            # the plain fuzzer mostly misses controls inside tabs (opening a tab replaces the panel it was
+                            # walking), so open each tab in turn, fuzz inside it, and measure it on its own
+                            counts = page.evaluate("[...document.querySelectorAll('#canvas .step-body [role=tablist]')].map(t => t.querySelectorAll('[role=tab]').length)")
+                            for ti, n in enumerate(counts):
+                                for k in range(n):
+                                    hit = page.evaluate("([ti, k]) => { const t = document.querySelectorAll('#canvas .step-body [role=tablist]')[ti]; const b = t && t.querySelectorAll('[role=tab]')[k]; if (!b) return false; b.click(); return true; }", [ti, k])
+                                    if not hit: continue
+                                    page.wait_for_timeout(200)
+                                    try:
+                                        clicks += page.evaluate(FUZZ_IN_TAB_JS, a.max_clicks)
+                                    except Exception as e:
+                                        logs.append(('fuzzerror', str(e)))
+                                    page.wait_for_timeout(700)
+                                    tab_metrics.append((f' (tab {ti + 1}.{k + 1})', page.evaluate('Guide.debug.metrics()') or {}))
+                                    if a.min_text: tiny += [f'(tab {ti + 1}.{k + 1}) ' + x for x in page.evaluate(TINY_TEXT_JS, a.min_text)]
+                                    if a.text_spill: spills += [f'(tab {ti + 1}.{k + 1}) ' + x for x in page.evaluate(TEXT_SPILL_JS)]
+                                    if not a.no_shots:
+                                        page.screenshot(path=str(shot_dir / f'{tag}-tab{ti + 1}-{k + 1}.png'))
                         # navigate away and back to prove cleanup works (only errors from this count)
                         n_before = len(logs)
                         page.keyboard.press('ArrowRight'); page.wait_for_timeout(120); page.keyboard.press('ArrowLeft'); page.wait_for_timeout(250)
@@ -187,6 +263,9 @@ def main():
                         for o in mm.get('walk', []): issues.append(f'during playback: {o}')
                         if mm.get('docOverflowX'): issues.append(f'page scrolls sideways{label}')
                     over(m, ''); over(after, ' (after clicking)')
+                    if tiny: issues.append('text too small to read: ' + '; '.join(tiny))
+                    for sp in spills: issues.append('text spills: ' + sp)
+                    for lab, mt in tab_metrics: over(mt, lab)
                     issues += [f'ERROR: {e}' for e in errs] + [f"RENDER ERROR: {e['msg'][:300]}" for e in rerr]
                     issues += [f'fit warning: {x}' for x in fit if not any('OVERFLOW' in i for i in issues)]
                     warn = [f'internal scroll: {x}' for x in (m.get('scrollers', []) + ((after or {}).get('scrollers', [])))]

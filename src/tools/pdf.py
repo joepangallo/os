@@ -11,7 +11,7 @@ src = Path(sys.argv[1]).resolve()
 out = Path(sys.argv[2]).resolve()
 FOOT = ('<div style="font:8px -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#69738c;width:100%;'
         'padding:0 0.65in;display:flex;justify-content:space-between">'
-        '<span>Operating Systems · Chapters 1–5 · Study Guide</span>'
+        '<span>Operating Systems · Chapters __RANGE__ · Study Guide</span>'
         '<span><span class="pageNumber"></span> / <span class="totalPages"></span></span></div>')
 
 with sync_playwright() as p:
@@ -24,6 +24,7 @@ with sync_playwright() as p:
     pg.on('pageerror', lambda e: errs.append(str(e)))
     pg.goto(src.as_uri() + '?print')
     pg.wait_for_selector('.print-doc', timeout=20000)
+    FOOT = FOOT.replace('__RANGE__', pg.evaluate("(window.Guide && Guide.book && Guide.book.range) || '1–5'"))
     pg.emulate_media(media='print')
     pg.wait_for_timeout(600)
     pg.pdf(path=str(out), format='Letter', print_background=True, display_header_footer=True,

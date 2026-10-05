@@ -42,6 +42,7 @@
 
   /* chapter colours */
   --ch1: #2563eb; --ch2: #7c3aed; --ch3: #0891b2; --ch4: #db2777; --ch5: #ea580c; /* one color per chapter (1 blue, 2 purple, 3 teal, 4 pink, 5 orange) for chapter tags and headers */
+  --ch6: #dc2626; --ch7: #047857; --ch8: #4f46e5; --ch9: #b45309; /* the second volume's chapter colors (6 red, 7 green, 8 indigo, 9 amber), each dark enough for small white text (at least 4.5 to 1 contrast) */
   --chc: var(--accent); /* --chc: the color of the chapter now on screen; the script swaps it when the chapter changes, starting from the accent */
 
   --r-sm: 8px; --r: 12px; --r-lg: 18px; /* corner rounding sizes: --r (12px) rounds cards and callouts; --r-sm and --r-lg are spare smaller and larger sizes */
@@ -78,6 +79,7 @@ html[data-theme="dark"] { /* dark theme: these values replace the ones above whe
   --hl: #6b5310; /* dark-mode highlighter: a dim gold, because bright yellow would glare on a dark page */
 
   --ch1: #6ea0ff; --ch2: #b69cff; --ch3: #38c7e6; --ch4: #f472b6; --ch5: #fb923c; /* dark-mode chapter colors: lighter versions of the five chapter colors */
+  --ch6: #f87171; --ch7: #34d399; --ch8: #a5b4fc; --ch9: #fbbf24; /* dark-mode versions of the second volume's chapter colors */
 } /* ends the dark-theme values */
 
 *, *::before, *::after { box-sizing: border-box; } /* makes every box's width and height include its padding and border, so sizes add up the way you expect */
@@ -350,6 +352,9 @@ table.tbl.compact th, table.tbl.compact td { padding: 4px 8px; font-size: 14px; 
 .num { font-variant-numeric: tabular-nums; } /* .num: evenly spaced digits so numbers in a column line up */
 .t { border-bottom: 2px dotted color-mix(in srgb, var(--chc) 70%, transparent); cursor: help; font-weight: 600; } /* .t: a key term in the text: dotted underline in the chapter color and a question-mark cursor, hinting it has a definition */
 .t:hover { background: var(--accent-bg); border-radius: 3px; } /* hovering a key term gives it a pale accent background while its definition box is shown */
+.t:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; } /* a key term reached with the keyboard gets a clear ring, so the student can see which word Enter will open */
+.step-title:focus { outline: none; } /* the slide title receives focus after a slide change only to orient keyboard and screen-reader users; it needs no ring */
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; } /* .sr-only: text kept for screen readers but taking up no space on screen (used by the slide announcer) */
 .flash { animation: flash 1s ease; } /* .flash: the script adds this for one second to draw the eye to a value that just changed */
 @keyframes flash { 0% { box-shadow: 0 0 0 0 var(--hl); background-color: var(--hl); } 100% { box-shadow: 0 0 0 10px transparent; } } /* the flash animation: starts with a yellow fill and glow, then the glow spreads out and fades away */
 .pulse { animation: pulse 1.4s ease-in-out infinite; } /* .pulse: makes something gently fade in and out over and over, to show it is waiting or active */
@@ -496,7 +501,7 @@ body.narrow .quiz { height: auto; } /* small screens: the quiz grows with its co
 /* ----------------------------------------------------------- home / chapter / review slides */
 .home-hero h1 { font-size: 40px; margin: 0; letter-spacing: -.025em; line-height: 1.08; } /* .home-hero: the large welcome heading on the home page, tight and bold */
 .home-hero p { margin: 8px 0 0; color: var(--ink-2); font-size: 17px; } /* the short introduction under the welcome heading */
-.chcards { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; } /* .chcards: the five chapter cards on the home page, side by side in equal columns */
+.chcards { display: grid; grid-template-columns: repeat(var(--chn, 5), minmax(0, 1fr)); gap: 12px; } /* .chcards: the chapter cards on the home page, side by side in equal columns (--chn = how many chapters this volume has) */
 .chcard { position: relative; text-align: left; border: 1px solid var(--line); border-radius: 14px; background: var(--panel-2); padding: 12px 14px 12px; cursor: pointer; display: flex; flex-direction: column; gap: 6px; min-height: 0; border-top: 5px solid var(--c); color: var(--ink); } /* .chcard: one chapter card: rounded, clickable, stacked, with a thick top edge in that chapter's color (--c) */
 .chcard:hover { border-color: var(--c); box-shadow: var(--shadow); } /* hovering a chapter card outlines it in the chapter color and lifts it with a shadow */
 .chcard .n { font-size: 12px; font-weight: 900; letter-spacing: .09em; text-transform: uppercase; color: var(--c); } /* .n: the small uppercase "Chapter 3" label at the top of each card, in the chapter color */

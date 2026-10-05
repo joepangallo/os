@@ -64,6 +64,7 @@
 
   /* chapter colours */
   --ch1: #2563eb; --ch2: #7c3aed; --ch3: #0891b2; --ch4: #db2777; --ch5: #ea580c; /* one color per chapter (1 blue, 2 purple, 3 teal, 4 pink, 5 orange) for chapter tags and headers */
+  --ch6: #dc2626; --ch7: #047857; --ch8: #4f46e5; --ch9: #b45309; /* the second volume's chapter colors (6 red, 7 green, 8 indigo, 9 amber), each dark enough for small white text (at least 4.5 to 1 contrast) */
   --chc: var(--accent); /* --chc: the color of the chapter now on screen; the script swaps it when the chapter changes, starting from the accent */
 
   --r-sm: 8px; --r: 12px; --r-lg: 18px; /* corner rounding sizes: --r (12px) rounds cards and callouts; --r-sm and --r-lg are spare smaller and larger sizes */
@@ -100,6 +101,7 @@ html[data-theme="dark"] { /* dark theme: these values replace the ones above whe
   --hl: #6b5310; /* dark-mode highlighter: a dim gold, because bright yellow would glare on a dark page */
 
   --ch1: #6ea0ff; --ch2: #b69cff; --ch3: #38c7e6; --ch4: #f472b6; --ch5: #fb923c; /* dark-mode chapter colors: lighter versions of the five chapter colors */
+  --ch6: #f87171; --ch7: #34d399; --ch8: #a5b4fc; --ch9: #fbbf24; /* dark-mode versions of the second volume's chapter colors */
 } /* ends the dark-theme values */
 
 *, *::before, *::after { box-sizing: border-box; } /* makes every box's width and height include its padding and border, so sizes add up the way you expect */
@@ -372,6 +374,9 @@ table.tbl.compact th, table.tbl.compact td { padding: 4px 8px; font-size: 14px; 
 .num { font-variant-numeric: tabular-nums; } /* .num: evenly spaced digits so numbers in a column line up */
 .t { border-bottom: 2px dotted color-mix(in srgb, var(--chc) 70%, transparent); cursor: help; font-weight: 600; } /* .t: a key term in the text: dotted underline in the chapter color and a question-mark cursor, hinting it has a definition */
 .t:hover { background: var(--accent-bg); border-radius: 3px; } /* hovering a key term gives it a pale accent background while its definition box is shown */
+.t:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; } /* a key term reached with the keyboard gets a clear ring, so the student can see which word Enter will open */
+.step-title:focus { outline: none; } /* the slide title receives focus after a slide change only to orient keyboard and screen-reader users; it needs no ring */
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; } /* .sr-only: text kept for screen readers but taking up no space on screen (used by the slide announcer) */
 .flash { animation: flash 1s ease; } /* .flash: the script adds this for one second to draw the eye to a value that just changed */
 @keyframes flash { 0% { box-shadow: 0 0 0 0 var(--hl); background-color: var(--hl); } 100% { box-shadow: 0 0 0 10px transparent; } } /* the flash animation: starts with a yellow fill and glow, then the glow spreads out and fades away */
 .pulse { animation: pulse 1.4s ease-in-out infinite; } /* .pulse: makes something gently fade in and out over and over, to show it is waiting or active */
@@ -518,7 +523,7 @@ body.narrow .quiz { height: auto; } /* small screens: the quiz grows with its co
 /* ----------------------------------------------------------- home / chapter / review slides */
 .home-hero h1 { font-size: 40px; margin: 0; letter-spacing: -.025em; line-height: 1.08; } /* .home-hero: the large welcome heading on the home page, tight and bold */
 .home-hero p { margin: 8px 0 0; color: var(--ink-2); font-size: 17px; } /* the short introduction under the welcome heading */
-.chcards { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; } /* .chcards: the five chapter cards on the home page, side by side in equal columns */
+.chcards { display: grid; grid-template-columns: repeat(var(--chn, 5), minmax(0, 1fr)); gap: 12px; } /* .chcards: the chapter cards on the home page, side by side in equal columns (--chn = how many chapters this volume has) */
 .chcard { position: relative; text-align: left; border: 1px solid var(--line); border-radius: 14px; background: var(--panel-2); padding: 12px 14px 12px; cursor: pointer; display: flex; flex-direction: column; gap: 6px; min-height: 0; border-top: 5px solid var(--c); color: var(--ink); } /* .chcard: one chapter card: rounded, clickable, stacked, with a thick top edge in that chapter's color (--c) */
 .chcard:hover { border-color: var(--c); box-shadow: var(--shadow); } /* hovering a chapter card outlines it in the chapter color and lifts it with a shadow */
 .chcard .n { font-size: 12px; font-weight: 900; letter-spacing: .09em; text-transform: uppercase; color: var(--c); } /* .n: the small uppercase "Chapter 3" label at the top of each card, in the chapter color */
@@ -647,8 +652,9 @@ body.narrow .route-bottom { display: none; } /* small screens: hide the second c
   'use strict';  // strict mode: the browser reports common mistakes as errors instead of silently ignoring them
 
   const CANVAS_W = 1200, CANVAS_H = 640, BODY_W = 1152, BODY_H = 540;  // fixed design size: every slide is laid out on a 1200 x 640 canvas with a 1152 x 540 content area, then scaled to fit
-  const STORE_KEY = 'os-guide-v1';  // the name under which saved progress is kept in localStorage (the browser's small per-site storage)
-  const Guide = (window.Guide = { chapters: [], sections: {}, scale: 1, narrow: false, CANVAS_W, CANVAS_H, BODY_W, BODY_H });  // creates the global Guide object that every section talks to: chapter list, section table, zoom, phone-width flag, sizes
+  const BOOK = Object.assign({ id: '1-5', range: '1–5', storeKey: 'os-guide-v1', countWord: 'five', subtitle: 'Chapters 1–5: from the hardware up to concurrency', prior: '' }, (typeof window !== 'undefined' && window.GuideBook) || {});  // BOOK: which volume this page is (chapters 1-5 unless the build set window.GuideBook first); it supplies the page wording and the storage name
+  const STORE_KEY = BOOK.storeKey;  // the name under which saved progress is kept in localStorage (the browser's small per-site storage); each volume has its own, so their progress never mixes
+  const Guide = (window.Guide = { chapters: [], sections: {}, scale: 1, narrow: false, book: BOOK, CANVAS_W, CANVAS_H, BODY_W, BODY_H });  // creates the global Guide object that every section talks to: chapter list, section table, zoom, phone-width flag, sizes
   const renderErrors = [];  // renderErrors: every step that crashed while drawing is recorded here so the automated checker can report it
   const registerErrors = [];  // registerErrors: problems found when chapters and sections sign up; printed to the console at start-up
 
@@ -854,6 +860,8 @@ body.narrow .route-bottom { display: none; } /* small screens: hide the second c
     if (sec.css) injectCSS(sec.css, 'css-' + sec.id.replace('.', '-'));  // adds the section's own styles under an id like css-3-2
     Guide.sections[sec.id] = sec;  // files the section in Guide.sections under its id, where buildSlides will find it
   };  // ends Guide.section
+  const lab = (x) => (x && x.label) || (x && x.id) || '';  // lab(section): the number shown for a section, normally its id ("7.2"); an appendix may carry its own label instead ("7A")
+  const labOf = (id) => lab(Guide.sections[id]) || id;  // labOf(id): the shown number for a section id, or the id itself when that section is not on this page
 
   /* ------------------------------------------------------------ glossary */
   const gloss = []; // {term, def, src}
@@ -896,6 +904,10 @@ body.narrow .route-bottom { display: none; } /* small screens: hide the second c
   Guide.glossary = gloss;  // exposed so sections and tests can read the full glossary list
   const extraTerms = [];  // extraTerms: terms from sections left out of a partial build, so their dotted words still show a definition
   Guide.extraTerms = (list) => { (list || []).forEach((x) => extraTerms.push(x)); };  // Guide.extraTerms(list): used by the build to add those terms, each as [term, definition, section id]
+  const priorTerms = [];  // priorTerms: terms taught in an earlier volume of the guide (chapters 1-5 for this page), so words like semaphore still show a definition here
+  Guide.priorTerms = (list) => { (list || []).forEach((x) => priorTerms.push(x)); };  // Guide.priorTerms(list): used by the build to add them, each as [term, definition, where it was taught in the earlier volume]
+  const isPrior = (src) => String(src).startsWith('prior:');  // isPrior(src): true for a term that was taught in the earlier volume rather than on this page
+  const priorWhere = (src) => { const w = String(src).slice(6); return (w.startsWith('ch') ? 'the Chapter ' + w.slice(2) + ' overview' : '§' + w) + ' of the Chapters ' + BOOK.prior + ' guide'; };  // priorWhere(src): says where an earlier-volume term was taught, for example "§5.4 of the Chapters 1–5 guide"
   function buildGlossary() {  // buildGlossary(): collects every term from sections and chapters into the glossary, run once at start-up
     const eachTerm = (arr, src) => (arr || []).forEach((t) => {  // eachTerm(arr, src): adds a list of terms from one place; each term may be [term, def] or { term, def }
       const [a, b] = Array.isArray(t) ? t : [t && t.term, t && t.def];  // unpacks the term and definition from either shape
@@ -907,7 +919,8 @@ body.narrow .route-bottom { display: none; } /* small screens: hide the second c
     sortedChapters().forEach((c) => sectionsOf(c.num).forEach((sec) => eachTerm(sec.terms, sec.id)));  // first pass: the sections of each chapter, in chapter and section order, so earlier sections define terms first
     Object.values(Guide.sections).forEach((sec) => eachTerm(sec.terms, sec.id));  // second pass: any section not reached above (for example one whose chapter was never registered)
     extraTerms.forEach((x) => addTerm(x[0], x[1], x[2]));   // other sections' terms (partial dev builds only)
-    sortedChapters().forEach((c) => eachTerm(c.terms, 'ch' + c.num));  // last: chapter-level terms, which only fill gaps the sections left
+    sortedChapters().forEach((c) => eachTerm(c.terms, 'ch' + c.num));  // then chapter-level terms, which only fill gaps the sections left
+    priorTerms.forEach((x) => addTerm(x[0], x[1], 'prior:' + x[2]));  // last: terms from the earlier volume, which only fill gaps this volume left (its own wording always wins)
     gloss.sort((a, b) => normTerm(a.term).localeCompare(normTerm(b.term)));  // sorts the glossary alphabetically by its tidied term for the Glossary panel
   }  // ends buildGlossary
 
@@ -994,14 +1007,15 @@ body.narrow .route-bottom { display: none; } /* small screens: hide the second c
     els.notes = h('aside', { class: 'drawer right', 'aria-label': 'Section notes' },  // notes panel: also slides in from the right side
       h('div', { class: 'dr-head' }, els.notesTitle, iconBtn('close', 'Close', closeAll)), els.notesBody);  // panel header with the notes title and a close button, then the notes themselves
     els.modal = h('div', { class: 'modal', onclick: (e) => { if (e.target === els.modal) closeAll(); } });  // help window background: a click on the dark area outside the card (not on the card itself) closes it
-    els.pop = h('div', { class: 'term-pop', role: 'tooltip' });  // term pop-up: the small box that shows a definition when a dotted word is hovered or tapped
+    els.pop = h('div', { class: 'term-pop', role: 'tooltip', id: 'term-pop' });  // term pop-up: the small box that shows a definition when a dotted word is hovered, tapped or opened from the keyboard; the id lets the word point screen readers at it
+    els.live = h('div', { class: 'sr-only', 'aria-live': 'polite', 'aria-atomic': 'true' });  // live: an invisible announcer; screen readers read out whatever is written into it, used to name the new slide when keyboard focus stays on a bar button
     els.toast = h('div', { class: 'toast', role: 'status' });  // toast: a short message that appears for about two seconds (role status makes screen readers announce it)
     const markers = frag(`<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>${  // markers: an invisible SVG holding arrowheads that diagrams attach to the ends of lines
       ['', 'cpu', 'mem', 'io', 'os', 'proc', 'thread', 'intr', 'ok', 'bad', 'warn', 'accent', 'muted'].map((c) => {  // one arrowhead per colour name: the default, the parts of the colour legend, and the ok/bad/warn/accent/muted tones
         const col = c === '' ? 'var(--ink-2)' : c === 'muted' ? 'var(--line-2)' : `var(--${c})`;  // the fill colour: dark ink for the default, a pale line colour for muted, otherwise the colour variable of that name
         return `<marker id="arr${c ? '-' + c : ''}" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:${col}"/></marker>`;  // one arrowhead (id arr or arr-cpu, arr-mem...): a small triangle that turns to follow the line it ends
       }).join('')}</defs></svg>`);  // joins all arrowheads into one string and closes the hidden SVG
-    document.body.append(markers, app, els.scrim, els.toc, els.gloss, els.notes, els.modal, els.pop, els.toast);  // puts everything on the page: the arrowheads, the app, the backdrop, the three panels, the help window and the two pop-ups
+    document.body.append(markers, app, els.scrim, els.toc, els.gloss, els.notes, els.modal, els.pop, els.toast, els.live);  // puts everything on the page: the arrowheads, the app, the backdrop, the three panels, the help window and the two pop-ups
   }  // ends buildFrame
 
   /* ------------------------------------------------------------ chrome */
@@ -1011,7 +1025,7 @@ body.narrow .route-bottom { display: none; } /* small screens: hide the second c
   function slideChapter(sl) { return sl && sl.ch ? sl.ch.num : 0; }  // slideChapter(sl): the chapter number of a slide, or 0 for home and the final challenge
   function slideLabel(sl) {  // slideLabel(sl): the short name of a slide used in the breadcrumb and the Back/Next buttons
     if (!sl) return '';  // no slide, no label
-    if (sl.type === 'step') return sl.sec.pseudo ? sl.sec.title : sl.sec.id + ' ' + sl.sec.title;  // a step is named after its section, like "3.2 Process States"; chapter intro steps use the chapter title
+    if (sl.type === 'step') return sl.sec.pseudo ? sl.sec.title : lab(sl.sec) + ' ' + sl.sec.title;  // a step is named after its section, like "3.2 Process States"; chapter intro steps use the chapter title
     return sl.title;  // other slides use their own title
   }  // ends slideLabel
   function updateChrome() {  // updateChrome(): refreshes everything around the slide (breadcrumb, chapter buttons, dots, Back/Next) after each move
@@ -1019,7 +1033,7 @@ body.narrow .route-bottom { display: none; } /* small screens: hide the second c
     const n = slideChapter(sl);  // n is its chapter number (0 outside chapters)
     setChapterColor(n);  // colours the page for that chapter
     // crumb
-    if (sl.type === 'home') els.crumb.innerHTML = '<b>Chapters 1–5</b> · interactive guide';  // on the home page the breadcrumb just names the guide
+    if (sl.type === 'home') els.crumb.innerHTML = `<b>Chapters ${esc(BOOK.range)}</b> · interactive guide`;  // on the home page the breadcrumb just names the guide
     else if (sl.type === 'step') els.crumb.innerHTML = `Chapter ${n} › <b>${esc(slideLabel(sl))}</b> › ${esc(sl.step.title)}`;  // on a step: chapter, section name in bold, then step title; esc keeps any special characters as plain text
     else els.crumb.innerHTML = (n ? `Chapter ${n} › ` : '') + `<b>${esc(sl.title)}</b>`;  // on other slides: the chapter (when there is one) and the slide title in bold
     // chapter buttons
@@ -1036,7 +1050,7 @@ body.narrow .route-bottom { display: none; } /* small screens: hide the second c
         const skip = coreRoute() && !isCore(slides[slideIndex(key)]);  // true when the core path is on and this step is not part of it, so its dot is shown faded
         els.dots.append(h('button', { class: 'bb-dot' + (i === sl.i ? ' on' : '') + (store.data.visited[key] ? ' seen' : '') + (skip ? ' skip' : ''), title: `${i + 1}. ${st.title}${skip ? ' (not on the core path)' : ''}`, 'aria-label': `Step ${i + 1}: ${st.title}`, onclick: () => go(slideIndex(key)) }));  // one dot: lit for the current step, filled once visited, faded if off the core path; hovering names the step, a click jumps there
       });  // ends the loop over steps
-      els.count.textContent = `${sl.sec.pseudo ? 'Ch ' + n : sl.sec.id} · step ${sl.i + 1} of ${steps.length}${coreRoute() ? ' · core path' : ''}`;  // counter under the dots, e.g. "3.2 · step 4 of 9" (chapter intro steps say "Ch 3"), plus a note when on the core path
+      els.count.textContent = `${sl.sec.pseudo ? 'Ch ' + n : lab(sl.sec)} · step ${sl.i + 1} of ${steps.length}${coreRoute() ? ' · core path' : ''}`;  // counter under the dots, e.g. "3.2 · step 4 of 9" (chapter intro steps say "Ch 3"), plus a note when on the core path
     } else els.count.textContent = `${cur + 1} / ${slides.length}`;  // on non-step slides the counter shows the slide's position in the whole guide instead, e.g. "12 / 240"
     // prev / next
     const p = cur > 0 ? slides[neighbor(-1)] : null, nx = cur < slides.length - 1 ? slides[neighbor(1)] : null;  // p and nx: the slides Back and Next would open (skipping off-path steps on the core path); null at either end
@@ -1054,14 +1068,17 @@ body.narrow .route-bottom { display: none; } /* small screens: hide the second c
   }  // ends updateChrome
 
   /* ------------------------------------------------------------ navigation */
+  let keep = { key: null, data: null };  // keep: a small store a step can fill with its own state (an edited workload, a chosen tab) so it survives a redraw caused by crossing the phone-width breakpoint
   function go(idx, opt = {}) {  // go(idx, opt): the one function that changes the slide; everything else (buttons, keys, links) calls it
     if (!slides.length) return;  // does nothing before the slide list exists
     idx = clamp(idx | 0, 0, slides.length - 1);  // turns idx into a whole number and keeps it inside the list
+    const first = cur < 0, before = document.activeElement;  // first: true for the very first slide shown; before: whatever had keyboard focus, checked again once the new slide is drawn
     if (curCtx) { curCtx._destroy(); curCtx = null; }  // tells the old slide to stop its timers, animations and listeners before it is removed
     hideTerm();  // hides any open definition pop-up
     if (els.toast) { clearTimeout(toast.t); els.toast.classList.remove('on'); }  // hides any toast message that belongs to the old slide
     cur = idx;  // records the new position
     const sl = slides[cur];  // sl is the slide about to be shown
+    if (!(opt.relayout && keep.key === sl.key)) keep = { key: sl.key, data: Object.create(null) };  // every normal visit starts with an empty keep store; only a redraw of the same slide for a new layout hands back the old one
     try { history.replaceState(null, '', '#' + sl.key); } catch (e) { /* file:// sandbox */ }
     // remember the last LEARNING page (never home/overview), overall and per chapter, so Continue can resume it
     if (LEARN[sl.type]) {  // only learning slides (steps, key terms, challenges) count as places to come back to
@@ -1072,6 +1089,12 @@ body.narrow .route-bottom { display: none; } /* small screens: hide the second c
     store.save();  // saves progress to the browser (the save waits a moment so rapid clicks cause one write)
     renderSlide(sl);  // draws the new slide into the canvas
     updateChrome();  // refreshes the bars and buttons around it
+    if (!first) {  // after the first slide, keep keyboard and screen-reader users oriented
+      const lost = !before || before === document.body || !before.isConnected;  // lost: focus was on nothing, or on part of the old slide that has just been removed
+      const head = els.canvas.querySelector('.step-title');  // head: the new slide's title
+      if (lost && head) head.focus({ preventScroll: true });  // moves focus to the new title, so the next Tab starts at the top of the new content and screen readers read the heading
+      else if (!opt.relayout) els.live.textContent = slideLabel(sl) + (sl.type === 'step' ? `, step ${sl.i + 1} of ${sl.sec.steps.length}: ${sl.step.title}` : '');  // focus stayed put (on a bar button, say): the announcer names the new slide instead
+    }  // ends the orientation step
     if (!opt.keepFocus) els.stage.scrollTop = 0;  // scrolls the stage back to the top, unless the caller asked to keep the current scroll (used when redrawing in place)
   }  // ends go
   const LEARN = { step: 1, terms: 1, chquiz: 1, final: 1 };  // LEARN: the slide types that count as learning pages for Continue; home and chapter overviews are left out
@@ -1129,7 +1152,7 @@ body.narrow .route-bottom { display: none; } /* small screens: hide the second c
       if (fit() && cur >= 0) {  // if the layout switched between desktop and phone-width, some slides must be redrawn
         const sl = slides[cur];  // sl is the slide on screen
         const layoutAware = sl.type === 'home' || sl.type === 'chapter' || (sl.type === 'step' && (sl.sec.layoutAware || (sl.sec.pseudo && sl.ch && sl.ch.layoutAware) || /narrow/.test(String(sl.step.render || '') + String(sl.step.html || ''))));  // redraw needed: home, overviews, sections marked layout-aware by the build, or steps whose code reads the phone-width flag
-        if (layoutAware) go(cur, { keepFocus: true }); // quizzes restore from saved state; other slides just reflow with CSS
+        if (layoutAware) go(cur, { keepFocus: true, relayout: true }); // quizzes restore from saved state, steps can restore from ctx.keep; other slides just reflow with CSS
       } else checkOverflow();  // no layout switch: just re-checks whether the content still fits
     }, 60);  // ends the 60 ms wait
   }  // ends onResize
@@ -1150,6 +1173,7 @@ body.narrow .route-bottom { display: none; } /* small screens: hide the second c
     const cleanups = [];  // cleanups: functions to run when the student leaves the slide (stop timers, remove listeners...)
     const ctx = {  // the ctx object itself
       el: body, slide: sl, sec: sl.sec, step: sl.step, narrow: Guide.narrow, alive: true,  // the step's body box, slide, section and step, the phone-width layout flag, and alive, which turns false once the slide is left
+      keep: keep.data,  // ctx.keep: the slide's keep store (see go); empty on a normal visit, carried over when the slide is redrawn for a phone-width or desktop layout
       h, s, frag, esc, util: Guide.util, ICON,  // the element builders and helpers, so section code can write ctx.h(...) without reaching for Guide
       $: (sel) => body.querySelector(sel),  // ctx.$(sel): the first element inside this step that matches a CSS selector
       $$: (sel) => Array.from(body.querySelectorAll(sel)),  // ctx.$$(sel): every matching element inside this step, as a real list
@@ -1182,21 +1206,21 @@ body.narrow .route-bottom { display: none; } /* small screens: hide the second c
     c.innerHTML = '';  // empties the canvas
     const body = h('div', { class: 'step-body' });  // the content area, a fixed 1152 x 540 box on desktop screens
     const eyebrow = h('div', { class: 'step-eyebrow' });  // the small line above the title: section number, section name and the kind of step
-    const title = h('h2', { class: 'step-title' });  // the slide title
+    const title = h('h2', { class: 'step-title', tabindex: '-1' });  // the slide title; tabindex -1 lets the guide move focus to it after a slide change without adding it to the Tab order
     c.append(h('header', { class: 'step-head' }, eyebrow, title), body);  // puts the heading (small line plus title) and the content area into the canvas
     const ctx = makeCtx(body, sl);  // builds the toolbox for this slide
     curCtx = ctx;  // remembers it so go() can shut it down when the student moves on
     try {  // anything that goes wrong while drawing is caught below, so one broken step does not break the whole guide
-      if (sl.type === 'home') { eyebrow.innerHTML = '<span class="kind">Welcome</span>'; title.textContent = 'Operating Systems · Chapters 1\u2060–\u20605'; renderHome(body, ctx); }  // home page: a Welcome label, the guide title (invisible word joiners keep "1-5" on one line) and the home content
+      if (sl.type === 'home') { eyebrow.innerHTML = '<span class="kind">Welcome</span>'; title.textContent = 'Operating Systems · Chapters ' + BOOK.range.replace('–', '\u2060–\u2060'); renderHome(body, ctx); }  // home page: a Welcome label, the guide title (invisible word joiners keep a range such as "1-5" on one line) and the home content
       else if (sl.type === 'chapter') { eyebrow.innerHTML = `<span class="sid">Chapter ${sl.ch.num}</span><span class="kind">${KIND.intro}</span>`; title.textContent = `Chapter ${sl.ch.num}: ${sl.ch.title}`; renderChapter(body, ctx, sl.ch); }  // chapter overview: chapter number and "Chapter Overview" label, the chapter title, then the overview content
       else if (sl.type === 'terms') { eyebrow.innerHTML = `<span class="sid">Chapter ${sl.ch.num}</span><span class="kind">${KIND.terms}</span>`; title.textContent = 'Key terms: flip, recall, repeat'; renderTerms(body, ctx, sl.ch); }  // key-term flashcards for a chapter
       else if (sl.type === 'chquiz') { eyebrow.innerHTML = `<span class="sid">Chapter ${sl.ch.num}</span><span class="kind">${KIND.review}</span>`; title.textContent = `Chapter ${sl.ch.num} challenge: mixed questions from every section`; renderChQuiz(body, ctx, sl.ch); }  // chapter challenge quiz, mixing questions from every section of the chapter
-      else if (sl.type === 'final') { eyebrow.innerHTML = `<span class="kind">${KIND.final}</span>`; title.textContent = 'Final challenge: all five chapters'; renderFinal(body, ctx); }  // final challenge quiz across all five chapters
+      else if (sl.type === 'final') { eyebrow.innerHTML = `<span class="kind">${KIND.final}</span>`; title.textContent = `Final challenge: all ${BOOK.countWord} chapters`; renderFinal(body, ctx); }  // final challenge quiz across every chapter of this volume
       else if (sl.type === 'step') {  // an ordinary step of a section (or a chapter intro step)
         const sec = sl.sec, st = sl.step;  // sec and st: the section and the step being shown
         c.className = 'sec-' + String(sec.id).replace('.', '-');  // gives the canvas a class like sec-3-2, so a section's own styles can target only its slides
         c.dataset.sec = sec.id;  // and a data-sec attribute holding the plain id
-        eyebrow.innerHTML = `<span class="sid">${esc(sec.pseudo ? 'Chapter ' + sec.chapter : sec.id)}</span><span>${esc(sec.pseudo ? 'Overview' : sec.title)}</span><span>·</span><span class="kind">${esc(KIND[st.kind] || st.kind || 'Learn')}</span>`;  // small line: section id and name (or chapter and "Overview"), a dot, then the step kind label from KIND
+        eyebrow.innerHTML = `<span class="sid">${esc(sec.pseudo ? 'Chapter ' + sec.chapter : lab(sec))}</span><span>${esc(sec.pseudo ? 'Overview' : sec.title)}</span><span>·</span><span class="kind">${esc(KIND[st.kind] || st.kind || 'Learn')}</span>`;  // small line: section id and name (or chapter and "Overview"), a dot, then the step kind label from KIND
         title.textContent = st.title;  // the step's title
         if (st.html) body.append(frag(typeof st.html === 'function' ? st.html(ctx) : st.html));  // fixed content: the step's html (text or a function that returns text) is turned into elements and added
         if (st.quiz) body.append(quiz(ctx, st.quiz, { key: sl.key, source: null }));  // quiz content: builds a quiz from the step's questions; the slide key keeps its saved answers apart from other quizzes
@@ -1264,23 +1288,23 @@ body.narrow .route-bottom { display: none; } /* small screens: hide the second c
     const wrap = h('div', { class: 'stack fill', style: { gap: '14px' } });  // wrap: a column holding everything on the home page, 14 pixels apart
     wrap.append(h('div', { class: 'row nw home-top', style: { justifyContent: 'space-between', alignItems: 'flex-end', gap: '24px' } },  // the top row: welcome text on the left, the Continue button and progress on the right
       h('div', { class: 'home-hero' },  // welcome block (hero)
-        h('div', { class: 'row gap-s' }, h('span', { class: 'chip accent' }, `5 chapters · ${secCount} sections`), h('span', { class: 'chip' }, 'explain → explore → check')),  // two badges: the chapter and section counts, and the explain, explore, check pattern every section follows
+        h('div', { class: 'row gap-s' }, h('span', { class: 'chip accent' }, `${sortedChapters().length} chapters · ${secCount} sections`), h('span', { class: 'chip' }, 'explain → explore → check')),  // two badges: the chapter and section counts, and the explain, explore, check pattern every section follows
         h('h1', { style: { marginTop: '6px' } }, 'See how an operating system really works.'),  // the big headline
-        h('p', {}, 'An interactive companion to Chapters 1–5 of ', h('i', {}, 'Operating Systems: Internals and Design Principles'), '. Every section explains one idea in plain language, lets you run it yourself, then checks your understanding.')),  // intro paragraph: names the course reading this guide accompanies (title in italics) and how each section works
+        h('p', {}, `An interactive companion to Chapters ${BOOK.range} of `, h('i', {}, 'Operating Systems: Internals and Design Principles'), '. Every section explains one idea in plain language, lets you run it yourself, then checks your understanding.')),  // intro paragraph: names the course reading this guide accompanies (title in italics) and how each section works
       h('div', { class: 'stack home-go', style: { alignItems: 'flex-end', gap: '8px', flex: 'none' } },  // the right-hand column of the top row
-        resumeSl ? h('button', { class: 'btn primary lg', onclick: () => go(resume) }, lastIdx > 0 ? `Continue: ${slideLabel(resumeSl)}` : 'Start with Chapter 1', h('span', { html: ICON.right, style: { width: '18px', display: 'inline-flex' } })) : null,  // main button: "Continue: <where you left off>" for a returning student, "Start with Chapter 1" for a new one
+        resumeSl ? h('button', { class: 'btn primary lg', onclick: () => go(resume) }, lastIdx > 0 ? `Continue: ${slideLabel(resumeSl)}` : `Start with Chapter ${(sortedChapters()[0] || { num: 1 }).num}`, h('span', { html: ICON.right, style: { width: '18px', display: 'inline-flex' } })) : null,  // main button: "Continue: <where you left off>" for a returning student, "Start with Chapter N" (this volume's first chapter) for a new one
         h('div', { class: 'small muted' }, coreRoute()  // progress line under the button; its wording depends on the chosen route
           ? `Core path: ${Math.round(routeDone * 100)}% done · all steps: ${Math.round(overall * 100)}%`  // on the core path: percent of core steps done, plus percent of all steps
           : `Your progress: ${Math.round(overall * 100)}% of steps visited`),  // on the full course: percent of all steps visited
         h('div', { class: 'route-top' }, routeSeg()))));  // a copy of the route switch that the stylesheet shows only on phone-width screens; closes the right column and top row
-    const cards = h('div', { class: 'chcards' });  // cards: the grid of chapter cards
+    const cards = h('div', { class: 'chcards', style: { '--chn': String(Math.max(1, sortedChapters().length)) } });  // cards: the grid of chapter cards; --chn tells the style sheet how many columns (one per chapter in this volume)
     for (const c of sortedChapters()) {  // one card per chapter
       const secs = sectionsOf(c.num);  // the chapter's sections, listed on its card
       const pct = progressOfChapter(c.num);  // the chapter's progress on the chosen route
       cards.append(h('button', { class: 'chcard', style: { '--c': `var(--ch${c.num})` }, onclick: () => go(slideIndex('ch' + c.num)) },  // the card is one big button in the chapter's colour that opens the chapter overview
         h('div', { class: 'n' }, 'Chapter ' + c.num),  // small "Chapter 3" line at the top of the card
         h('div', { class: 'tt' }, c.title),  // the chapter title
-        h('ul', {}, secs.map((x) => h('li', { style: { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } }, `${x.id} ${x.short || x.title}`))),  // the list of sections, each cut short with "..." if too long for one line (a short title is used when given)
+        h('ul', {}, secs.map((x) => h('li', { style: { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } }, `${lab(x)} ${x.short || x.title}`))),  // the list of sections, each cut short with "..." if too long for one line (a short title is used when given)
         h('div', { style: { marginTop: 'auto' } }, h('div', { class: 'meter' }, h('i', { style: { width: pct * 100 + '%' } })),  // a progress meter pushed to the bottom of the card, filled to the chapter's progress
           h('div', { class: 'xs muted', style: { marginTop: '3px' } }, `${Math.round(pct * 100)}% ${coreRoute() ? 'of core path' : 'visited'}`, (() => { const m = chapterMastery(c.num); return m ? ` · quizzes ${m.tried}/${m.of}, ${Math.round(m.pct * 100)}% right` : ''; })()))));  // progress in words, plus the chapter's quiz results when any quizzes were tried; closes the card
     }  // ends the loop over chapters
@@ -1322,9 +1346,9 @@ body.narrow .route-bottom { display: none; } /* small screens: hide the second c
     const right = h('div', { class: 'stack', style: { gap: '10px' } },  // the right column
       h('h4', {}, `${secs.length} sections in this chapter`),  // heading with the number of sections
       h('div', { class: 'chmap' }, secs.map((x) => h('button', { onclick: () => go(slideIndex(x.id + '/1')) },  // the section map: one button per section that opens its first step
-        h('b', {}, `${x.id} ${x.title}`), h('span', { class: 'muted' }, x.summary || ''), secDone(x) ? h('span', { class: 'chip ok', style: { marginLeft: '6px', lineHeight: '1.3' } }, 'done') : null, masteryChip(secMastery(x))))),  // each shows the id and title, a one-line summary, a "done" tag if every step was visited, and the quiz score tag
+        h('b', {}, `${lab(x)} ${x.title}`), h('span', { class: 'muted' }, x.summary || ''), secDone(x) ? h('span', { class: 'chip ok', style: { marginLeft: '6px', lineHeight: '1.3' } }, 'done') : null, masteryChip(secMastery(x))))),  // each shows the id and title, a one-line summary, a "done" tag if every step was visited, and the quiz score tag
       h('div', { class: 'row', style: { marginTop: 'auto' } },  // a row of buttons pushed to the bottom of the column
-        resumeKey ? h('button', { class: 'btn primary', title: resumeSl && lastKey ? 'Resume at ' + slideLabel(resumeSl) + (resumeSl.step ? ': ' + resumeSl.step.title : '') : '', onclick: () => go(slideIndex(resumeKey)) }, lastKey ? `Continue at ${resumeSl && resumeSl.sec && !resumeSl.sec.pseudo ? resumeSl.sec.id : 'the overview'}` : 'Start chapter', h('span', { html: ICON.right, style: { width: '18px', display: 'inline-flex' } })) : null,  // Continue (to the last place, naming the section) or Start chapter; hovering shows the exact step
+        resumeKey ? h('button', { class: 'btn primary', title: resumeSl && lastKey ? 'Resume at ' + slideLabel(resumeSl) + (resumeSl.step ? ': ' + resumeSl.step.title : '') : '', onclick: () => go(slideIndex(resumeKey)) }, lastKey ? `Continue at ${resumeSl && resumeSl.sec && !resumeSl.sec.pseudo ? lab(resumeSl.sec) : 'the overview'}` : 'Start chapter', h('span', { html: ICON.right, style: { width: '18px', display: 'inline-flex' } })) : null,  // Continue (to the last place, naming the section) or Start chapter; hovering shows the exact step
         h('button', { class: 'btn', onclick: () => go(slideIndex('ch' + ch.num + '-terms')) }, 'Key terms'),  // button to the chapter's key-term flashcards
         h('button', { class: 'btn', onclick: () => go(slideIndex('ch' + ch.num + '-quiz')) }, 'Chapter challenge'),  // button to the chapter challenge quiz
         h('div', { class: 'grow', style: { minWidth: '120px' } }, h('div', { class: 'meter' }, h('i', { style: { width: pct * 100 + '%' } })), h('div', { class: 'xs muted' }, `${Math.round(pct * 100)}% visited`))));  // a progress meter with the visited percentage beneath it
@@ -1363,7 +1387,7 @@ body.narrow .route-bottom { display: none; } /* small screens: hide the second c
       front.innerHTML = esc(g.term);  // the term on the front, as plain text
       back.innerHTML = esc(g.def);  // the definition on the back, as plain text
       counter.textContent = `Card ${i + 1} of ${deck.length}`;  // updates the card counter
-      src.innerHTML = g.src.startsWith('ch') ? 'From the chapter overview' : `From section ${g.src} ${esc((Guide.sections[g.src] || {}).title || '')}`;  // names the source: the chapter overview, or the section id and title
+      src.innerHTML = g.src.startsWith('ch') ? 'From the chapter overview' : `From section ${esc(labOf(g.src))} ${esc((Guide.sections[g.src] || {}).title || '')}`;  // names the source: the chapter overview, or the section id and title
       list.innerHTML = '';  // clears the term list before rebuilding it
       deck.forEach((d, j) => list.append(h('button', {  // one button per term in the list
         class: 'btn sm ' + (j === i ? 'on' : 'ghost'), style: { justifyContent: 'flex-start', height: 'auto', minHeight: '28px', whiteSpace: 'normal', textAlign: 'left', padding: '3px 8px' },  // the current card is highlighted; others are plain, left-aligned buttons that may wrap onto two lines
@@ -1440,7 +1464,7 @@ body.narrow .route-bottom { display: none; } /* small screens: hide the second c
     sampledQuiz(body, ctx, sectionsOf(ch.num), 12, 'ch' + ch.num + '-quiz', `Twelve questions drawn from every section of Chapter ${ch.num}. The <b>§</b> tag shows which section to revisit if you miss one.`);  // twelve questions from every section of the chapter, saved under a key like ch3-quiz, with a short explanation
   }  // ends renderChQuiz
   function renderFinal(body, ctx) {  // renderFinal(body, ctx): the final challenge page
-    sampledQuiz(body, ctx, Object.values(Guide.sections), 20, 'final', 'Twenty questions drawn from all five chapters. Try to beat your best score, then draw a new set.');  // twenty questions from every section of every chapter, saved under the key final
+    sampledQuiz(body, ctx, Object.values(Guide.sections), 20, 'final', `Twenty questions drawn from all ${BOOK.countWord} chapters. Try to beat your best score, then draw a new set.`);  // twenty questions from every section of every chapter, saved under the key final
   }  // ends renderFinal
 
   /* =================================================================== UI components */
@@ -1529,9 +1553,11 @@ body.narrow .route-bottom { display: none; } /* small screens: hide the second c
   UI.flipcards = function (ctx, pairs, o = {}) {  // UI.flipcards(ctx, pairs, o): a grid of cards, each with a front and a back, that turn over when clicked
     const grid = h('div', { class: 'grid-' + (o.cols || 3) });  // the grid, 3 columns unless o.cols says otherwise
     pairs.forEach(([f, b]) => {  // one card per [front, back] pair
-      const card = h('div', { class: 'flip', style: { minHeight: (o.height || 96) + 'px' }, tabindex: 0, role: 'button', 'aria-label': 'Flip card' },  // the card: at least 96 pixels tall (or o.height), reachable with Tab and announced as a button
-        h('div', { class: 'flip-in' }, h('div', { class: 'flip-face front' }, h('div', { html: f })), h('div', { class: 'flip-face back' }, h('div', { html: b }))));  // the inner layer that rotates, with the front face and the back face, each holding HTML
-      const flip = () => card.classList.toggle('on');  // flip(): turns the card over by toggling the on class
+      const front = h('div', { class: 'flip-face front' }, h('div', { html: f })), back = h('div', { class: 'flip-face back', 'aria-hidden': 'true' }, h('div', { html: b }));  // the two faces; the back starts hidden from screen readers because it is out of sight
+      const name = 'Flip card: ' + (front.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 120);  // name: what a screen reader announces, built from the card's own question so every card sounds different
+      const card = h('div', { class: 'flip', style: { minHeight: (o.height || 96) + 'px' }, tabindex: 0, role: 'button', 'aria-label': name, 'aria-pressed': 'false' },  // the card: at least 96 pixels tall (or o.height), reachable with Tab, announced as a button named after its question, and not yet pressed (answer hidden)
+        h('div', { class: 'flip-in' }, front, back));  // the inner layer that rotates, holding the front face and the back face
+      const flip = () => { const on = card.classList.toggle('on'); card.setAttribute('aria-pressed', on ? 'true' : 'false'); front.setAttribute('aria-hidden', on ? 'true' : 'false'); back.setAttribute('aria-hidden', on ? 'false' : 'true'); };  // flip(): turns the card over, tells screen readers it is now pressed (answer showing) and hides whichever face is out of sight
       card.addEventListener('click', flip);  // a click turns the card
       card.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flip(); } });  // Enter or Space also turn it, so it works from the keyboard; preventDefault stops Space from scrolling the page
       grid.append(card);  // adds the card to the grid
@@ -1749,7 +1775,7 @@ body.narrow .route-bottom { display: none; } /* small screens: hide the second c
         isRetry ? h('div', { class: 'small muted' }, 'Retries improve what you have learned, not your first-try score.') : null,  // on a retry round, a reminder that retries count toward learned, not toward the first-try score
         h('div', { class: 'muted' }, msg),  // the encouraging message
         o.source && revisit.length ? h('div', { class: 'row small', style: { justifyContent: 'center', gap: '6px' } }, h('span', {}, 'Sections to revisit:'),  // on challenge quizzes with misses: "Sections to revisit:" followed by a button per section
-          revisit.map((x) => h('button', { class: 'btn sm', type: 'button', title: (Guide.sections[x] || {}).title || '', onclick: () => go(slideIndex(x + '/1')) }, '§' + x))) : null,  // each button shows the section number and jumps to that section's first step; hovering shows its title
+          revisit.map((x) => h('button', { class: 'btn sm', type: 'button', title: (Guide.sections[x] || {}).title || '', onclick: () => go(slideIndex(x + '/1')) }, '§' + labOf(x)))) : null,  // each button shows the section number and jumps to that section's first step; hovering shows its title
         h('div', { class: 'row', style: { justifyContent: 'center' } },  // the row of buttons at the bottom of the results
           missed.length ? h('button', { class: 'btn primary', type: 'button', onclick: () => restart(missed) }, `Retry the ${missed.length} I missed`) : null,  // Retry the ones I missed: starts a retry round with only the missed questions (shown only if any were missed)
           h('button', { class: 'btn', type: 'button', onclick: () => restart(range(qs.length)) }, 'Start over')))));  // Start over: a fresh round with every question; closes the results card
@@ -1774,7 +1800,7 @@ body.narrow .route-bottom { display: none; } /* small screens: hide the second c
       const left = h('div', { class: 'quiz-q' });  // left: the question side (type line, text, options, Check button)
       const fb = h('div', { class: 'quiz-fb', 'aria-live': 'polite' });  // fb: the feedback side (instructions, verdict, explanation); aria-live makes screen readers read changes to it
       main.append(left, fb);  // puts the two sides in the quiz area
-      left.append(h('div', { class: 'quiz-type' }, `Question ${k + 1} of ${order.length} · ${QLABEL[q.type]}`, q.source && o.source ? h('span', { class: 'quiz-src' }, '§' + q.source) : null));  // type line, e.g. "Question 3 of 12 · Multiple choice", plus the section tag on challenge quizzes
+      left.append(h('div', { class: 'quiz-type' }, `Question ${k + 1} of ${order.length} · ${QLABEL[q.type]}`, q.source && o.source ? h('span', { class: 'quiz-src' }, '§' + labOf(q.source)) : null));  // type line, e.g. "Question 3 of 12 · Multiple choice", plus the section tag on challenge quizzes
       left.append(h('div', { class: 'quiz-qtext', html: q.q }));  // the question text, which may contain HTML such as bold or code
       if (q.code) left.append(codeEl(q.code, { nums: false, fontSize: 13.5 }));  // an optional code listing that goes with the question, without line numbers
       const box = h('div', { class: 'qopts' });  // box: where the answer options are drawn
@@ -2013,7 +2039,7 @@ body.narrow .route-bottom { display: none; } /* small screens: hide the second c
     const home = h('button', { type: 'button', class: 'toc-sec' + (sl.type === 'home' ? ' on' : ''), style: { paddingLeft: '8px' }, onclick: () => { closeAll(); go(0); } }, h('span', { class: 'tt b' }, 'Home'));  // a Home entry, highlighted when on the home page; clicking closes the panel and goes home
     if (!f) els.tocBody.append(home);  // Home is listed only when no filter is typed
     for (const c of sortedChapters()) {  // one group per chapter
-      const secs = sectionsOf(c.num).filter((x) => !f || (x.id + ' ' + x.title + ' ' + (x.summary || '')).toLowerCase().includes(f));  // the chapter's sections whose id, title or summary contain the filter text
+      const secs = sectionsOf(c.num).filter((x) => !f || (x.id + ' ' + lab(x) + ' ' + x.title + ' ' + (x.summary || '')).toLowerCase().includes(f));  // the chapter's sections whose id, title or summary contain the filter text
       if (f && !secs.length && !c.title.toLowerCase().includes(f)) continue;  // while filtering, skips a chapter with no matching section unless its own title matches
       const grp = h('div', { class: 'toc-ch' });  // the chapter's group box
       const cm = chapterMastery(c.num);  // the chapter's quiz results, for the tooltip
@@ -2022,7 +2048,7 @@ body.narrow .route-bottom { display: none; } /* small screens: hide the second c
       for (const x of secs) {  // one entry per matching section
         const on = sl.sec === x;  // on: whether this is the section on screen now
         grp.append(h('button', { type: 'button', class: 'toc-sec' + (on ? ' on' : ''), 'aria-current': on ? 'true' : null, onclick: () => { closeAll(); go(slideIndex(x.id + '/1')); } },  // the section entry, highlighted and marked as current for screen readers when on; a click opens its first step
-          h('span', { class: 'n' }, x.id), h('span', { class: 'tt' }, x.title), masteryChip(secMastery(x)), secDone(x) ? h('span', { class: 'ck', title: 'All steps visited' }, '✓') : null));  // inside it: section id, title, quiz score tag, and a check mark once every step has been visited
+          h('span', { class: 'n' }, lab(x)), h('span', { class: 'tt' }, x.title), masteryChip(secMastery(x)), secDone(x) ? h('span', { class: 'ck', title: 'All steps visited' }, '✓') : null));  // inside it: section id, title, quiz score tag, and a check mark once every step has been visited
       }  // ends the loop over sections
       if (!f && sectionsOf(c.num).length) {  // when not filtering, chapters with sections also list their two review pages
         [['-terms', 'Key-term flashcards'], ['-quiz', 'Chapter challenge']].forEach(([suf, lab]) => grp.append(h('button', { type: 'button', class: 'toc-sec extra' + (sl.key === 'ch' + c.num + suf ? ' on' : ''), onclick: () => { closeAll(); go(slideIndex('ch' + c.num + suf)); } }, h('span', { class: 'n' }, ''), h('span', { class: 'tt' }, lab))));  // entries for the chapter's key-term flashcards and challenge quiz, highlighted when one of them is on screen
@@ -2045,15 +2071,16 @@ body.narrow .route-bottom { display: none; } /* small screens: hide the second c
     for (const g of list) {  // one entry per term
       const L = g.term.replace(/^[^A-Za-z0-9]+/, '').charAt(0).toUpperCase();  // L: the term's first letter or digit, in capitals, skipping any leading symbols
       if (L !== letter && !f) { letter = L; els.glBody.append(h('div', { class: 'gl-letter' }, L)); }  // when not searching, a new first letter gets its own heading
+      const prior = isPrior(g.src);  // prior: true when the term was taught in the earlier volume, which is a different page
       const target = g.src.startsWith('ch') ? g.src : g.src + '/1';  // target: the slide that teaches this term: the chapter overview, or the section's first step
       if (slideIndex(target) < 0 && !g.src.startsWith('ch')) { /* term from a section not in this build */ }
-      els.glBody.append(h('div', { class: 'gl-item' }, h('b', {}, g.term), h('span', { class: 'src', title: 'Go to where this term is taught', onclick: () => { closeAll(); go(slideIndex(target)); } }, g.src.startsWith('ch') ? 'Chapter ' + g.src.slice(2) : '§' + g.src), h('p', {}, g.def)));  // the entry: the term in bold, a link naming where it is taught (a click closes the panel and goes there), the definition
+      els.glBody.append(h('div', { class: 'gl-item' }, h('b', {}, g.term), (prior ? h('span', { class: 'src', title: 'Taught in ' + priorWhere(g.src) }, 'Ch ' + BOOK.prior + ' guide') : h('span', { class: 'src', title: 'Go to where this term is taught', onclick: () => { closeAll(); go(slideIndex(target)); } }, g.src.startsWith('ch') ? 'Chapter ' + g.src.slice(2) : '§' + labOf(g.src))), h('p', {}, g.def)));  // the entry: the term in bold, a link naming where it is taught (a click closes the panel and goes there), the definition (an earlier-volume term names that volume instead of linking)
     }  // ends the loop over terms
   }  // ends renderGloss
   function renderNotes() {  // renderNotes(): fills the notes panel with the notes of the section on screen
     const sl = slides[cur];  // sl: the slide on screen
     const sec = sl && sl.sec;  // sec: its section, if it has one
-    els.notesTitle.textContent = sec ? (sec.pseudo ? sec.title : `${sec.id} ${sec.title}`) + ' — notes' : 'Notes';  // panel title, e.g. "3.2 Process States — notes" (or the chapter title for chapter intro steps)
+    els.notesTitle.textContent = sec ? (sec.pseudo ? sec.title : `${lab(sec)} ${sec.title}`) + ' — notes' : 'Notes';  // panel title, e.g. "3.2 Process States — notes" (or the chapter title for chapter intro steps)
     els.notesBody.innerHTML = sec && sec.notes ? sec.notes : '<p class="muted">Notes are available on section steps.</p>';  // the notes themselves (HTML written by the section), or a short message on slides without notes
   }  // ends renderNotes
   function openModal() {  // openModal(): opens the help window with shortcuts, colour key, route switch, printable guide and progress reset
@@ -2084,19 +2111,32 @@ body.narrow .route-bottom { display: none; } /* small screens: hide the second c
 
   /* ------------------------------------------------------------ term popovers */
   let popTimer = null;  // popTimer: the delay timer used to show or hide a pop-up on mouse hover
+  let popFor = null;  // popFor: the dotted word whose definition is showing, so a second Enter closes it and screen readers know which word it describes
+  function armTerms(root) {  // armTerms(root): makes every dotted key term inside root reachable and usable from the keyboard
+    if (!root || !root.querySelectorAll) return;  // ignores text nodes and anything without children to search
+    const list = root.matches && root.matches('.t') ? [root] : [];  // list: root itself if it is a term
+    list.push(...root.querySelectorAll('.t'));  // plus every term inside it
+    for (const el of list) {  // goes through them
+      if (el.hasAttribute('tabindex') || (el.parentElement && el.parentElement.closest('button, a, label, [role="button"]'))) continue;  // skips terms already set up, and terms inside a button, link or card (a control inside a control confuses keyboards and screen readers)
+      el.setAttribute('tabindex', '0'); el.setAttribute('role', 'button');  // Tab can now reach the word, and screen readers announce it as something to press
+      el.setAttribute('aria-label', (el.textContent || '').trim() + ', show definition');  // its spoken name says what pressing it does
+    }  // ends the loop over terms
+  }  // ends armTerms
   function showTerm(el) {  // showTerm(el): shows the definition pop-up for a dotted word el, positioned just below it (or above if no room)
     const key = el.dataset.t || el.textContent;  // the term to look up: the element's data-t attribute if it has one, otherwise its visible text
     const sl = slides[cur];  // sl: the slide on screen
     const g = lookupTerm(key, sl && sl.sec ? sl.sec.id : null);  // looks up the term, preferring the wording of the section on screen
     if (!g) { console.warn('[term] no glossary entry for "' + key + '"'); return; }  // no definition found: warns in the console so the author can add one, and shows nothing
-    els.pop.innerHTML = `<b>${esc(g.term)}</b>${esc(g.def)}<div class="src">${g.src.startsWith('ch') ? 'Chapter ' + g.src.slice(2) + ' overview' : 'Taught in §' + g.src} · full list: press G</div>`;  // fills the pop-up: the term in bold, its definition, and where it is taught, with a reminder that G opens the full list
+    els.pop.innerHTML = `<b>${esc(g.term)}</b>${esc(g.def)}<div class="src">${isPrior(g.src) ? 'Taught in ' + esc(priorWhere(g.src)) : g.src.startsWith('ch') ? 'Chapter ' + g.src.slice(2) + ' overview' : 'Taught in §' + esc(labOf(g.src))} · full list: press G</div>`;  // fills the pop-up: the term in bold, its definition, and where it is taught, with a reminder that G opens the full list
     els.pop.classList.add('on');  // makes the pop-up visible so its size can be measured
+    if (popFor && popFor !== el) popFor.removeAttribute('aria-describedby');  // the word that showed the previous definition no longer points at the pop-up
+    popFor = el; el.setAttribute('aria-describedby', 'term-pop');  // this word now points screen readers at the definition it opened
     const r = el.getBoundingClientRect(); const pr = els.pop.getBoundingClientRect();  // r: where the word is on screen; pr: the pop-up's size
     let x = r.left + r.width / 2 - pr.width / 2; x = clamp(x, 8, innerWidth - pr.width - 8);  // centres the pop-up under the word, but keeps it at least 8 pixels inside the window's left and right edges
     let y = r.bottom + 8; if (y + pr.height > innerHeight - 8) y = r.top - pr.height - 8;  // places it 8 pixels below the word, or above the word if it would run off the bottom of the window
     els.pop.style.left = x + 'px'; els.pop.style.top = Math.max(8, y) + 'px';  // moves the pop-up there, never above the top edge
   }  // ends showTerm
-  function hideTerm() { clearTimeout(popTimer); if (els.pop) els.pop.classList.remove('on'); }  // hideTerm(): cancels any pending hover timer and hides the pop-up
+  function hideTerm() { clearTimeout(popTimer); if (els.pop) els.pop.classList.remove('on'); if (popFor) { popFor.removeAttribute('aria-describedby'); popFor = null; } }  // hideTerm(): cancels any pending hover timer, hides the pop-up and unlinks it from its word
 
   /* ------------------------------------------------------------ misc */
   function toast(msg, ms = 2200) {  // toast(msg, ms): shows a short message at the bottom of the screen for ms milliseconds (2.2 seconds by default)
@@ -2119,6 +2159,7 @@ body.narrow .route-bottom { display: none; } /* small screens: hide the second c
       if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return;  // leaves alone keys already handled elsewhere and any key pressed with Command, Control or Alt (browser shortcuts)
       const t = e.target;  // t: the element that had focus when the key was pressed
       if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) && !(e.key === 'Tab' && t.closest && t.closest('.drawer.on, .modal.on'))) { if (e.key === 'Escape') { t.blur(); closeAll(); } return; }  // while typing in a box or dropdown, shortcuts stay off (except Tab inside a panel); Escape leaves the box and closes panels
+      if ((e.key === 'Enter' || e.key === ' ') && t && t.classList && t.classList.contains('t')) { e.preventDefault(); if (popFor === t && els.pop.classList.contains('on')) hideTerm(); else showTerm(t); return; }  // Enter or Space on a focused dotted word opens its definition, or closes it if it is already open: the keyboard version of clicking it
       const k = e.key;  // k: the key's name, like ArrowRight or g
       const openPanel = [els.toc, els.gloss, els.notes, els.modal].find((d) => d.classList.contains('on'));  // openPanel: the panel or help window that is open, if any
       if (openPanel && k === 'Tab') {   // keep focus cycling inside the open panel
@@ -2168,6 +2209,9 @@ body.narrow .route-bottom { display: none; } /* small screens: hide the second c
         if (t && !(e.relatedTarget && e.relatedTarget.closest && e.relatedTarget.closest('.t') === t)) { clearTimeout(popTimer); popTimer = setTimeout(hideTerm, 220); }  // if the mouse truly left the term (not just moved onto a part of it), hides the pop-up after 220 ms
       });  // ends the mouseout handler
     }  // ends the hover-only block
+    document.addEventListener('focusout', (e) => { if (e.target === popFor) hideTerm(); });  // when keyboard focus leaves the word whose definition is open, the pop-up closes
+    if (window.MutationObserver) new MutationObserver((recs) => { for (const r of recs) r.addedNodes.forEach((n) => armTerms(n)); }).observe(els.canvas, { childList: true, subtree: true });  // whenever new content appears in the slide (a new slide, a redrawn panel, a quiz question), its dotted words are made keyboard-ready
+    armTerms(els.canvas);  // and the content already on screen is set up now
     window.addEventListener('resize', onResize);  // refits the canvas when the window changes size
     if (window.ResizeObserver) new ResizeObserver(onResize).observe(els.stage);  // also refits when the stage itself changes size for another reason (a ResizeObserver watches one element's size)
     window.addEventListener('hashchange', () => { const i = slideIndex(keyFromHash()); if (i >= 0 && i !== cur) go(i); });  // when the address's # part changes (browser Back/Forward, or an edited link), opens that slide if it exists
@@ -2195,12 +2239,12 @@ body.narrow .route-bottom { display: none; } /* small screens: hide the second c
     doc.append(h('div', { class: 'p-title' },  // the title page
       h('div', { style: { fontSize: '12pt', fontWeight: 800, letterSpacing: '.12em', textTransform: 'uppercase', color: '#4f46e5' } }, 'Study guide'),  // a small uppercase "Study guide" label in indigo
       h('h1', {}, 'Operating Systems'),  // the main title
-      h('div', { style: { fontSize: '16pt', color: '#3d4760' } }, 'Chapters 1–5: from the hardware up to concurrency'),  // subtitle naming the chapters covered
+      h('div', { style: { fontSize: '16pt', color: '#3d4760' } }, BOOK.subtitle),  // subtitle naming the chapters this volume covers
       h('p', { style: { marginTop: '18pt', maxWidth: '5.4in', color: '#3d4760' } }, 'This printable guide collects the notes, key terms and review questions (with answers and explanations) from the interactive guide. Use it to review after working through the simulations.'),  // paragraph: what the printable guide contains and when to use it
       h('ol', { style: { marginTop: '14pt', fontSize: '12pt' } }, chs.map((c) => h('li', {}, c.title)))));  // a numbered list of the chapter titles; closes the title page
     const toc = h('div', { class: 'p-toc' }, h('h2', {}, 'Contents'));  // the contents page, starting with its heading
     const tl = h('ol', {});  // tl: the numbered chapter list of the contents
-    chs.forEach((c) => tl.append(h('li', {}, h('b', {}, `Chapter ${c.num}: ${c.title}`), h('ul', {}, sectionsOf(c.num).map((x) => h('li', {}, `${x.id} ${x.title}`))))));  // each chapter in bold, with its sections listed beneath it
+    chs.forEach((c) => tl.append(h('li', {}, h('b', {}, `Chapter ${c.num}: ${c.title}`), h('ul', {}, sectionsOf(c.num).map((x) => h('li', {}, `${lab(x)} ${x.title}`))))));  // each chapter in bold, with its sections listed beneath it
     toc.append(tl);  // adds the list to the contents page
     doc.append(toc);  // adds the contents page to the document
     for (const c of chs) {  // one part of the document per chapter
@@ -2213,7 +2257,7 @@ body.narrow .route-bottom { display: none; } /* small screens: hide the second c
       if (c.notes) chd.append(h('div', { html: c.notes }));  // its chapter-level notes, if any
       for (const x of sectionsOf(c.num)) {  // one block per section of the chapter
         const sd = h('div', { class: 'p-sec' });  // sd: the section's block
-        sd.append(h('div', { class: 'p-sec-h' }, h('span', { class: 'n' }, x.id), h('span', {}, x.title)));  // the section heading: its id and title
+        sd.append(h('div', { class: 'p-sec-h' }, h('span', { class: 'n' }, lab(x)), h('span', {}, x.title)));  // the section heading: its id and title
         if (x.objectives) sd.append(h('div', { class: 'p-obj' }, h('b', {}, 'You should be able to'), h('ul', {}, x.objectives.map((o) => h('li', { html: o })))));  // its learning objectives, if any
         if (x.notes) sd.append(h('div', { html: x.notes }));  // its notes, if any
         const terms = (x.terms || []).map((t) => (Array.isArray(t) ? t : [t.term, t.def]));  // its key terms, accepting either [term, definition] or { term, def }
@@ -2232,7 +2276,7 @@ body.narrow .route-bottom { display: none; } /* small screens: hide the second c
       h('button', { class: 'btn primary', type: 'button', onclick: () => window.print() }, 'Print or save as PDF'),  // a button that opens the browser's print window, which can also save a PDF
       h('a', { class: 'btn', href: location.href.split('?')[0] }, 'Back to the interactive guide')));  // a link back to the interactive guide (the same address without ?print)
     document.body.append(doc);  // adds the document to the page
-    document.title = 'Operating Systems Chapters 1-5 Study Guide';  // the browser tab title, also used as the default name of a saved PDF
+    document.title = `Operating Systems Chapters ${BOOK.range.replace('–', '-')} Study Guide`;  // the browser tab title, also used as the default name of a saved PDF
   }  // ends renderPrint
 
   function keyFromHash() {  // keyFromHash(): reads the slide key from the # part of the page address, e.g. #3.2/4 gives 3.2/4

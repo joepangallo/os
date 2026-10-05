@@ -20,3 +20,6 @@ __pycache__/
 
 # Internal authoring instructions (kept locally, not part of the guide)
 src/AUTHORING.txt
+
+# Internal authoring instructions for volume 2 (kept locally)
+src/AUTHORING-6-9.txt
