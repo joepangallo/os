@@ -1,15 +1,17 @@
 # Operating Systems — Audio Course (Chapters 6–9)
 
-Four adapted audio episodes covering the chapters in `operating-systems-ch6-9.html`,
-in the style of a two-host teaching conversation (Alex and Jordan).
+Four audio episodes adapting chapters 6–9 of the course
+(`operating-systems-ch6-9.html`), in the style of a two-host teaching
+conversation (Alex and Jordan). Each file is named for the chapter it covers.
 
-| # | Episode | Chapter | Length |
-|---|---------|---------|--------|
-| 1 | Concurrency: Deadlock and Starvation | 6 | 11:02 |
-| 2 | Memory Management | 7 | 11:46 |
-| 3 | Virtual Memory | 8 | 9:31 |
-| 4 | Uniprocessor Scheduling | 9 | 8:54 |
+| Audio file | Chapter | Subject | Length |
+|------------|---------|---------|--------|
+| ch6-concurrency-deadlock-and-starvation.mp3 | Chapter 6 | Concurrency: Deadlock and Starvation | 11:02 |
+| ch7-memory-management.mp3 | Chapter 7 | Memory Management | 11:46 |
+| ch8-virtual-memory.mp3 | Chapter 8 | Virtual Memory | 9:31 |
+| ch9-uniprocessor-scheduling.mp3 | Chapter 9 | Uniprocessor Scheduling | 8:54 |
 
-Each episode adapts the chapter's concepts conversationally (~1,500 spoken words)
-rather than reading the interactive guide verbatim. Narration scripts are in
-`scripts/`. Voices: Alex (avocado_v2:MAI_01), Jordan (avocado_v2:MAI_03).
+Each episode adapts its chapter's concepts conversationally rather than reading
+the course material verbatim. Narration scripts are in `scripts/`, named to
+match (`ch6-script.txt`, …).
+Voices: Alex (avocado_v2:MAI_01), Jordan (avocado_v2:MAI_03).
