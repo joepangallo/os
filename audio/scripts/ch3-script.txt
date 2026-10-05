@@ -1,0 +1,73 @@
+Alex: Welcome back to the Operating Systems Audio Course. I am Alex, with Jordan. Quick look back first. Last time we met the operating system itself: three goals, convenience, efficiency, and the ability to evolve, two jobs, a convenient interface and a resource manager, and four eras of history, each one fixing the last era's waste. And the biggest achievement of all that history was an idea: the process. Today, chapter three takes that idea apart. What a process is, the states it passes through, how the operating system remembers every one, and how it stays in control.
+
+Jordan: I am Jordan. So last time the process was the hero that made multiprogramming and time sharing possible. This time we open it up and see how it works.
+
+Alex: And here is the hook. A program sitting on your disk is not a process. It is a file. Dead instructions, no memory, no state, and the operating system keeps no record of it at all. The moment you launch it, the operating system builds a living thing around it: gives it an identity, loads it into memory, hands it resources, and starts tracking everything about it. A recipe is not a meal. A process is the cooking.
+
+Jordan: Okay, so what exactly is a process, in the course's words?
+
+Alex: A program in execution. The running program together with its current state, its memory, and the resources the operating system has given it. It is the unit the operating system schedules and manages. Everything the course does from here on is about processes, so this definition has to be rock solid.
+
+Jordan: And the operating system remembers each process with the P C B, the process control block.
+
+Alex: The single most important data structure in this chapter. For every process, the operating system keeps a P C B holding everything it needs to manage that process. Three groups of information. First, process identification: the process identifier, the P I D, plus user and group info. Second, processor state information: the program counter, the saved register values, what the course calls the context, plus stack pointers and status flags. Third, process control information: the current state, the priority, memory pointers saying where its code and data live, I O status, and accounting info like how much processor time it has used.
+
+Jordan: That is a lot of bookkeeping. Why does the operating system need the saved registers?
+
+Alex: Because that is what makes pausing and resuming possible. The program counter says which instruction comes next. The registers hold the intermediate values of the computation in progress. Save all of that in the P C B, and the operating system can stop a process cold, run something else for a while, and later restore the exact register values so the process carries on as if it had never stopped. Lose the P C B and the process is lost. There is nothing to resume from.
+
+Jordan: So the P C B is like a hospital chart. Everything the staff needs to treat this patient, and if the chart is lost, they have to start over.
+
+Alex: Good analogy. And the process image is the whole patient: the program code, the data, the stack, which is scratch space for function calls and local variables, and the P C B itself. Code, data, stack, P C B. That is everything that makes up a process in memory.
+
+Jordan: That is beat one: what a process is and how the operating system records it. Beat two is the life story, the states.
+
+Alex: Right. From the processor's point of view, running processes produce interleaved traces of instructions, with a small dispatcher switching between them. To manage that, the operating system models each process's life as states and transitions. The simplest model has two states: Running and Not Running. But that cannot tell a process that is ready to run from one that is waiting for something, so it is not enough.
+
+Jordan: Hence the five-state model.
+
+Alex: New, Ready, Running, Blocked, and Exit. Let me walk you through one process's life, because the course does exactly this with an example. You launch an editor. The operating system creates a process: it assigns an identifier, say P I D seven, builds a P C B, and marks it New. Then comes the admit transition. The process joins the Ready queue. It could run right now. It is just waiting for its turn on the processor.
+
+Jordan: Then dispatch.
+
+Alex: The operating system loads the process's registers into the processor. Its instructions now execute. The program counter moves through its code. If it runs past its time limit, a timeout sends it back to Ready. Now the interesting one. The editor asks to read notes dot txt and cannot continue until the disk delivers. That is the event wait transition. The operating system saves its registers in the P C B, marks it Blocked, and runs another process. Blocked means it cannot continue until some event happens, and it is not eligible to run even if the processor is free.
+
+Jordan: And the event occurs transition brings it back.
+
+Alex: When the disk interrupts with the data, yes, Blocked to Ready. And when you close the editor, the release transition: the operating system frees its memory, closes its files, keeps the P C B briefly for accounting, then deletes it.
+
+Jordan: What about when memory gets tight? That is where the suspend states come in.
+
+Alex: Exactly. When memory fills up, the operating system may move a process's image out to disk, swapping, to free memory for others. That gives two more states. Suppose our blocked editor gets swapped out. It is now Blocked Suspend: still waiting for its disk data, and out of memory. When the data arrives, it becomes Ready Suspend: waiting for nothing, but its image is still on disk. Then the activate transition swaps it back in, and it is Ready again, waiting for its turn.
+
+Jordan: So the suspended states are about memory pressure, not about what the process is doing.
+
+Alex: Precisely. Suspended tells you where the process lives. Blocked versus Ready tells you what it is waiting for. Two independent questions, which is why the model needs both dimensions.
+
+Jordan: Beat three: how the operating system controls all of this.
+
+Alex: Two ideas here, and the first is modes. The processor has a user mode and a kernel mode. Ordinary programs run in user mode: privileged instructions and protected memory areas are off limits. The operating system runs in kernel mode: everything is available. Creating a process takes five steps, from assigning the identifier to building the data structures. And here is the key question from beat one of last episode: how does the operating system regain control? Three ways. An interrupt, like the timer or a disk finishing. A trap, which is an error like dividing by zero or touching forbidden memory. Or a system call, when the program deliberately asks the operating system for a service.
+
+Jordan: And switching modes versus switching processes.
+
+Alex: A mode switch is cheap: the processor just flips a bit and jumps into kernel code. A full process switch is expensive. The operating system must save the outgoing process's context into its P C B, update the queues and tables, pick the next process, and restore its context. That is real work, and it is pure overhead, time spent managing instead of computing.
+
+Jordan: Where does the operating system's own code run? That was section three point five.
+
+Alex: Three designs. The kernel can run outside all processes, as its own separate entity. It can run inside each user process, borrowing the process's context when a call comes in. Or it can be built as a set of separate system processes. Different systems choose differently, and the choice shapes everything about performance and structure.
+
+Jordan: And the chapter ends with a real example: UNIX System V Release Four.
+
+Alex: UNIX S V R four, the classic case study. It mostly runs operating system code inside user processes. It refines the model into nine process states, finer-grained than our five plus suspend. It splits each process image into three parts: user-level context, register context, and system-level context. And it creates processes with the fork call, where a process clones itself and the two then go their separate ways. If you have ever wondered where fork comes from, this is the chapter.
+
+Jordan: Let me try the summary. A process is a program in execution, and the P C B is how the operating system remembers it: identifier, state, priority, program counter, saved registers, memory pointers, I O status, accounting.
+
+Alex: Got it.
+
+Jordan: The five-state model is New, Ready, Running, Blocked, Exit, with transitions like admit, dispatch, timeout, event wait, event occurs, and release. Add swapping and you get the suspend states, Ready Suspend and Blocked Suspend. Control comes from user and kernel mode, the operating system regains control through interrupts, traps, and system calls, and a process switch costs far more than a mode switch.
+
+Alex: Perfect. Here is your try-thinking-about-it moment. Open your system's process list. Task Manager on Windows, Activity Monitor on the Mac, top on Linux. Every row in that list is a process, and the columns, the P I D, the state, the memory, the C P U time, are fields of its P C B made visible. You are looking at the operating system's own bookkeeping, live.
+
+Jordan: I have stared at Task Manager for years without knowing that.
+
+Alex: Next time, we split the process in two. Chapter three treated the process as one thing: the thing that owns resources and the thing that runs. Chapter four pulls those apart. The process keeps owning the resources, the address space, the files, the devices. And a new unit, the thread, becomes the thing that is scheduled and runs. One process, several paths of execution. See you there.
