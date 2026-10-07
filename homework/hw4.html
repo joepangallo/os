@@ -1,0 +1,1167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Chapters 8 and 9: page tables and the TLB, page replacement, resident sets and the working set, memory management in real systems, the kinds of scheduling, scheduling algorithms by hand and traditional UNIX priorities, plus a Python simulator of page replacement and processor scheduling.">
+<title>Homework 4: Virtual Memory and Scheduling</title>
+<style>
+:root {  /* design tokens: every color and size the page uses is named once here */
+  --font: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;  /* the reading typeface: whatever system font the computer already has */
+  --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;  /* a fixed-width typeface for code, registers and hex values */
+  --bg: #eef1f7;  /* the pale blue-grey page background behind the cards */
+  --panel: #ffffff;  /* white, the fill for cards and answer boxes */
+  --panel-2: #f5f7fb;  /* a slightly tinted white for boxes nested inside cards */
+  --ink: #151c2c;  /* the main text color, a very dark blue */
+  --ink-2: #3d4760;  /* a lighter text color for secondary text */
+  --muted: #69738c;  /* grey text for hints and small print */
+  --line: #d9deea;  /* the thin border color around panels and table cells */
+  --accent: #4f46e5;  /* indigo, for buttons, links and focus rings */
+  --accent-bg: #e8e7fd;  /* a pale indigo fill behind highlighted items */
+  --accent-ink: #ffffff;  /* text placed on top of the accent color */
+  --hw: #2563eb;  /* this homework's own color; each page overrides it in its body tag */
+  --good: #15803d;  /* green, for "saved" and success messages */
+  --warn: #b45309;  /* amber, for cautions */
+  --code-bg: #0f172a;  /* the dark background of code blocks */
+  --code-ink: #e2e8f0;  /* the light text inside code blocks */
+  --code-comment: #94a3b8;  /* comments inside code, dimmer than the code itself */
+  --code-string: #fbbf24;  /* strings inside code */
+  --code-keyword: #c4b5fd;  /* Python keywords inside code */
+  --code-number: #7dd3fc;  /* numbers inside code */
+  --radius: 12px;  /* the corner rounding used by cards and boxes */
+  --shadow: 0 1px 2px rgba(20, 28, 48, .06), 0 6px 18px rgba(20, 28, 48, .06);  /* a soft shadow that lifts cards off the page */
+}  /* end of the light-theme tokens */
+@media (prefers-color-scheme: dark) {  /* when the computer is set to dark mode... */
+  :root {  /* ...swap the tokens for darker ones; every rule below uses the tokens, so nothing else changes */
+    --bg: #0d1220;  /* near-black blue page */
+    --panel: #151c2e;  /* dark cards */
+    --panel-2: #1b2438;  /* slightly lighter nested boxes */
+    --ink: #e7ebf5;  /* light main text */
+    --ink-2: #c3cadb;  /* light secondary text */
+    --muted: #8f99b3;  /* grey hints that still read on dark */
+    --line: #2b3550;  /* dark borders */
+    --accent: #8b85ff;  /* a lighter indigo that stays readable on dark */
+    --accent-bg: #25234d;  /* dark indigo fill */
+    --accent-ink: #0d1220;  /* dark text on the light-indigo buttons */
+    --good: #4ade80;  /* lighter green */
+    --warn: #fbbf24;  /* lighter amber */
+    --shadow: 0 1px 2px rgba(0, 0, 0, .4);  /* shadows barely show on dark, so keep them small */
+  }  /* end of the dark tokens */
+}  /* end of the dark-mode block */
+*, *::before, *::after { box-sizing: border-box; }  /* widths include padding and border, which makes layouts predictable */
+html { scroll-behavior: smooth; scroll-padding-top: 76px; }  /* in-page links glide, and stop below the sticky bar instead of under it */
+body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.6 var(--font); -webkit-font-smoothing: antialiased; }  /* base page: background, text color, size and line spacing */
+a { color: var(--accent); }  /* links use the accent color */
+code, kbd, pre, textarea.mono, .grid input { font-family: var(--mono); }  /* code and hex values use the fixed-width face */
+code { background: var(--panel-2); border: 1px solid var(--line); border-radius: 5px; padding: 0 .3em; font-size: .92em; }  /* inline code gets a small tinted pill */
+kbd { border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; padding: 0 .35em; font-size: .88em; background: var(--panel); }  /* a key on the keyboard */
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }  /* a clear ring shows where keyboard focus is */
+.wrap { width: min(920px, calc(100% - 32px)); margin: 0 auto; }  /* the reading column: at most 920px wide, 16px gutter each side on phones */
+.skip { position: absolute; left: 12px; top: -60px; z-index: 50; padding: 8px 12px; background: var(--ink); color: var(--bg); border-radius: 8px; }  /* "skip to content" link, hidden above the page... */
+.skip:focus { top: 8px; }  /* ...until a keyboard user tabs onto it */
+header.hero { background: linear-gradient(135deg, var(--hw), #1e1b4b); color: #fff; padding: 40px 0 34px; }  /* the colored title band at the top */
+.hero .kicker { display: block; font-size: .78rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; opacity: .85; }  /* the small label above the title */
+.hero h1 { margin: 6px 0 10px; font-size: clamp(1.9rem, 5vw, 2.9rem); line-height: 1.15; letter-spacing: -.02em; }  /* the title grows with the screen but never overflows a phone */
+.hero p { margin: 0; max-width: 62ch; font-size: 1.06rem; opacity: .95; }  /* the one-paragraph summary under the title */
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; padding: 0; list-style: none; }  /* a row of small labels that wraps on phones */
+.chips li { border: 1px solid rgba(255, 255, 255, .35); border-radius: 999px; padding: 3px 11px; font-size: .8rem; font-weight: 700; background: rgba(255, 255, 255, .1); }  /* one pill-shaped label */
+nav.bar { position: sticky; top: 0; z-index: 20; background: var(--panel); border-bottom: 1px solid var(--line); box-shadow: var(--shadow); }  /* the navigation bar that stays at the top while scrolling */
+.bar .wrap { display: flex; align-items: center; gap: 6px 14px; flex-wrap: wrap; padding: 8px 0; }  /* bar contents sit in one row and wrap onto two on phones */
+.bar a.nav { color: var(--ink-2); text-decoration: none; font-weight: 650; font-size: .9rem; padding: 4px 2px; }  /* each section link */
+.bar a.nav:hover { color: var(--accent); }  /* links light up under the mouse */
+.bar .spacer { flex: 1; }  /* pushes the progress counter and button to the right-hand end */
+.bar .progress { font-size: .85rem; color: var(--muted); white-space: nowrap; }  /* "7 of 40 answered" */
+button, .btn { font: inherit; font-size: .9rem; font-weight: 700; border: 1px solid var(--accent); background: var(--accent); color: var(--accent-ink); border-radius: 8px; padding: 6px 12px; cursor: pointer; }  /* the main button style */
+button.ghost { background: transparent; color: var(--accent); }  /* a quieter outline button for secondary actions */
+button:hover { filter: brightness(1.08); }  /* buttons brighten slightly under the mouse */
+main { padding: 26px 0 60px; }  /* space above and below the main content */
+section.card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 22px 24px; margin: 0 0 22px; }  /* one white card per problem or topic */
+@media (max-width: 600px) { section.card { padding: 16px 14px; } }  /* phones get tighter card padding so text has room */
+h2 { margin: 0 0 10px; font-size: 1.45rem; line-height: 1.25; }  /* problem titles */
+h2 .num { color: var(--hw); margin-right: .35em; }  /* the "Problem 3" part of a title, in the homework color */
+h3 { margin: 22px 0 8px; font-size: 1.1rem; }  /* sub-headings inside a card */
+.part-label { display: block; margin: 36px 0 12px; font-size: .8rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--hw); }  /* the "Part A" / "Part B" divider label */
+.given { background: var(--panel-2); border: 1px solid var(--line); border-left: 4px solid var(--hw); border-radius: 8px; padding: 12px 16px; margin: 12px 0; }  /* a box that holds the facts a problem gives you */
+.given > :first-child { margin-top: 0; }  /* no extra gap at the top of that box */
+.given > :last-child { margin-bottom: 0; }  /* no extra gap at the bottom either */
+.note { border-left: 4px solid var(--accent); background: var(--accent-bg); border-radius: 8px; padding: 10px 14px; margin: 12px 0; }  /* a tip */
+.caution { border-left: 4px solid var(--warn); background: var(--panel-2); border-radius: 8px; padding: 10px 14px; margin: 12px 0; }  /* a caution */
+.scroll-x { overflow-x: auto; -webkit-overflow-scrolling: touch; }  /* wide tables scroll sideways inside their own box instead of widening the page */
+table.data { border-collapse: collapse; margin: 8px 0; font-size: .95rem; }  /* a table of given facts */
+table.data th, table.data td { border: 1px solid var(--line); padding: 5px 10px; text-align: left; vertical-align: top; }  /* its cells */
+table.data th { background: var(--panel-2); font-weight: 700; }  /* its header cells */
+table.data td.mono, table.data th.mono { font-family: var(--mono); }  /* cells that hold hex values */
+.part { margin: 18px 0 0; padding-top: 14px; border-top: 1px dashed var(--line); }  /* one lettered sub-question, separated by a dashed line */
+.part .q { margin: 0 0 8px; }  /* the question text */
+.part .q b.letter { color: var(--hw); }  /* the (a), (b), (c) letter */
+.ans { margin: 6px 0 0; }  /* the space that holds an answer box */
+.ans textarea { width: 100%; min-height: 96px; resize: vertical; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--ink); font: inherit; font-size: .95rem; line-height: 1.5; padding: 9px 11px; }  /* a free-text answer box */
+.ans textarea.mono { font-size: .85rem; white-space: pre; overflow-wrap: normal; overflow-x: auto; }  /* the box for pasted program output keeps columns lined up */
+.ans textarea:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px var(--accent-bg); }  /* the box being typed in is highlighted */
+.ans .status { display: block; min-height: 1.2em; font-size: .78rem; color: var(--muted); margin-top: 2px; }  /* "saved" appears here after typing */
+.ans .status.saved { color: var(--good); }  /* the saved message is green */
+table.grid { border-collapse: collapse; margin: 6px 0; font-size: .9rem; }  /* a table of small answer boxes */
+table.grid th, table.grid td { border: 1px solid var(--line); padding: 0; }  /* grid cells: the input fills the cell, so no padding */
+table.grid th { background: var(--panel-2); padding: 5px 8px; font-weight: 700; text-align: left; white-space: nowrap; }  /* row and column labels */
+table.grid thead th { text-align: center; }  /* column labels are centered over their inputs */
+table.grid tbody th { white-space: normal; min-width: 110px; max-width: 240px; }  /* long row labels wrap onto several lines instead of pushing the inputs off a phone screen */
+table.grid td input { width: 100%; min-width: 64px; border: 0; background: var(--panel); color: var(--ink); padding: 6px 8px; font-size: .9rem; }  /* the input inside a grid cell */
+table.grid.wide td input { min-width: 150px; }  /* grids whose answers are sentences get wider cells */
+table.grid td input:focus { outline: 2px solid var(--accent); outline-offset: -2px; }  /* the focused cell is outlined */
+.sheet { display: grid; gap: 10px; }  /* the answer-sheet panel near the top of the page */
+.sheet label { font-weight: 700; font-size: .9rem; }  /* "Your name" */
+.sheet input[type=text] { width: 100%; max-width: 360px; border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; font: inherit; background: var(--panel); color: var(--ink); }  /* the name box */
+.sheet .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }  /* the row of sheet buttons */
+.sheet .msg { font-size: .88rem; color: var(--muted); min-height: 1.3em; }  /* messages such as "Loaded 38 answers" */
+ol.steps { padding-left: 1.3em; }  /* numbered setup steps */
+ol.steps > li { margin: 0 0 12px; }  /* space between steps */
+.os { display: grid; grid-template-columns: 88px 1fr; gap: 4px 10px; margin: 6px 0; align-items: baseline; }  /* "Windows: ... / macOS: ..." rows */
+.os > b { font-size: .82rem; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }  /* the operating-system name */
+@media (max-width: 520px) { .os { grid-template-columns: 1fr; } }  /* on phones the name sits above its instructions */
+.codebox { margin: 12px 0; border-radius: 10px; overflow: hidden; border: 1px solid #1e293b; }  /* a code block with its toolbar */
+.codebox .tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; background: #1e293b; color: #cbd5e1; padding: 6px 10px; font-size: .85rem; }  /* the toolbar: file name plus buttons */
+.codebox .tools .name { font-family: var(--mono); font-weight: 700; flex: 1; }  /* the file name */
+.codebox .tools button { background: #334155; border-color: #475569; color: #f1f5f9; padding: 3px 10px; font-size: .8rem; }  /* toolbar buttons */
+.codebox pre, pre.term { margin: 0; background: var(--code-bg); color: var(--code-ink); padding: 12px 14px; overflow-x: auto; font-size: .8rem; line-height: 1.5; tab-size: 4; }  /* the code itself scrolls sideways inside its box */
+.codebox pre.tall { max-height: 560px; overflow-y: auto; }  /* long files scroll inside a box instead of filling several screens */
+pre.term { border-radius: 10px; margin: 8px 0; }  /* a terminal command or output shown on its own */
+pre code { background: none; border: 0; padding: 0; font-size: inherit; color: inherit; }  /* code inside a code block must not get the inline-code pill style */
+pre .c { color: var(--code-comment); }  /* comments */
+pre .s { color: var(--code-string); }  /* strings */
+pre .k { color: var(--code-keyword); }  /* keywords */
+pre .n { color: var(--code-number); }  /* numbers */
+ul.check { list-style: none; padding-left: 0; }  /* the submission checklist */
+ul.check li { padding-left: 1.6em; position: relative; margin: 0 0 8px; }  /* each item leaves room for its box */
+ul.check li::before { content: "\2610"; position: absolute; left: 0; color: var(--hw); }  /* an empty checkbox drawn in front of each item */
+footer { color: var(--muted); font-size: .85rem; text-align: center; padding: 10px 0 40px; }  /* the small print at the very bottom */
+@media print {  /* when the page is printed or saved as a PDF */
+  nav.bar, .skip, .sheet .row, .codebox .tools button { display: none; }  /* hide things that only work on screen */
+  section.card { box-shadow: none; break-inside: avoid-page; }  /* no shadows, and try not to split a card across pages */
+  body { background: #fff; }  /* white paper */
+}  /* end of the print block */
+.answer { border-left: 4px solid var(--good); background: var(--panel-2); border-radius: 8px; padding: 10px 14px; margin: 10px 0; }  /* solutions: the final answer to a part, in a green-edged box */
+.answer > :first-child { margin-top: 0; }  /* no extra gap at the top of an answer box */
+.answer > :last-child { margin-bottom: 0; }  /* nor at the bottom */
+.mistake { border-left: 4px solid var(--warn); background: var(--panel-2); border-radius: 8px; padding: 10px 14px; margin: 10px 0; }  /* solutions: a common mistake and how to spot it */
+.mistake > :first-child { margin-top: 0; }  /* no extra gap at the top of a mistake box */
+.mistake > :last-child { margin-bottom: 0; }  /* nor at the bottom */
+</style>
+</head>
+<body data-hw="os-hw4" data-sheet="hw4-answers.html" style="--hw: #7c3aed;">
+<a class="skip" href="#main">Skip to the content</a>
+<header class="hero">
+  <div class="wrap">
+    <span class="kicker">Operating Systems · Homework 4</span>
+    <h1>Virtual Memory and Scheduling</h1>
+    <p>Chapters 8 and 9. Size page tables, time memory accesses through the TLB, replay four replacement policies by hand and measure a working set. Then schedule five processes six different ways and follow traditional UNIX priorities second by second. In Part B you finish a simulator that runs the same policies on thousands of page references and hundreds of processes.</p>
+    <ul class="chips">
+      <li>Chapter 8: Virtual Memory</li>
+      <li>Chapter 9: Uniprocessor Scheduling</li>
+      <li>Part A: 8 problems</li>
+      <li>Part B: simulate replacement and scheduling</li>
+    </ul>
+  </div>
+</header>
+
+<nav class="bar" aria-label="Homework sections">
+  <div class="wrap">
+    <a class="nav" href="#start">Start</a>
+    <a class="nav" href="#part-a">Part A</a>
+    <a class="nav" href="#part-b">Part B</a>
+    <a class="nav" href="#submit">Submit</a>
+    <span class="spacer"></span>
+    <span class="progress js-progress"></span>
+    <button type="button" class="js-download">Download answer sheet</button>
+  </div>
+</nav>
+
+<main id="main" class="wrap">
+
+<section class="card" id="start">
+  <h2>How this homework works</h2>
+  <p>There are two parts. <b>Part A</b> is eight problems: four about virtual memory (page tables, the TLB, page replacement, working sets and how real systems manage memory) and four about scheduling the processor (the kinds of scheduling, the policies worked by hand, and priorities that change over time). <b>Part B</b> is a Python program, <code>vmsched.py</code>, that runs page-replacement and scheduling policies on much larger inputs than anyone would work by hand. You write the missing policies, run it, and explain what the numbers show.</p>
+  <p>Every question has an answer box right under it. What you type is saved automatically in this browser. When you are done, <b>Download answer sheet</b> saves all of your answers as one HTML file, <code>hw4-answers.html</code>, which goes into a GitHub repository together with your finished <code>vmsched.py</code>.</p>
+  <div class="note"><b>Show your work on every calculation.</b> Write the formula, the numbers you put into it, and the result. For the replacement and scheduling tables, a short note on any step you found tricky helps show your reasoning.</div>
+  <div class="caution"><b>Switching computers?</b> Drafts live in one browser only. Download the answer sheet, then use <b>Load a saved answer sheet</b> on the other computer to pick up where you left off.</div>
+  <h3>Your answer sheet</h3>
+  <div class="sheet">
+    <div>
+      <label for="student-name">Your name (printed at the top of the answer sheet)</label><br>
+      <input type="text" id="student-name" autocomplete="name">
+    </div>
+    <div class="row">
+      <button type="button" class="js-download">Download answer sheet</button>
+      <button type="button" class="ghost" id="sheet-load">Load a saved answer sheet</button>
+      <input type="file" id="sheet-file" accept=".html,text/html" hidden>
+      <button type="button" class="ghost" id="sheet-clear">Clear all answers</button>
+      <span class="progress js-progress"></span>
+    </div>
+    <p class="msg js-sheet-msg" aria-live="polite"></p>
+  </div>
+</section>
+
+<span class="part-label" id="part-a">Part A · Problems</span>
+
+<!-- ============================ Problem 1 ============================ -->
+<section class="card" id="p1">
+  <h2><span class="num">Problem 1</span>Page tables of every shape</h2>
+  <div class="given">
+    <p>Sizes in this problem use powers of two: 1 KiB = 1,024 bytes, 1 MiB = 1,024 KiB, 1 GiB = 1,024 MiB. Memory is byte-addressable (every byte has its own address).</p>
+    <p>For parts (a) to (c): a computer uses <b>32-bit virtual addresses</b>, <b>4 KiB pages</b> and page table entries of <b>4 bytes</b>.</p>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(a)</b> How many pages does one process's virtual address space hold? How large is a single-level page table with one entry for every one of those pages, in bytes and in MiB, and how many 4 KiB pages does that table itself fill?</p>
+    <div class="ans" data-id="p1a" data-rows="4" data-label="Problem 1(a)"></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(b)</b> The OS uses a <b>two-level</b> page table. A virtual address is split into a 10-bit index into the root table (the page directory), a 10-bit index into a second-level page table, and a 12-bit offset. The root table always exists and fills one page. A second-level table, also one page, exists only if at least one page it maps is in use. A process uses exactly three regions of its address space:</p>
+    <div class="scroll-x">
+      <table class="data">
+        <tr><th>Region</th><th>First address</th><th>Last address</th></tr>
+        <tr><td>Code and data</td><td class="mono">0x00010000</td><td class="mono">0x0081FFFF</td></tr>
+        <tr><td>A shared library</td><td class="mono">0x40000000</td><td class="mono">0x401FFFFF</td></tr>
+        <tr><td>Stack</td><td class="mono">0xFFF00000</td><td class="mono">0xFFFFFFFF</td></tr>
+      </table>
+    </div>
+    <p class="q">For each region, give the number of pages it holds and the root-table indices (in decimal) whose second-level tables it needs.</p>
+    <div class="scroll-x"><table class="grid" data-id="p1b-grid" data-corner="Region" data-rows="Code and data|Shared library|Stack" data-cols="Pages in the region|Root indices it needs" data-label="Problem 1(b) table"></table></div>
+    <p class="q">How many second-level tables exist in total? How much memory does the whole page table (root plus second-level tables) take, in KiB, and how many times smaller is that than the single-level table from (a)?</p>
+    <div class="ans" data-id="p1b" data-rows="4" data-label="Problem 1(b)"></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(c)</b> Split each address the process from (b) might use into its two indices (in decimal) and its offset (in hexadecimal), and say whether a second-level table exists for it.</p>
+    <div class="scroll-x"><table class="grid" data-id="p1c-grid" data-corner="Address" data-rows="0x00803A10|0x401337C4|0x7FFE0010|0xFFF8C123" data-cols="Root index|Second-level index|Offset (hex)|Second-level table exists? (yes / no)" data-label="Problem 1(c) table"></table></div>
+    <p class="q">What happens when the process touches the address whose second-level table does not exist, and why is that the right outcome?</p>
+    <div class="ans" data-id="p1c" data-rows="3" data-label="Problem 1(c)"></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(d)</b> A 64-bit processor uses <b>48-bit virtual addresses</b>, 4 KiB pages, 8-byte entries and a <b>four-level</b> table: four 9-bit indices and a 12-bit offset. How many virtual pages does one address space hold, and how large would a single-level table for it be, in GiB? Why does each level use exactly 9 bits? What is the least page-table memory a process needs if it uses exactly one page?</p>
+    <div class="ans" data-id="p1d" data-rows="5" data-label="Problem 1(d)"></div>
+    <p class="q">How much of the address space does <b>one entry</b> at each level cover? (A lowest-level entry covers one 4 KiB page; Linux calls the four levels PTE, PMD, PUD and PGD, from the bottom up.)</p>
+    <div class="scroll-x"><table class="grid" data-id="p1d-grid" data-corner="Level" data-rows="Lowest level (PTE)|Third level (PMD)|Second level (PUD)|Top level (PGD)" data-cols="Address space one entry covers" data-label="Problem 1(d) table"></table></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(e)</b> A machine with <b>8 GiB</b> of main memory and 4 KiB frames uses an <b>inverted page table</b> whose entries are 16 bytes (page number, process ID, control bits and a chain pointer). How many entries does it have, how large is it, and what percentage of main memory is that? How does its size change if the number of running processes grows from 10 to 500, and why? Why does the lookup need a hash function and chains?</p>
+    <div class="ans" data-id="p1e" data-rows="5" data-label="Problem 1(e)"></div>
+  </div>
+</section>
+
+<!-- ============================ Problem 2 ============================ -->
+<section class="card" id="p2">
+  <h2><span class="num">Problem 2</span>The TLB and the cost of a memory reference</h2>
+  <div class="given">
+    <p>Searching the TLB takes <b>2 ns</b> and one access to main memory takes <b>80 ns</b>. On a TLB <b>hit</b>, a reference costs the TLB search plus one memory access for the data. On a TLB <b>miss</b>, it costs the TLB search, then one memory access for every level of the page table (to read the entries), then the memory access for the data. Ignore memory caches. Ignore page faults in (a) and (b).</p>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(a)</b> Give the effective (average) access time for each TLB hit ratio and each page-table shape, and how much slower that is than the plain 80 ns memory access, as a percentage.</p>
+    <div class="scroll-x"><table class="grid" data-id="p2a" data-corner="TLB hit ratio" data-rows="0.90|0.99" data-cols="Single-level table: time (ns)|Single-level: % slower|Four-level table: time (ns)|Four-level: % slower" data-label="Problem 2(a) table"></table></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(b)</b> Why does a good TLB hit ratio matter more with a four-level table than with a single-level one? Why must the TLB be emptied, or its entries tagged with an address-space ID, when the OS switches from one process to another?</p>
+    <div class="ans" data-id="p2b" data-rows="4" data-label="Problem 2(b)"></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(c)</b> Now add page faults to the single-level case with hit ratio 0.99. Servicing a fault takes <b>6 ms</b>. Use this model: average time = (1 − <i>p</i>) × (your 0.99 single-level time from (a)) + <i>p</i> × 6 ms, where <i>p</i> is the fraction of references that fault. (i) What is the average time when one reference in 100,000 faults, and what percentage slower is that than with no faults? (ii) What is the largest <i>p</i> that keeps the average within 10% of the no-fault time? Write it as "one fault every ___ references".</p>
+    <div class="ans" data-id="p2c" data-rows="6" data-label="Problem 2(c)"></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(d)</b> A process has three regions, each starting on a page boundary: code of <b>1,030 KiB</b>, data of <b>3,000 KiB</b> and a stack of <b>70 KiB</b>. The TLB has <b>64</b> entries. Compare ordinary 4 KiB pages with 2 MiB large pages. (Internal fragmentation is the unused space at the end of each region's last page. TLB reach is the amount of memory the TLB's entries can map at once.)</p>
+    <div class="scroll-x"><table class="grid" data-id="p2d-grid" data-corner="Page size" data-rows="4 KiB|2 MiB" data-cols="Pages needed (all three regions)|Internal fragmentation (KiB)|TLB reach" data-label="Problem 2(d) table"></table></div>
+    <p class="q">Give one reason to prefer each page size. Then explain why making pages bigger does not simply keep lowering the page-fault rate for a process whose memory is only partly resident.</p>
+    <div class="ans" data-id="p2d" data-rows="5" data-label="Problem 2(d)"></div>
+  </div>
+</section>
+
+<!-- ============================ Problem 3 ============================ -->
+<section class="card" id="p3">
+  <h2><span class="num">Problem 3</span>Four replacement policies by hand</h2>
+  <div class="given">
+    <p>A process has <b>3 frames</b>, all empty at the start, and makes these 18 page references, in order:</p>
+    <p style="font-family:var(--mono);font-size:1.05rem;letter-spacing:.06em">4 2 1 3 2 4 2 1 2 4 6 2 4 2 6 5 4 5</p>
+    <ul>
+      <li>Every reference to a page that is not resident is a <b>page fault</b>, including the first loads into empty frames.</li>
+      <li>Empty frames are filled in order: Frame 1, then Frame 2, then Frame 3. A page that replaces another takes the evicted page's frame.</li>
+      <li><b>OPT</b> evicts the page whose next reference is farthest in the future. If several resident pages are never referenced again, it evicts the one in the lowest-numbered frame.</li>
+      <li><b>LRU</b> evicts the page whose last reference is longest ago. <b>FIFO</b> evicts the page that was loaded longest ago.</li>
+      <li><b>Clock</b>: each frame has a use bit, and a pointer starts at Frame 1. Loading a page (into an empty frame or as a replacement) sets its use bit to 1 and moves the pointer to the next frame (after Frame 3 comes Frame 1). A hit sets the page's use bit to 1 and does not move the pointer. On a fault with every frame full, the pointer looks at its frame: if the use bit is 1, it clears it to 0 and moves on; if it is 0, that page is replaced.</li>
+    </ul>
+    <p>In each table, every column is one reference (its position, then the page). Write the page in each frame <b>after</b> that reference (leave a frame blank while it is empty), and an <b>F</b> in the bottom row if the reference faulted.</p>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(a)</b> Fill in the tables for OPT and LRU.</p>
+    <p><b>OPT</b></p>
+    <div class="scroll-x"><table class="grid" data-id="p3a-opt" data-corner="OPT" data-rows="Frame 1|Frame 2|Frame 3|Fault (F)" data-cols="1: 4|2: 2|3: 1|4: 3|5: 2|6: 4|7: 2|8: 1|9: 2|10: 4|11: 6|12: 2|13: 4|14: 2|15: 6|16: 5|17: 4|18: 5" data-label="Problem 3(a) OPT table"></table></div>
+    <p><b>LRU</b></p>
+    <div class="scroll-x"><table class="grid" data-id="p3a-lru" data-corner="LRU" data-rows="Frame 1|Frame 2|Frame 3|Fault (F)" data-cols="1: 4|2: 2|3: 1|4: 3|5: 2|6: 4|7: 2|8: 1|9: 2|10: 4|11: 6|12: 2|13: 4|14: 2|15: 6|16: 5|17: 4|18: 5" data-label="Problem 3(a) LRU table"></table></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(b)</b> Fill in the tables for FIFO and clock. For clock, also write the three use bits after each reference, Frame 1 first (for example <code>101</code>).</p>
+    <p><b>FIFO</b></p>
+    <div class="scroll-x"><table class="grid" data-id="p3b-fifo" data-corner="FIFO" data-rows="Frame 1|Frame 2|Frame 3|Fault (F)" data-cols="1: 4|2: 2|3: 1|4: 3|5: 2|6: 4|7: 2|8: 1|9: 2|10: 4|11: 6|12: 2|13: 4|14: 2|15: 6|16: 5|17: 4|18: 5" data-label="Problem 3(b) FIFO table"></table></div>
+    <p><b>Clock</b></p>
+    <div class="scroll-x"><table class="grid" data-id="p3b-clock" data-corner="Clock" data-rows="Frame 1|Frame 2|Frame 3|Use bits|Fault (F)" data-cols="1: 4|2: 2|3: 1|4: 3|5: 2|6: 4|7: 2|8: 1|9: 2|10: 4|11: 6|12: 2|13: 4|14: 2|15: 6|16: 5|17: 4|18: 5" data-label="Problem 3(b) clock table"></table></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(c)</b> Give each policy's total number of faults. Then look at reference 6 (page 4): which page does FIFO evict there, which does clock evict, and why does clock make the better choice? Why does LRU come closer to OPT than FIFO does on this string?</p>
+    <div class="scroll-x"><table class="grid" data-id="p3c-grid" data-corner="Policy" data-rows="OPT|LRU|FIFO|Clock" data-cols="Total faults" data-label="Problem 3(c) totals"></table></div>
+    <div class="ans" data-id="p3c" data-rows="5" data-label="Problem 3(c)"></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(d)</b> Run FIFO on this string, once with 3 frames and once with 4 frames (same fault rules, all frames empty at the start). How many faults does each give? What is this effect called, and why can it happen with FIFO but never with LRU or OPT?</p>
+    <p style="font-family:var(--mono);font-size:1.05rem;letter-spacing:.06em">1 2 3 4 5 2 3 1 2 3 4 3 5 1</p>
+    <div class="ans" data-id="p3d" data-rows="6" data-label="Problem 3(d)"></div>
+  </div>
+</section>
+
+<!-- ============================ Problem 4 ============================ -->
+<section class="card" id="p4">
+  <h2><span class="num">Problem 4</span>Working sets, resident sets and load control</h2>
+  <div class="given">
+    <p>A process makes these references. Virtual time counts the process's own references, starting at 1.</p>
+    <div class="scroll-x">
+      <table class="data">
+        <tr><th>Virtual time <i>t</i></th><td>1</td><td>2</td><td>3</td><td>4</td><td>5</td><td>6</td><td>7</td><td>8</td><td>9</td><td>10</td><td>11</td><td>12</td><td>13</td><td>14</td><td>15</td></tr>
+        <tr><th>Page</th><td>1</td><td>2</td><td>1</td><td>3</td><td>2</td><td>1</td><td>4</td><td>5</td><td>4</td><td>6</td><td>5</td><td>4</td><td>6</td><td>1</td><td>2</td></tr>
+      </table>
+    </div>
+    <p>The working set <b>W(<i>t</i>, Δ)</b> is the set of distinct pages referenced at virtual times <i>t</i> − Δ + 1 through <i>t</i>: the last Δ references, counting the one at time <i>t</i>. Early on, when fewer than Δ references exist, it uses all of them.</p>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(a)</b> Write each working set as a set, such as {1, 3}.</p>
+    <div class="scroll-x"><table class="grid" data-id="p4a" data-corner="Window" data-rows="Δ = 2|Δ = 4|Δ = 6" data-cols="t = 6|t = 10|t = 15" data-label="Problem 4(a) table"></table></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(b)</b> Give the size |W(<i>t</i>, 4)| at every virtual time, then the average size over all 15 times.</p>
+    <div class="scroll-x"><table class="grid" data-id="p4b-grid" data-sep=";" data-corner="t" data-rows="Size of W(t, 4)" data-cols="1;2;3;4;5;6;7;8;9;10;11;12;13;14;15" data-label="Problem 4(b) table"></table></div>
+    <p class="q">The average size of W(<i>t</i>, 2) is 1.93 and of W(<i>t</i>, 6) is 3.47. What rule do the three averages illustrate? Around which times does the process change locality, what happens to the working set's size there, and why is that a misleading moment to decide how many frames the process needs?</p>
+    <div class="ans" data-id="p4b" data-rows="5" data-label="Problem 4(b)"></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(c)</b> Resident set management combines an allocation (fixed or variable number of frames per process) with a replacement scope (local: evict only the faulting process's pages; global: evict any unlocked page). For each combination, say whether it is possible, then either how a page fault is handled or why it cannot exist.</p>
+    <div class="scroll-x"><table class="grid wide" data-id="p4c" data-corner="Combination" data-rows="Fixed allocation, local scope|Fixed allocation, global scope|Variable allocation, local scope|Variable allocation, global scope" data-cols="Possible? (yes / no)|How a fault is handled, or why it cannot exist" data-label="Problem 4(c) table"></table></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(d)</b> (i) A process faults on page 17, which was evicted 30 ms ago and is still on the free page list. What does the OS do, and why is that so much faster than an ordinary fault? (ii) With <b>demand cleaning</b>, a fault picks a victim page that has been modified. How many disk transfers does the faulting process wait for, and why? (iii) What can <b>precleaning</b> waste, and how does page buffering get the advantages of both?</p>
+    <div class="ans" data-id="p4d" data-rows="6" data-label="Problem 4(d)"></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(e)</b> A monitor shows: 40 processes in main memory, processor utilization 12%, the paging disk busy 97% of the time, each process runs only 0.4 ms, on average, between page faults, while servicing one fault takes 6 ms. What is happening, and what should load control do about it? Explain using the rule that keeps the mean time between faults equal to the mean time to service a fault. If the OS decides to suspend one process, give one advantage and one drawback of suspending (i) the process that just faulted and (ii) the process with the smallest resident set.</p>
+    <div class="ans" data-id="p4e" data-rows="7" data-label="Problem 4(e)"></div>
+  </div>
+</section>
+
+<!-- ============================ Problem 5 ============================ -->
+<section class="card" id="p5">
+  <h2><span class="num">Problem 5</span>Memory management in real systems</h2>
+  <div class="part">
+    <p class="q"><b class="letter">(a)</b> A UNIX system replaces pages with a <b>two-handed clock</b>. The front hand clears each page's reference bit; the back hand follows <b>800 pages</b> behind (the handspread) and evicts any page whose bit is still 0. Both hands move at the scan rate, which grows in a straight line from <b>200 pages per second</b> (slowscan) when free memory is at <b>4,096</b> frames (lotsfree) to <b>6,200 pages per second</b> (fastscan) when free memory has fallen to <b>1,024</b> frames (minfree). For each amount of free memory, give the scan rate and how long a page has, after the front hand passes it, to be referenced again before the back hand reaches it.</p>
+    <div class="scroll-x"><table class="grid" data-id="p5a" data-corner="Free frames" data-rows="4,096|2,560|1,024" data-cols="Scan rate (pages per second)|Time to be referenced again (s)" data-label="Problem 5(a) table"></table></div>
+    <div class="ans" data-id="p5a-why" data-rows="3" data-label="Problem 5(a) explanation" data-placeholder="Why should that time get shorter as free memory runs out?"></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(b)</b> The kernel needs <b>10,000</b> objects of <b>200 bytes</b> each. Compare three ways to supply them: a whole 4 KiB page per object; a buddy system, which hands out blocks whose size is a power of two (the smallest that fits); and a <b>slab allocator</b>, which cuts 4 KiB pages into as many 200-byte slots as fit and leaves the remainder of each page unused.</p>
+    <div class="scroll-x"><table class="grid" data-id="p5b" data-corner="Scheme" data-rows="A whole page per object|Buddy blocks|Slab cache" data-cols="Memory used for 10,000 objects (bytes)|Percentage of that memory wasted" data-label="Problem 5(b) table"></table></div>
+    <div class="ans" data-id="p5b-lazy" data-rows="3" data-label="Problem 5(b) lazy buddy" data-placeholder="What does a lazy buddy system do differently when a block is freed, and why does that save time?"></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(c)</b> Linux. (i) Linux writes its page-table code for four levels (PGD, PUD, PMD, PTE). How does the same code run on a processor whose hardware has only two levels? (ii) Linux keeps an <b>active</b> list and an <b>inactive</b> list of pages. Describe what happens to a page on the inactive list that is referenced once, and then referenced again, and say from which end of which list the kernel takes pages when it needs free frames.</p>
+    <div class="ans" data-id="p5c" data-rows="5" data-label="Problem 5(c)"></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(d)</b> Windows. In the default 32-bit layout, each process sees a 4 GB address space: <code>0x00000000–0x0000FFFF</code> is a reserved region, <code>0x00010000–0x7FFEFFFF</code> is user space, <code>0x7FFF0000–0x7FFFFFFF</code> is a region the program cannot access, and <code>0x80000000–0xFFFFFFFF</code> is system space. Name the region of each address and say what that region is for.</p>
+    <div class="scroll-x"><table class="grid wide" data-id="p5d" data-corner="Address" data-rows="0x00000F20|0x00401000|0x7FFF8000|0x80123000" data-cols="Region|What the region is for" data-label="Problem 5(d) table"></table></div>
+    <div class="ans" data-id="p5d-ws" data-rows="4" data-label="Problem 5(d) reserve and trim" data-placeholder="What is the difference between reserving and committing a region? When memory gets scarce, what does the memory manager do to working sets, and where do the removed pages go first?"></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(e)</b> Android phones usually have no swap area on their flash storage. Give two reasons. What does Android do instead when memory runs low, in what order, and what must every app therefore be ready for?</p>
+    <div class="ans" data-id="p5e" data-rows="5" data-label="Problem 5(e)"></div>
+  </div>
+</section>
+
+<!-- ============================ Problem 6 ============================ -->
+<section class="card" id="p6">
+  <h2><span class="num">Problem 6</span>Who decides, and by what measure?</h2>
+  <div class="part">
+    <p class="q"><b class="letter">(a)</b> For each decision, name the scheduler that makes it (long-term, medium-term, short-term or I/O scheduling) and the transitions it causes in the seven-state process model (New, Ready, Running, Blocked, Ready/Suspend, Blocked/Suspend, Exit). List every state change, for every process involved (some decisions cause several), or write "none" if no process changes state.</p>
+    <div class="scroll-x"><table class="grid wide" data-id="p6a" data-corner="Decision" data-rows="A batch job has been waiting to start; the OS decides to create its process now and load it into memory|Main memory is overcommitted; the OS writes a blocked process out to disk|A clock interrupt ends the running process's time slice and the OS picks who runs next|Two processes are waiting for disk reads; the disk becomes free and the OS picks whose read goes first|Memory has been freed; the OS brings a Ready/Suspend process back into main memory|The system is saturated, so a new login is refused with a 'system full, try later' message|A semaphore signal wakes a high-priority process, which then takes the processor from the running one" data-cols="Scheduler|Transition(s)" data-label="Problem 6(a) table"></table></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(b)</b> Classify each scheduling criterion.</p>
+    <div class="scroll-x"><table class="grid" data-id="p6b" data-corner="Criterion" data-rows="Turnaround time|Response time|Deadlines|Predictability|Throughput|Processor utilization|Fairness|Enforcing priorities|Balancing resources" data-cols="User- or system-oriented?|Performance-related or other?" data-label="Problem 6(b) table"></table></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(c)</b> Describe each policy. Write the selection function using <i>w</i> (time spent waiting so far), <i>e</i> (time spent executing so far) and <i>s</i> (total service time the process needs), for example max[<i>w</i>].</p>
+    <div class="scroll-x"><table class="grid" data-id="p6c" data-corner="Policy" data-rows="FCFS|Round robin|SPN|SRT|HRRN|Feedback" data-cols="Selection function|Preemptive or nonpreemptive?|Can a process starve? (yes / no)" data-label="Problem 6(c) table"></table></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(d)</b> A system has four priority queues, RQ0 (highest) to RQ3, and always runs the first process of the highest non-empty queue. A long background job sits in RQ3. A new job enters RQ0 every 5 ms, and each needs exactly 5 ms of processor time. What happens to the background job, and why? Describe one change to the policy that guarantees it eventually runs, and say what preemption costs the system each time it happens.</p>
+    <div class="ans" data-id="p6d" data-rows="5" data-label="Problem 6(d)"></div>
+  </div>
+</section>
+
+<!-- ============================ Problem 7 ============================ -->
+<section class="card" id="p7">
+  <h2><span class="num">Problem 7</span>Six policies, one workload</h2>
+  <div class="given">
+    <div class="scroll-x">
+      <table class="data">
+        <tr><th>Process</th><th>V</th><th>W</th><th>X</th><th>Y</th><th>Z</th></tr>
+        <tr><th>Arrival time</th><td>0</td><td>1</td><td>2</td><td>5</td><td>9</td></tr>
+        <tr><th>Service time <i>Ts</i></th><td>6</td><td>3</td><td>7</td><td>2</td><td>2</td></tr>
+      </table>
+    </div>
+    <ul>
+      <li>Time moves in whole units, and one processor runs one process at a time. Ignore the time taken to switch processes.</li>
+      <li>A process that arrives at time <i>t</i> joins the ready queue <b>before</b> a process that is preempted (or whose quantum runs out) at the same time <i>t</i>.</li>
+      <li><b>RR q = 1</b>: when the quantum runs out, the running process goes to the back of the ready queue; if no other process is ready, it simply keeps running.</li>
+      <li><b>SPN</b> and <b>HRRN</b> choose only when the processor becomes free, and never preempt. HRRN picks the largest ratio R = (<i>w</i> + <i>s</i>) / <i>s</i>, where <i>w</i> is the time waited so far.</li>
+      <li><b>SRT</b> always runs the process with the least remaining service time; a new arrival preempts only if its remaining time is strictly less.</li>
+      <li><b>Feedback, q = 1</b>: queues RQ0 (highest), RQ1, RQ2, … with as many levels as needed, each first-come first-served. A new process enters RQ0. After each unit of running, an unfinished process moves down one queue, <b>unless</b> no other process is ready at that moment (a process arriving at that same moment counts as ready), in which case it stays where it is and keeps running. The processor always takes the first process of the highest non-empty queue.</li>
+      <li>Ties in SPN, SRT and HRRN go to the process that arrived earlier.</li>
+      <li>Turnaround time <i>Tr</i> = finish time − arrival time. Normalized turnaround = <i>Tr</i> / <i>Ts</i> (1.00 is the best possible).</li>
+    </ul>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(a)</b> Write which process runs in each time unit under each policy.</p>
+    <div class="scroll-x"><table class="grid" data-id="p7a" data-corner="Policy" data-rows="FCFS|RR q = 1|SPN|SRT|HRRN|Feedback q = 1" data-cols="0–1|1–2|2–3|3–4|4–5|5–6|6–7|7–8|8–9|9–10|10–11|11–12|12–13|13–14|14–15|15–16|16–17|17–18|18–19|19–20" data-label="Problem 7(a) timeline"></table></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(b)</b> Finish times.</p>
+    <div class="scroll-x"><table class="grid" data-id="p7b" data-corner="Policy" data-rows="FCFS|RR q = 1|SPN|SRT|HRRN|Feedback q = 1" data-cols="V|W|X|Y|Z" data-label="Problem 7(b) finish times"></table></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(c)</b> Turnaround times <i>Tr</i> and their mean (two decimal places).</p>
+    <div class="scroll-x"><table class="grid" data-id="p7c" data-corner="Policy" data-rows="FCFS|RR q = 1|SPN|SRT|HRRN|Feedback q = 1" data-cols="V|W|X|Y|Z|Mean" data-label="Problem 7(c) turnaround"></table></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(d)</b> Normalized turnaround <i>Tr</i> / <i>Ts</i> and its mean (two decimal places).</p>
+    <div class="scroll-x"><table class="grid" data-id="p7d" data-corner="Policy" data-rows="FCFS|RR q = 1|SPN|SRT|HRRN|Feedback q = 1" data-cols="V|W|X|Y|Z|Mean" data-label="Problem 7(d) normalized turnaround"></table></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(e)</b> (i) Under HRRN, show the response ratios of the waiting processes at time 9 and at time 11, and say which process wins at 11, and why. (ii) Under SRT, what happens at time 9 when Z arrives, and which rule decides it? (iii) Which policy gives the best mean normalized turnaround, which gives Y its worst treatment, and why?</p>
+    <div class="ans" data-id="p7e" data-rows="7" data-label="Problem 7(e)"></div>
+  </div>
+</section>
+
+<!-- ============================ Problem 8 ============================ -->
+<section class="card" id="p8">
+  <h2><span class="num">Problem 8</span>Priorities that change over time</h2>
+  <div class="part">
+    <p class="q"><b class="letter">(a)</b> SPN and HRRN need each process's next processor burst before it happens. <b>Exponential averaging</b> predicts it: S(<i>n</i> + 1) = α·T(<i>n</i>) + (1 − α)·S(<i>n</i>), where T(<i>n</i>) is the <i>n</i>th measured burst and S(<i>n</i>) was its prediction. A process starts with the guess S(1) = 8 ms, and its bursts turn out to be T(1) to T(6) = 6, 4, 6, 14, 13, 13 ms. Give the predictions to two decimal places.</p>
+    <div class="scroll-x"><table class="grid" data-id="p8a" data-corner="Weight" data-rows="α = 0.2|α = 0.8" data-cols="S(2)|S(3)|S(4)|S(5)|S(6)|S(7)" data-label="Problem 8(a) table"></table></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(b)</b> The process changed its behavior at burst 4. How far off was each α's prediction for T(5) and for T(6)? Write out the weights that the four most recent bursts receive in S(<i>n</i> + 1) for α = 0.8 and for α = 0.2, and what they add up to. When would you choose the smaller α?</p>
+    <div class="ans" data-id="p8b" data-rows="5" data-label="Problem 8(b)"></div>
+  </div>
+  <div class="part">
+    <div class="given">
+      <p>Traditional UNIX recomputes priorities once per second. A lower number means a <b>higher</b> priority. Divisions round down.</p>
+      <ul>
+        <li>The clock interrupts 60 times per second and adds 1 to the running process's CPU count each time, so a process that runs a whole second adds 60.</li>
+        <li>At every whole second <i>t</i> = 1, 2, 3, …, every process's CPU count is halved: CPU = CPU / 2. Then every priority is recomputed: P = Base + CPU / 2 + nice.</li>
+        <li>At <i>t</i> = 0 each priority is Base + 0 + nice.</li>
+        <li>The process with the lowest P runs for the whole next second. A tie goes to the process that has gone longest without running; among processes that have never run, X comes first, then Y, then Z.</li>
+      </ul>
+      <p>Three CPU-bound processes X, Y and Z start at time 0 with CPU count 0 and base priority 60. X and Y have nice 0; <b>Z has nice 8</b>.</p>
+    </div>
+    <p class="q"><b class="letter">(c)</b> Fill in the table. Each row shows the values just after that second's recomputation, and who then runs.</p>
+    <div class="scroll-x"><table class="grid" data-id="p8c" data-corner="Time (s)" data-rows="0|1|2|3|4|5|6" data-cols="X CPU|X priority|Y CPU|Y priority|Z CPU|Z priority|Runs next" data-label="Problem 8(c) table"></table></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(d)</b> Repeat the same start with Z's nice raised to 10. Continue until X and Y fall into a repeating pattern, and give the two priorities they alternate between. Does Z ever run? Explain, using the halving of CPU counts, why or why not.</p>
+    <div class="ans" data-id="p8d" data-rows="6" data-label="Problem 8(d)"></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(e)</b> Add an I/O-bound process D (base 60, nice 0) to the original X, Y, Z system. Whenever its input arrives it runs for only 3 clock ticks and then blocks again; assume this happens once every second, so D adds exactly 3 to its CPU count each second. Assume that when D's input arrives, D preempts the running process if D's priority number is lower. Starting from a CPU count of 0, give D's CPU count just after each halving for the first few seconds: what CPU count and priority does D settle at? What does that mean for how quickly D gets the processor each time its input arrives, and why is that good for the whole system?</p>
+    <div class="ans" data-id="p8e" data-rows="5" data-label="Problem 8(e)"></div>
+  </div>
+</section>
+
+<span class="part-label" id="part-b">Part B · Simulate replacement and scheduling</span>
+
+<section class="card" id="b-setup">
+  <h2><span class="num">B1</span>Set up your computer and repository</h2>
+  <p>You need <b>Python</b> to run the program, <b>Git</b> to track your files and a free <b>GitHub</b> account to hold the repository. If you set these up for an earlier homework, check them with <code>python --version</code> (macOS: <code>python3 --version</code>) and <code>git --version</code>, then start at step 4.</p>
+  <p>Every command below is typed into a <b>terminal</b>: on Windows open <b>PowerShell</b> (Start menu, type "PowerShell"); on macOS open <b>Terminal</b> (press <kbd>⌘</kbd> + <kbd>Space</kbd>, type "Terminal"). Type a command, then press <kbd>Enter</kbd>.</p>
+  <ol class="steps">
+    <li><b>Install Python 3</b> from <a href="https://www.python.org/downloads/">python.org/downloads</a> (any version 3.10 or newer; use the standard installer).
+      <div class="os"><b>Windows</b><span>On the installer's first screen, tick <b>"Add python.exe to PATH"</b> before clicking Install. Check it with <code>python --version</code>.</span></div>
+      <div class="os"><b>macOS</b><span>Run the downloaded installer. Check it with <code>python3 --version</code>.</span></div>
+      <p>On macOS and Linux the command is <code>python3</code> everywhere this page says <code>python</code>.</p>
+    </li>
+    <li><b>Install Git.</b>
+      <div class="os"><b>Windows</b><span>Download it from <a href="https://git-scm.com/downloads">git-scm.com/downloads</a> and accept the installer's defaults. Close and reopen PowerShell, then check with <code>git --version</code>.</span></div>
+      <div class="os"><b>macOS</b><span>Type <code>git --version</code>. If Git is missing, macOS offers to install the command-line developer tools; accept, wait, and run the command again.</span></div>
+    </li>
+    <li><b>Tell Git who you are</b> (once per computer):
+      <pre class="term">git config --global user.name "Your Name"
+git config --global user.email "you@example.com"</pre>
+    </li>
+    <li><b>Create the repository on GitHub.</b> Sign in at <a href="https://github.com">github.com</a>, click <b>+</b> at the top right, then <b>New repository</b>. Name it <code>os-hw4</code>, tick <b>Add a README file</b>, and click <b>Create repository</b>.</li>
+    <li><b>Copy it to your computer.</b> Click the green <b>Code</b> button, copy the HTTPS address, then:
+      <pre class="term">cd ~
+git clone https://github.com/YOUR-USERNAME/os-hw4.git
+cd os-hw4</pre>
+      <code>cd ~</code> moves the terminal into your home folder, where the repository is created. Run every later command from inside the <code>os-hw4</code> folder.</li>
+    <li><b>Get the starter file.</b> Click <b>Download</b> on the code box in B2 and move <code>vmsched.py</code> into the <code>os-hw4</code> folder (check that the name ends in <code>.py</code>, not <code>.py.txt</code>) (or create the file in a code editor such as VS Code and paste in what <b>Copy</b> gives you).</li>
+    <li><b>Run it once before changing anything:</b>
+      <pre class="term">python vmsched.py</pre>
+      The OPT and FIFO rows of Experiment 1, the FIFO and OPT lines of Experiment 2, and the FCFS and SPN rows of Experiments 3 and 4 appear, and each experiment then prints <code>-&gt; stopped here: TODO ...</code>. Seeing that output means your setup is correct. The complete program finishes within a few seconds.</li>
+  </ol>
+  <pre class="term">Experiment 1: page faults for 3,000 references to 40 pages
+  reference string with locality
+    frames      1     2     3     4     5     6     7     8     9    10
+    OPT      2426  1440   910   615   448   352   307   278   257   238
+    FIFO     2426  1918  1410  1078   851   700   602   529   480   440
+  -&gt; stopped here: TODO 1: lru is not written yet
+
+Experiment 2: Belady's anomaly in 20,000 random strings (30 references, 6 pages)
+  FIFO   more faults with more frames in  39 of 20,000 strings
+         first example: 1 5 2 2 2 2 1 1 0 4 4 1 5 4 3 2 1 2 3 5 4 3 2 0 4 0 4 0 4 3
+         faults with 1-6 frames: [25, 20, 17, 11, 12, 6]
+  OPT    more faults with more frames in   0 of 20,000 strings
+  -&gt; stopped here: TODO 1: lru is not written yet
+
+Experiment 3: five processes (name arrival service): A 0 5  B 1 7  C 3 2  D 4 4  E 6 1
+  FCFS    finish  A:  5  B: 12  C: 14  D: 18  E: 19   mean Tr 10.80   mean Tr/Ts 4.91
+  SPN     finish  A:  5  B: 19  C:  7  D: 12  E:  8   mean Tr  7.40   mean Tr/Ts 1.91
+  -&gt; stopped here: TODO 3: round_robin is not written yet
+
+Experiment 4: 600 random processes (mean service 5.11, processor busy about 90% of the time)
+  policy    mean Tr/Ts   shortest third   longest third   worst Tr/Ts   longest wait
+  FCFS          14.24            28.75            3.94        104.00            108
+  SPN            3.47             4.66            3.06         25.00            340
+  -&gt; stopped here: TODO 3: round_robin is not written yet</pre>
+</section>
+
+<section class="card" id="b-code">
+  <h2><span class="num">B2</span>The starter program</h2>
+  <p>Read it from top to bottom first; every line carries a comment. It runs four experiments:</p>
+  <ol>
+    <li><b>Page faults:</b> builds two strings of 3,000 page references to a 40-page process, one with locality (the process works on 3 to 6 neighbouring pages for a while, then moves on) and one uniformly random, and counts the faults of OPT, FIFO, LRU and clock with 1 to 10 frames.</li>
+    <li><b>Belady's anomaly:</b> tests 20,000 short random strings and counts, for each policy, the strings on which one more frame gives <i>more</i> faults.</li>
+    <li><b>Five processes:</b> schedules a small workload with FCFS, SPN, round robin (quantum 1 and 4) and HRRN and prints every finish time.</li>
+    <li><b>A random workload:</b> schedules 600 processes with random arrival times and service times and reports the normalized turnaround <i>Tr</i>/<i>Ts</i> of all processes, of the shortest third and of the longest third, the worst <i>Tr</i>/<i>Ts</i>, and the longest time any process spent waiting.</li>
+  </ol>
+  <div class="note">Why the output is the same on every computer: every "random" choice comes from <code>random.Random(SEED)</code>, a generator started from a fixed number. The same seed always produces the same sequence of numbers, so the strings and the workload are identical everywhere, and so are the results. Your output should match a classmate's line for line once both programs are correct.</div>
+  <div class="codebox" data-file="vmsched.py"><div class="tools"><span class="name">vmsched.py</span><button type="button" class="js-copy">Copy</button><button type="button" class="js-save">Download</button></div><pre class="tall"><code><span class="s">"""vmsched.py: page replacement and processor scheduling, simulated.
+
+Run it from a terminal in the folder that holds this file:
+    python vmsched.py           (Windows)   or   python3 vmsched.py   (macOS / Linux)
+
+Your work is marked with TODO. Everything else already works: run the file before you change
+anything; each experiment that reaches an unwritten TODO says which one and the rest still run.
+Every "random" number comes from a generator started with a fixed seed, so the whole output is
+the same on every computer and every run.
+"""</span>
+
+<span class="k">import</span> random  <span class="c"># the seeded random-number generator that builds the reference strings and the workload</span>
+<span class="k">from</span> collections <span class="k">import</span> deque  <span class="c"># a queue with fast removal from the front: the ready queue of round robin</span>
+
+SEED = <span class="n">2026</span>  <span class="c"># the generator's starting point; the same seed gives the same "random" numbers everywhere</span>
+PAGES = <span class="n">40</span>  <span class="c"># Experiment 1: the process has 40 virtual pages, numbered 0 to 39</span>
+REF_LENGTH = <span class="n">3000</span>  <span class="c"># Experiment 1: each reference string holds 3,000 page references</span>
+MAX_FRAMES = <span class="n">10</span>  <span class="c"># Experiment 1: the fault table tries 1, 2, ..., 10 frames</span>
+BELADY_STRINGS = <span class="n">20000</span>  <span class="c"># Experiment 2: how many short random strings are tested for Belady's anomaly</span>
+BELADY_LENGTH = <span class="n">30</span>  <span class="c"># Experiment 2: references per short string</span>
+BELADY_PAGES = <span class="n">6</span>  <span class="c"># Experiment 2: pages per short string, numbered 0 to 5</span>
+NUM_PROCS = <span class="n">600</span>  <span class="c"># Experiment 4: processes in the random workload</span>
+MEAN_SERVICE = <span class="n">5</span>  <span class="c"># Experiment 4: average service time (time units of processor work) per process</span>
+MEAN_GAP = <span class="n">5.5</span>  <span class="c"># Experiment 4: average time between arrivals; 5 / 5.5 keeps the processor about 90% busy</span>
+
+
+<span class="k">class</span> NotWrittenYet(Exception):  <span class="c"># a custom error the starter raises wherever a TODO has not been written yet</span>
+    <span class="k">pass</span>  <span class="c"># it needs no extra behavior; its name and message say everything</span>
+
+
+<span class="c"># ---------------------------------------------------------------------------</span>
+<span class="c"># Reference strings: the order in which a process touches its pages</span>
+<span class="c"># ---------------------------------------------------------------------------</span>
+<span class="k">def</span> locality_refs(rng, length, pages):  <span class="c"># a string with locality: the process works on a few pages for a while, then moves on</span>
+    refs = []  <span class="c"># the string being built</span>
+    <span class="k">while</span> len(refs) &lt; length:  <span class="c"># one phase per trip around this loop, until the string is long enough</span>
+        size = rng.randint(<span class="n">3</span>, <span class="n">6</span>)  <span class="c"># this phase's working set holds 3 to 6 pages</span>
+        start = rng.randrange(pages - size + <span class="n">1</span>)  <span class="c"># it is a run of neighbouring pages, like one loop's code or one array</span>
+        working = list(range(start, start + size))  <span class="c"># the pages of this phase, e.g. [12, 13, 14, 15]</span>
+        <span class="k">for</span> _ <span class="k">in</span> range(rng.randint(<span class="n">50</span>, <span class="n">250</span>)):  <span class="c"># the phase lasts 50 to 250 references</span>
+            <span class="k">if</span> rng.random() &lt; <span class="n">0.9</span>:  <span class="c"># 9 references in 10 stay inside the working set...</span>
+                refs.append(rng.choice(working))  <span class="c"># ...on one of its pages, picked at random</span>
+            <span class="k">else</span>:  <span class="c"># ...and 1 in 10 strays anywhere (a global variable, a library call, the stack)</span>
+                refs.append(rng.randrange(pages))  <span class="c"># any page of the process</span>
+    <span class="k">return</span> refs[:length]  <span class="c"># cut the last phase short so the string has exactly `length` references</span>
+
+
+<span class="k">def</span> uniform_refs(rng, length, pages):  <span class="c"># a string with NO locality: every reference is equally likely to hit any page</span>
+    <span class="k">return</span> [rng.randrange(pages) <span class="k">for</span> _ <span class="k">in</span> range(length)]  <span class="c"># one independent random page per reference</span>
+
+
+<span class="c"># ---------------------------------------------------------------------------</span>
+<span class="c"># Page replacement: each function returns how many page faults the string causes</span>
+<span class="c"># (a fault is counted every time the referenced page is not resident, including the first loads)</span>
+<span class="c"># ---------------------------------------------------------------------------</span>
+<span class="k">def</span> fifo(refs, nframes):  <span class="c"># first in, first out: evict the page that has been in memory longest</span>
+    frames = []  <span class="c"># the resident pages, oldest first</span>
+    faults = <span class="n">0</span>  <span class="c"># faults so far</span>
+    <span class="k">for</span> page <span class="k">in</span> refs:  <span class="c"># one reference at a time, in order</span>
+        <span class="k">if</span> page <span class="k">in</span> frames:  <span class="c"># a hit: the page is already in a frame...</span>
+            <span class="k">continue</span>  <span class="c"># ...and FIFO does nothing on a hit</span>
+        faults += <span class="n">1</span>  <span class="c"># a miss: page fault</span>
+        <span class="k">if</span> len(frames) == nframes:  <span class="c"># every frame is taken...</span>
+            frames.pop(<span class="n">0</span>)  <span class="c"># ...so evict the oldest page, at the front of the list</span>
+        frames.append(page)  <span class="c"># the new page is now the youngest, at the back</span>
+    <span class="k">return</span> faults  <span class="c"># the total</span>
+
+
+<span class="k">def</span> next_use(refs, i, page):  <span class="c"># when is `page` referenced next after position i? (used by OPT)</span>
+    <span class="k">try</span>:  <span class="c"># list.index raises ValueError when the value does not occur</span>
+        <span class="k">return</span> refs.index(page, i + <span class="n">1</span>)  <span class="c"># the position of its next reference</span>
+    <span class="k">except</span> ValueError:  <span class="c"># it is never referenced again...</span>
+        <span class="k">return</span> len(refs)  <span class="c"># ...which counts as farther away than any real reference</span>
+
+
+<span class="k">def</span> opt(refs, nframes):  <span class="c"># optimal: evict the page whose next use lies farthest in the future (needs to know the future)</span>
+    frames = []  <span class="c"># the resident pages; list position = frame number</span>
+    faults = <span class="n">0</span>  <span class="c"># faults so far</span>
+    <span class="k">for</span> i, page <span class="k">in</span> enumerate(refs):  <span class="c"># i is the position of this reference in the string</span>
+        <span class="k">if</span> page <span class="k">in</span> frames:  <span class="c"># a hit</span>
+            <span class="k">continue</span>  <span class="c"># nothing to do</span>
+        faults += <span class="n">1</span>  <span class="c"># a page fault</span>
+        <span class="k">if</span> len(frames) &lt; nframes:  <span class="c"># a frame is still empty...</span>
+            frames.append(page)  <span class="c"># ...so the page simply goes into it</span>
+            <span class="k">continue</span>  <span class="c"># and this reference is done</span>
+        victim = max(frames, key=<span class="k">lambda</span> p: next_use(refs, i, p))  <span class="c"># the farthest next use; on a tie max() keeps the lowest frame</span>
+        frames[frames.index(victim)] = page  <span class="c"># the new page takes the victim's frame</span>
+    <span class="k">return</span> faults  <span class="c"># the total</span>
+
+
+<span class="k">def</span> lru(refs, nframes):  <span class="c"># least recently used: evict the page that has gone unused for the longest time</span>
+    <span class="c"># TODO 1: return the number of page faults, like fifo() above. Keep a list `frames` ordered from least recently</span>
+    <span class="c">#         used (front) to most recently used (back). The one difference from FIFO: on a HIT, move the page to the</span>
+    <span class="c">#         back of the list (frames.remove(page) then frames.append(page)), because it has just been used.</span>
+    <span class="k">raise</span> NotWrittenYet(<span class="s">"TODO 1: lru is not written yet"</span>)  <span class="c"># delete this line once your code is in place</span>
+
+
+<span class="k">def</span> clock(refs, nframes):  <span class="c"># the clock policy: FIFO order plus a use bit that gives a recently used page a second chance</span>
+    <span class="c"># TODO 2: return the number of page faults. Start with frames = [None] * nframes (None = empty frame), a list of</span>
+    <span class="c">#         use bits of the same size, all 0, and hand = 0 (the frame the pointer is at). Rules, the same as Problem 3:</span>
+    <span class="c">#         - a hit sets that frame's use bit to 1 and does NOT move the hand;</span>
+    <span class="c">#         - on a fault, while the hand's frame holds a page whose use bit is 1: clear the bit to 0 and move the hand</span>
+    <span class="c">#           on with hand = (hand + 1) % nframes, which wraps from the last frame back to frame 0;</span>
+    <span class="c">#         - then load the page into the hand's frame (it is empty or has use bit 0), set its use bit to 1,</span>
+    <span class="c">#           and move the hand one frame on.</span>
+    <span class="k">raise</span> NotWrittenYet(<span class="s">"TODO 2: clock is not written yet"</span>)  <span class="c"># delete this line once your code is in place</span>
+
+
+POLICIES = ((<span class="s">"OPT"</span>, opt), (<span class="s">"FIFO"</span>, fifo), (<span class="s">"LRU"</span>, lru), (<span class="s">"CLOCK"</span>, clock))  <span class="c"># the replacement policies, in the order the tables print them</span>
+
+
+<span class="k">def</span> experiment_faults():  <span class="c"># fault counts for 1 to 10 frames, on a string with locality and on a uniform random one</span>
+    print(<span class="s">f"Experiment 1: page faults for {REF_LENGTH:,} references to {PAGES} pages"</span>)  <span class="c"># a title</span>
+    rng = random.Random(SEED)  <span class="c"># a fresh generator, so this experiment's strings do not depend on the others</span>
+    strings = ((<span class="s">"with locality"</span>, locality_refs(rng, REF_LENGTH, PAGES)), (<span class="s">"uniform random"</span>, uniform_refs(rng, REF_LENGTH, PAGES)))  <span class="c"># the two strings</span>
+    <span class="k">for</span> label, refs <span class="k">in</span> strings:  <span class="c"># one table per string</span>
+        print(<span class="s">f"  reference string {label}"</span>)  <span class="c"># which string this table is for</span>
+        print(<span class="s">"    frames "</span> + <span class="s">""</span>.join(<span class="s">f"{n:&gt;6}"</span> <span class="k">for</span> n <span class="k">in</span> range(<span class="n">1</span>, MAX_FRAMES + <span class="n">1</span>)))  <span class="c"># the header: 1 to 10 frames</span>
+        <span class="k">for</span> name, policy <span class="k">in</span> POLICIES:  <span class="c"># one row per policy</span>
+            counts = [policy(refs, n) <span class="k">for</span> n <span class="k">in</span> range(<span class="n">1</span>, MAX_FRAMES + <span class="n">1</span>)]  <span class="c"># the faults for every frame count (an unwritten TODO stops here)</span>
+            print(<span class="s">f"    {name:&lt;6} "</span> + <span class="s">""</span>.join(<span class="s">f"{c:&gt;6}"</span> <span class="k">for</span> c <span class="k">in</span> counts))  <span class="c"># the row</span>
+
+
+<span class="k">def</span> anomaly(counts):  <span class="c"># does a fault list for 1, 2, 3, ... frames ever go UP when one frame is added?</span>
+    <span class="k">return</span> any(more &gt; fewer <span class="k">for</span> fewer, more <span class="k">in</span> zip(counts, counts[<span class="n">1</span>:]))  <span class="c"># compare each count with the next one</span>
+
+
+<span class="k">def</span> experiment_belady():  <span class="c"># how often does each policy show Belady's anomaly on short random strings?</span>
+    print(<span class="s">f"\nExperiment 2: Belady's anomaly in {BELADY_STRINGS:,} random strings ({BELADY_LENGTH} references, {BELADY_PAGES} pages)"</span>)  <span class="c"># a title</span>
+    rng = random.Random(SEED + <span class="n">1</span>)  <span class="c"># a separate generator (seed 2027) for this experiment</span>
+    tests = [uniform_refs(rng, BELADY_LENGTH, BELADY_PAGES) <span class="k">for</span> _ <span class="k">in</span> range(BELADY_STRINGS)]  <span class="c"># the short strings</span>
+    <span class="k">for</span> name, policy <span class="k">in</span> ((<span class="s">"FIFO"</span>, fifo), (<span class="s">"OPT"</span>, opt), (<span class="s">"LRU"</span>, lru), (<span class="s">"CLOCK"</span>, clock)):  <span class="c"># each policy in turn</span>
+        found = []  <span class="c"># the strings on which this policy shows the anomaly</span>
+        <span class="k">for</span> refs <span class="k">in</span> tests:  <span class="c"># every string</span>
+            counts = [policy(refs, n) <span class="k">for</span> n <span class="k">in</span> range(<span class="n">1</span>, BELADY_PAGES + <span class="n">1</span>)]  <span class="c"># faults with 1 to 6 frames</span>
+            <span class="k">if</span> anomaly(counts):  <span class="c"># one more frame gave MORE faults somewhere</span>
+                found.append((refs, counts))  <span class="c"># remember the string and its counts</span>
+        print(<span class="s">f"  {name:&lt;6} more faults with more frames in {len(found):&gt;3} of {len(tests):,} strings"</span>)  <span class="c"># the tally</span>
+        <span class="k">if</span> found <span class="k">and</span> name == <span class="s">"FIFO"</span>:  <span class="c"># show the first FIFO example in full</span>
+            refs, counts = found[<span class="n">0</span>]  <span class="c"># the first one found</span>
+            print(<span class="s">f"         first example: {' '.join(map(str, refs))}"</span>)  <span class="c"># the string itself</span>
+            print(<span class="s">f"         faults with 1-{BELADY_PAGES} frames: {counts}"</span>)  <span class="c"># its fault counts</span>
+
+
+<span class="c"># ---------------------------------------------------------------------------</span>
+<span class="c"># Processor scheduling: each policy takes a list of (name, arrival, service) and returns {name: finish time}</span>
+<span class="c"># Time moves in whole units. A process that arrives at time t joins the ready queue before a process</span>
+<span class="c"># preempted at the same time t. Ties go to the process that arrived earlier.</span>
+<span class="c"># ---------------------------------------------------------------------------</span>
+<span class="k">def</span> fcfs(procs):  <span class="c"># first come, first served: run each process to the end, in order of arrival</span>
+    finish = {}  <span class="c"># finish time of each process</span>
+    now = <span class="n">0</span>  <span class="c"># the simulated clock</span>
+    <span class="k">for</span> name, arrival, service <span class="k">in</span> sorted(procs, key=<span class="k">lambda</span> p: p[<span class="n">1</span>]):  <span class="c"># in arrival order (sorting keeps the listed order on ties)</span>
+        now = max(now, arrival)  <span class="c"># if the processor is idle, wait for this process to arrive</span>
+        now += service  <span class="c"># it runs to the end without interruption</span>
+        finish[name] = now  <span class="c"># and finishes here</span>
+    <span class="k">return</span> finish  <span class="c"># every finish time</span>
+
+
+<span class="k">def</span> spn(procs):  <span class="c"># shortest process next: when the processor is free, run the waiting process with the smallest service time</span>
+    waiting = sorted(procs, key=<span class="k">lambda</span> p: p[<span class="n">1</span>])  <span class="c"># processes that have not started yet, in arrival order</span>
+    finish = {}  <span class="c"># finish time of each process</span>
+    now = <span class="n">0</span>  <span class="c"># the simulated clock</span>
+    <span class="k">while</span> waiting:  <span class="c"># until every process has run</span>
+        ready = [p <span class="k">for</span> p <span class="k">in</span> waiting <span class="k">if</span> p[<span class="n">1</span>] &lt;= now]  <span class="c"># the ones that have already arrived</span>
+        <span class="k">if</span> <span class="k">not</span> ready:  <span class="c"># nobody has arrived yet...</span>
+            now = waiting[<span class="n">0</span>][<span class="n">1</span>]  <span class="c"># ...so the processor idles until the next arrival</span>
+            <span class="k">continue</span>  <span class="c"># and decides again</span>
+        chosen = min(ready, key=<span class="k">lambda</span> p: (p[<span class="n">2</span>], p[<span class="n">1</span>]))  <span class="c"># the smallest service time; ties go to the earlier arrival</span>
+        waiting.remove(chosen)  <span class="c"># it starts now...</span>
+        now += chosen[<span class="n">2</span>]  <span class="c"># ...and runs to the end (no preemption)</span>
+        finish[chosen[<span class="n">0</span>]] = now  <span class="c"># its finish time</span>
+    <span class="k">return</span> finish  <span class="c"># every finish time</span>
+
+
+<span class="k">def</span> round_robin(procs, quantum):  <span class="c"># round robin: each process runs at most `quantum` units, then goes to the back of the queue</span>
+    <span class="c"># TODO 3: return {name: finish time}, like fcfs() above. Useful pieces:</span>
+    <span class="c">#   pending = deque(sorted(procs, key=lambda p: p[1]))     processes that have not arrived yet, in arrival order</span>
+    <span class="c">#   left = {name: service for name, arrival, service in procs}   the work each process still needs</span>
+    <span class="c">#   ready = deque()                                         the ready queue of names; ready.popleft() takes the front</span>
+    <span class="c"># Repeat until every process has a finish time:</span>
+    <span class="c">#   1. move every process that has arrived (pending[0][1] &lt;= now) from pending to the back of ready;</span>
+    <span class="c">#   2. if ready is empty, set now to the next arrival time and start again;</span>
+    <span class="c">#   3. take the front process, run it for min(quantum, what it still needs), and advance now by that much;</span>
+    <span class="c">#   4. move the processes that arrived while it ran (or exactly as it stopped) to the back of ready FIRST;</span>
+    <span class="c">#   5. then record its finish time if it has no work left, or else put it at the back of ready.</span>
+    <span class="k">raise</span> NotWrittenYet(<span class="s">"TODO 3: round_robin is not written yet"</span>)  <span class="c"># delete this line once your code is in place</span>
+
+
+<span class="k">def</span> hrrn(procs):  <span class="c"># highest response ratio next: like SPN, but choose the largest R = (waiting time + service) / service</span>
+    <span class="c"># TODO 4: copy the body of spn() above and change only the line that chooses. HRRN picks the process with the</span>
+    <span class="c">#         LARGEST response ratio R = (w + s) / s, where w = now - arrival is the time it has waited so far and s is</span>
+    <span class="c">#         its service time. Ties go to the earlier arrival.</span>
+    <span class="k">raise</span> NotWrittenYet(<span class="s">"TODO 4: hrrn is not written yet"</span>)  <span class="c"># delete this line once your code is in place</span>
+
+
+<span class="k">def</span> scheduling_results(procs, finish):  <span class="c"># turnaround and normalized turnaround for every process</span>
+    rows = []  <span class="c"># one (name, arrival, service, finish, Tr, Tr/Ts) tuple per process</span>
+    <span class="k">for</span> name, arrival, service <span class="k">in</span> procs:  <span class="c"># in the listed order</span>
+        tr = finish[name] - arrival  <span class="c"># turnaround time: from arrival to finish</span>
+        rows.append((name, arrival, service, finish[name], tr, tr / service))  <span class="c"># normalized turnaround: Tr divided by the service time Ts</span>
+    <span class="k">return</span> rows  <span class="c"># the table</span>
+
+
+SCHEDULERS = ((<span class="s">"FCFS"</span>, fcfs), (<span class="s">"SPN"</span>, spn), (<span class="s">"RR q=1"</span>, <span class="k">lambda</span> p: round_robin(p, <span class="n">1</span>)), (<span class="s">"RR q=4"</span>, <span class="k">lambda</span> p: round_robin(p, <span class="n">4</span>)), (<span class="s">"HRRN"</span>, hrrn))  <span class="c"># the policies to compare; lambda fixes each quantum</span>
+
+
+FIVE = [(<span class="s">"A"</span>, <span class="n">0</span>, <span class="n">5</span>), (<span class="s">"B"</span>, <span class="n">1</span>, <span class="n">7</span>), (<span class="s">"C"</span>, <span class="n">3</span>, <span class="n">2</span>), (<span class="s">"D"</span>, <span class="n">4</span>, <span class="n">4</span>), (<span class="s">"E"</span>, <span class="n">6</span>, <span class="n">1</span>)]  <span class="c"># Experiment 3's workload: (name, arrival time, service time)</span>
+
+
+<span class="k">def</span> experiment_five():  <span class="c"># every policy on a small workload you can check by hand</span>
+    print(<span class="s">"\nExperiment 3: five processes (name arrival service): "</span> + <span class="s">"  "</span>.join(<span class="s">f"{n} {a} {s}"</span> <span class="k">for</span> n, a, s <span class="k">in</span> FIVE))  <span class="c"># a title with the workload</span>
+    <span class="k">for</span> label, policy <span class="k">in</span> SCHEDULERS:  <span class="c"># one block per policy</span>
+        rows = scheduling_results(FIVE, policy(FIVE))  <span class="c"># run it and measure (an unwritten TODO stops here)</span>
+        cells = <span class="s">"  "</span>.join(<span class="s">f"{name}:{fin:&gt;3}"</span> <span class="k">for</span> name, _, _, fin, _, _ <span class="k">in</span> rows)  <span class="c"># the finish times</span>
+        mean_tr = sum(r[<span class="n">4</span>] <span class="k">for</span> r <span class="k">in</span> rows) / len(rows)  <span class="c"># mean turnaround</span>
+        mean_norm = sum(r[<span class="n">5</span>] <span class="k">for</span> r <span class="k">in</span> rows) / len(rows)  <span class="c"># mean normalized turnaround</span>
+        print(<span class="s">f"  {label:&lt;7} finish  {cells}   mean Tr {mean_tr:5.2f}   mean Tr/Ts {mean_norm:4.2f}"</span>)  <span class="c"># one line per policy</span>
+
+
+<span class="k">def</span> random_workload(rng, count):  <span class="c"># `count` processes with random arrival gaps and random service times</span>
+    procs = []  <span class="c"># the workload being built</span>
+    now = <span class="n">0</span>  <span class="c"># arrival time of the next process</span>
+    <span class="k">for</span> i <span class="k">in</span> range(<span class="n">1</span>, count + <span class="n">1</span>):  <span class="c"># P1, P2, ...</span>
+        now += round(rng.expovariate(<span class="n">1</span> / MEAN_GAP))  <span class="c"># the gap to this arrival: exponentially distributed, rounded to whole units (0 allowed)</span>
+        service = max(<span class="n">1</span>, round(rng.expovariate(<span class="n">1</span> / MEAN_SERVICE)))  <span class="c"># its service time: exponential too, rounded, at least 1</span>
+        procs.append((<span class="s">f"P{i}"</span>, now, service))  <span class="c"># one process</span>
+    <span class="k">return</span> procs  <span class="c"># the whole workload</span>
+
+
+<span class="k">def</span> experiment_random():  <span class="c"># every policy on a large random workload, split by job length</span>
+    rng = random.Random(SEED + <span class="n">2</span>)  <span class="c"># a separate generator (seed 2028) for this experiment</span>
+    procs = random_workload(rng, NUM_PROCS)  <span class="c"># the workload</span>
+    total = sum(p[<span class="n">2</span>] <span class="k">for</span> p <span class="k">in</span> procs)  <span class="c"># all the processor work there is</span>
+    print(<span class="s">f"\nExperiment 4: {NUM_PROCS} random processes (mean service {total / NUM_PROCS:.2f}, processor busy about {100 * total / fcfs(procs)[procs[-1][0]]:.0f}% of the time)"</span>)  <span class="c"># a title; FCFS never idles while work waits, so its last finish is the makespan</span>
+    by_length = sorted(range(NUM_PROCS), key=<span class="k">lambda</span> i: (procs[i][<span class="n">2</span>], i))  <span class="c"># process positions from shortest to longest service time</span>
+    third = NUM_PROCS // <span class="n">3</span>  <span class="c"># how many processes form a third</span>
+    short, long_ = set(by_length[:third]), set(by_length[-third:])  <span class="c"># the shortest third and the longest third</span>
+    print(<span class="s">"  policy    mean Tr/Ts   shortest third   longest third   worst Tr/Ts   longest wait"</span>)  <span class="c"># the header</span>
+    <span class="k">for</span> label, policy <span class="k">in</span> SCHEDULERS:  <span class="c"># one row per policy</span>
+        rows = scheduling_results(procs, policy(procs))  <span class="c"># run and measure (an unwritten TODO stops here)</span>
+        norm = [r[<span class="n">5</span>] <span class="k">for</span> r <span class="k">in</span> rows]  <span class="c"># every normalized turnaround</span>
+        mean = <span class="k">lambda</span> idx: sum(norm[i] <span class="k">for</span> i <span class="k">in</span> idx) / len(idx)  <span class="c"># the mean over a set of positions</span>
+        wait = max(r[<span class="n">4</span>] - r[<span class="n">2</span>] <span class="k">for</span> r <span class="k">in</span> rows)  <span class="c"># the longest time any process spent NOT running: Tr minus its service time</span>
+        print(<span class="s">f"  {label:&lt;8} {mean(range(NUM_PROCS)):&gt;10.2f} {mean(short):&gt;16.2f} {mean(long_):&gt;15.2f} {max(norm):&gt;13.2f} {wait:&gt;14}"</span>)  <span class="c"># the row</span>
+
+
+<span class="k">def</span> main():  <span class="c"># runs the experiments in order</span>
+    <span class="k">for</span> experiment <span class="k">in</span> (experiment_faults, experiment_belady, experiment_five, experiment_random):  <span class="c"># 1, 2, 3, 4</span>
+        <span class="k">try</span>:  <span class="c"># run one experiment</span>
+            experiment()  <span class="c"># if it reaches an unwritten TODO, NotWrittenYet jumps to the except below</span>
+        <span class="k">except</span> NotWrittenYet <span class="k">as</span> missing:  <span class="c"># a TODO was reached</span>
+            print(<span class="s">f"  -&gt; stopped here: {missing}"</span>)  <span class="c"># say which one, then carry on with the next experiment</span>
+
+
+<span class="k">if</span> __name__ == <span class="s">"__main__"</span>:  <span class="c"># true when the file is run directly (not imported)</span>
+    main()  <span class="c"># start the program</span></code></pre></div>
+</section>
+
+<section class="card" id="b-tasks">
+  <h2><span class="num">B3</span>Write the missing pieces, run, and explain</h2>
+  <ol class="steps">
+    <li><b>TODO 1</b>: <code>lru</code>. Problem 3 practises it by hand; in code it is FIFO with one change.</li>
+    <li><b>TODO 2</b>: <code>clock</code>, with exactly the rules of Problem 3.</li>
+    <li><b>TODO 3</b>: <code>round_robin</code>, with a quantum parameter. The comments list the five steps; the rule about arrivals and preempted processes is the one from Problem 7.</li>
+    <li><b>TODO 4</b>: <code>hrrn</code>, a copy of <code>spn</code> with a different choice.</li>
+    <li>Run the complete program:
+      <pre class="term">python vmsched.py</pre>
+      No line may say "stopped here".</li>
+  </ol>
+
+  <div class="part">
+    <p class="q"><b class="letter">B-a</b> Paste the complete output of <code>python vmsched.py</code>, run before your B-g change.</p>
+    <div class="ans" data-id="ba" data-kind="output" data-rows="16" data-label="Part B (a) output" data-placeholder="Paste the terminal output here."></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">B-b</b> <b>Experiment 1, the string with locality.</b> Rank the four policies from fewest to most faults at 2 frames and at 10 frames. Explain why LRU comes closest to OPT, and why FIFO falls behind most clearly once there are enough frames to hold a working set. At about how many frames does adding a frame stop helping much, and how does that connect to the working sets that <code>locality_refs</code> builds?</p>
+    <div class="ans" data-id="bb" data-rows="6" data-label="Part B (b)"></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">B-c</b> <b>Experiment 1, the uniform random string.</b> Why are FIFO, LRU and clock almost exactly equal here, and why do their counts fall only slowly as frames are added? Estimate the fault count for 10 frames from the fraction of the 40 pages that fit in memory, and compare with your output. Why does OPT still do much better?</p>
+    <div class="ans" data-id="bc" data-rows="5" data-label="Part B (c)"></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">B-d</b> <b>Experiment 2.</b> Copy the four counts. Check the first FIFO example: between which two frame counts do its faults go up? Why can OPT and LRU never show Belady's anomaly (think about which pages are resident with <i>n</i> frames compared with <i>n</i> + 1 frames), and why does that argument fail for FIFO and for clock?</p>
+    <div class="ans" data-id="bd" data-rows="6" data-label="Part B (d)"></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">B-e</b> <b>Experiments 3 and 4.</b> First check your round robin by hand: write the RR q = 1 timeline for Experiment 3's five processes (one letter per time unit, using the rules of Problem 7) and confirm that it gives the finish times your program printed.</p>
+    <div class="ans" data-id="be-rr" data-rows="3" data-label="Part B (e) round robin check" data-placeholder="Timeline: A B ...&#10;Finish times: ..."></div>
+    <p class="q">Then copy Experiment 4's results.</p>
+    <div class="scroll-x"><table class="grid" data-id="be" data-corner="Policy" data-rows="FCFS|SPN|RR q=1|RR q=4|HRRN" data-cols="Mean Tr/Ts|Shortest third|Longest third|Worst Tr/Ts|Longest wait" data-label="Part B (e) table"></table></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">B-f</b> Using your Experiment 4 numbers: which policy treats short and long processes almost equally, and how? Which policy punishes short processes most, and why? Which policy makes some process wait longest, which kind of process is it likely to be, and what is that effect called? How does HRRN's ratio limit it? Round robin's longest wait is also large: why is that a different kind of waiting from the longest wait under SPN?</p>
+    <div class="ans" data-id="bf" data-rows="7" data-label="Part B (f)"></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">B-g</b> <b>Your own experiment.</b> Change one thing in <code>vmsched.py</code> to test an idea of your own, and mark the changed line with a comment that starts <code># B-g</code>. Some starting points: make <code>MEAN_GAP</code> larger or smaller (a lighter or heavier load); add <code>("RR q=20", lambda p: round_robin(p, 20))</code> anywhere in the <code>SCHEDULERS</code> list (the order of the rows does not matter); make the working sets in <code>locality_refs</code> larger, or the share of stray references bigger; give <code>PAGES</code> a different value. <b>Before running it</b>, write down the change, what you predict will happen and why (use the chapter's ideas and your earlier results). Then run it, paste the relevant lines of output, and say whether your prediction held and what explains any surprise.</p>
+    <div class="ans" data-id="bg" data-rows="8" data-label="Part B (g)" data-placeholder="Change: ...&#10;Prediction and reason (written before running): ...&#10;Output: ...&#10;Did it hold? Why or why not: ..."></div>
+  </div>
+</section>
+
+<section class="card" id="submit">
+  <h2>Submit</h2>
+  <ol class="steps">
+    <li>Click <b>Download answer sheet</b> (in the bar at the top) after your last answer is typed. Move <code>hw4-answers.html</code> from your Downloads folder into the <code>os-hw4</code> folder, and open it once in a browser to check that every answer is there.</li>
+    <li>Send both files to GitHub, from inside the <code>os-hw4</code> folder:
+      <pre class="term">git add vmsched.py hw4-answers.html
+git commit -m "Homework 4"
+git push</pre>
+      The first push opens a browser window to sign in (Windows) or asks for a username and password (macOS). GitHub does not accept your account password there. Instead, create a token: GitHub → Settings → Developer settings → Personal access tokens → <b>Tokens (classic)</b> → Generate new token (classic), tick the <b>repo</b> box, and generate it. Paste the token when asked for the password; nothing appears on screen while you paste, which is normal. If you would rather skip the command line, the repository page's <b>Add file → Upload files</b> button works too.</li>
+    <li>Refresh your repository's page on GitHub and check that both files are there.</li>
+  </ol>
+  <p>Your repository should contain:</p>
+  <ul class="check">
+    <li><code>vmsched.py</code> with every TODO written, so that all four experiments run to the end without a "stopped here" line, and your B-g change marked with <code># B-g</code>.</li>
+    <li><code>hw4-answers.html</code>, downloaded from this page, with every question answered.</li>
+  </ul>
+  <p><b>Submit your GitHub repo link.</b></p>
+</section>
+
+</main>
+<footer>Operating Systems · Homework 4 · Chapters 8 and 9</footer>
+
+<script>
+(function () {  // everything lives inside this function so none of its names can clash with anything else on the page
+  'use strict';  // strict mode turns silent JavaScript mistakes into visible errors
+  var HW = document.body.getAttribute('data-hw');  // this page's short id, such as "os-hw1", written on the <body> tag
+  var SHEET_FILE = document.body.getAttribute('data-sheet');  // the answer-sheet file name, such as "hw1-answers.html"
+  var TITLE = document.title;  // the page title, reused as the answer sheet's title
+  var STORE_KEY = 'answers:' + HW;  // the name under which this page's drafts are kept in the browser
+  var answers = {};  // every answer typed so far, as { answerId: value }
+  var canSave = true;  // becomes false if this browser refuses to store anything (private windows sometimes do)
+
+  function readStore() {  // loads saved drafts from the browser, if there are any
+    try { return JSON.parse(window.localStorage.getItem(STORE_KEY) || '{}') || {}; }  // stored as JSON text; parse it back into an object
+    catch (e) { canSave = false; return {}; }  // storage blocked or the text is damaged: start empty and remember that saving is off
+  }  // end of readStore
+  function writeStore() {  // saves every answer back into the browser
+    try { window.localStorage.setItem(STORE_KEY, JSON.stringify(answers)); return true; }  // turn the object into JSON text and store it
+    catch (e) { canSave = false; return false; }  // storage blocked or full: report failure
+  }  // end of writeStore
+
+  function isFilled(value) {  // does this answer contain anything yet?
+    if (typeof value === 'string') return value.trim() !== '';  // a text answer counts once it has a non-space character
+    if (Array.isArray(value)) return value.some(function (row) { return Array.isArray(row) && row.some(function (cell) { return typeof cell === 'string' && cell.trim() !== ''; }); });  // a grid counts once any cell is filled
+    return false;  // anything else (missing, wrong type) counts as empty
+  }  // end of isFilled
+
+  function updateProgress() {  // refreshes every "n of m answered" counter on the page
+    var items = document.querySelectorAll('[data-answer]');  // every answer box and answer grid
+    var done = 0;  // how many have something in them
+    items.forEach(function (el) { if (isFilled(answers[el.getAttribute('data-id')])) done += 1; });  // count the filled ones
+    document.querySelectorAll('.js-progress').forEach(function (el) { el.textContent = done + ' of ' + items.length + ' answered'; });  // write the count
+  }  // end of updateProgress
+
+  var saveTimer = null;  // used to wait until typing pauses before saving
+  var pendingStatus = [];  // the status lines of every box edited since the last save
+  function scheduleSave(statusEl) {  // called on every keystroke; saves 400 ms after the last one
+    if (statusEl && pendingStatus.indexOf(statusEl) === -1) pendingStatus.push(statusEl);  // remember this box so its status is updated too
+    clearTimeout(saveTimer);  // cancel the save that was waiting, because another key arrived
+    saveTimer = setTimeout(function () {  // start a fresh 400 ms wait
+      var ok = writeStore();  // save everything (all boxes at once)
+      pendingStatus.forEach(function (el) {  // every box edited since the last save
+        el.textContent = ok ? 'Saved in this browser' : 'Not saved: this browser blocks storage. Download your answer sheet before closing the page.';  // say what happened
+        el.className = ok ? 'status saved' : 'status';  // green when saved
+      });  // end of status updates
+      pendingStatus = [];  // start a fresh list for the next round of typing
+      updateProgress();  // the counter may have changed
+    }, 400);  // 400 milliseconds
+  }  // end of scheduleSave
+
+  function buildTextBox(holder) {  // turns an empty <div class="ans" data-id="..."> into a working answer box
+    var id = holder.getAttribute('data-id');  // this answer's id, such as "p3b"
+    var box = document.createElement('textarea');  // the box itself
+    box.rows = Number(holder.getAttribute('data-rows') || 4);  // starting height, in lines
+    box.setAttribute('aria-label', holder.getAttribute('data-label') || id);  // what a screen reader announces for this box
+    box.spellcheck = holder.getAttribute('data-kind') !== 'output';  // no red squiggles under pasted program output
+    if (holder.getAttribute('data-kind') === 'output') box.className = 'mono';  // program output keeps its columns in a fixed-width face
+    box.placeholder = holder.getAttribute('data-placeholder') || 'Type your answer here.';  // grey hint text shown while empty
+    var status = document.createElement('span');  // the small "Saved" line under the box
+    status.className = 'status';  // styled grey until something is saved
+    status.setAttribute('aria-live', 'polite');  // screen readers announce the saved message without interrupting
+    box.value = typeof answers[id] === 'string' ? answers[id] : '';  // restore a saved draft, if there is one
+    box.addEventListener('input', function () { answers[id] = box.value; scheduleSave(status); });  // keep the answer object up to date and save soon
+    holder.setAttribute('data-answer', '');  // mark it as an answer for the progress counter
+    holder.appendChild(box);  // put the box on the page
+    holder.appendChild(status);  // and its status line under it
+  }  // end of buildTextBox
+
+  function splitList(text, sep) {  // "PC|IR|AC" becomes ["PC", "IR", "AC"]
+    return (text || '').split(sep || '|').map(function (s) { return s.trim(); });  // split on the separator (a bar unless the grid names another) and trim spaces
+  }  // end of splitList
+
+  function buildGrid(table) {  // turns <table class="grid" data-rows="..." data-cols="..."> into a table of small inputs
+    var id = table.getAttribute('data-id');  // this grid's id
+    var rows = splitList(table.getAttribute('data-rows'), table.getAttribute('data-sep'));  // the row labels (a grid whose labels contain "|" names another separator in data-sep)
+    var cols = splitList(table.getAttribute('data-cols'), table.getAttribute('data-sep'));  // the column labels
+    var saved = Array.isArray(answers[id]) ? answers[id] : [];  // a saved draft, if there is one
+    var head = document.createElement('thead');  // the header row
+    var headRow = document.createElement('tr');  // one row inside it
+    var corner = document.createElement('th');  // the top-left corner cell
+    corner.textContent = table.getAttribute('data-corner') || '';  // an optional label for the row-label column
+    headRow.appendChild(corner);  // add the corner
+    cols.forEach(function (c) { var th = document.createElement('th'); th.scope = 'col'; th.textContent = c; headRow.appendChild(th); });  // one header cell per column
+    head.appendChild(headRow);  // finish the header
+    var body = document.createElement('tbody');  // the input rows
+    var status = document.createElement('span');  // the "Saved" line under the grid
+    status.className = 'status';  // grey until something is saved
+    status.setAttribute('aria-live', 'polite');  // announced politely to screen readers
+    rows.forEach(function (r, ri) {  // one table row per row label
+      var tr = document.createElement('tr');  // the row
+      var th = document.createElement('th');  // its label cell
+      th.scope = 'row';  // tells screen readers this cell labels the row
+      th.textContent = r;  // the label text
+      tr.appendChild(th);  // add the label
+      cols.forEach(function (c, ci) {  // one input per column
+        var td = document.createElement('td');  // the cell
+        var input = document.createElement('input');  // the input inside it
+        input.type = 'text';  // plain text, so hex values like 13A0 are allowed
+        input.autocomplete = 'off';  // no browser suggestions from other sites
+        input.spellcheck = false;  // hex values are not words
+        input.setAttribute('aria-label', r + ', ' + c);  // e.g. "Fetch 1, PC"
+        input.value = (Array.isArray(saved[ri]) && typeof saved[ri][ci] === 'string') ? saved[ri][ci] : '';  // restore a saved value
+        input.addEventListener('input', function () {  // on every change to this cell...
+          if (!Array.isArray(answers[id])) answers[id] = rows.map(function () { return cols.map(function () { return ''; }); });  // ...make sure a full empty grid exists...
+          if (!Array.isArray(answers[id][ri])) answers[id][ri] = cols.map(function () { return ''; });  // ...including this row...
+          answers[id][ri][ci] = input.value;  // ...store the new value...
+          scheduleSave(status);  // ...and save soon
+        });  // end of the input listener
+        td.appendChild(input);  // put the input in the cell
+        tr.appendChild(td);  // and the cell in the row
+      });  // end of the columns
+      body.appendChild(tr);  // add the finished row
+    });  // end of the rows
+    table.appendChild(head);  // attach the header
+    table.appendChild(body);  // attach the body
+    table.setAttribute('data-answer', '');  // mark it as an answer for the progress counter
+    var wrapper = table.parentNode;  // grids sit inside a sideways-scrolling wrapper
+    wrapper.parentNode.insertBefore(status, wrapper.nextSibling);  // the status line goes just below that wrapper
+  }  // end of buildGrid
+
+  function fillAll() {  // puts the values in `answers` back into every box and grid (used after loading a sheet)
+    document.querySelectorAll('.ans[data-id]').forEach(function (holder) {  // each text box
+      var box = holder.querySelector('textarea');  // the box inside the holder
+      var v = answers[holder.getAttribute('data-id')];  // its value
+      box.value = typeof v === 'string' ? v : '';  // write it (or clear it)
+    });  // end of text boxes
+    document.querySelectorAll('table.grid[data-id]').forEach(function (table) {  // each grid
+      var v = answers[table.getAttribute('data-id')];  // its value: an array of rows
+      table.querySelectorAll('tbody tr').forEach(function (tr, ri) {  // each row
+        tr.querySelectorAll('input').forEach(function (input, ci) {  // each cell
+          input.value = (Array.isArray(v) && Array.isArray(v[ri]) && typeof v[ri][ci] === 'string') ? v[ri][ci] : '';  // write it (or clear it)
+        });  // end of cells
+      });  // end of rows
+    });  // end of grids
+    var name = document.getElementById('student-name');  // the name box
+    if (name) name.value = typeof answers.__name === 'string' ? answers.__name : '';  // restore the name
+    updateProgress();  // the counter changed
+  }  // end of fillAll
+
+  function esc(text) {  // makes any text safe to put inside HTML: < > & " ' become harmless codes
+    return String(text).replace(/[&<>"']/g, function (ch) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]; });  // one replacement per dangerous character
+  }  // end of esc
+
+  function questionFor(el) {  // finds the question text that belongs to an answer box or grid
+    var part = el.closest('.part');  // the lettered sub-question that holds it
+    var q = part ? part.querySelector('.q') : null;  // its question paragraph
+    return q ? q.textContent.replace(/\s+/g, ' ').trim() : (el.getAttribute('data-label') || '');  // its text, squeezed onto one line
+  }  // end of questionFor
+
+  function buildSheet() {  // writes the whole answer sheet as one standalone HTML document (a string)
+    var name = (answers.__name || '').trim() || '(no name entered)';  // the student's name
+    var when = new Date().toLocaleString();  // the date and time the sheet was made
+    var html = [];  // the sheet is built up as a list of pieces, joined at the end
+    var lastProblem = '';  // remembers which problem heading was printed last
+    document.querySelectorAll('[data-answer]').forEach(function (el) {  // every answer in page order
+      var id = el.getAttribute('data-id');  // its id
+      var card = el.closest('section');  // the card (problem) it sits in
+      var heading = card && card.querySelector('h2') ? card.querySelector('h2').textContent.trim() : '';  // that problem's title
+      if (heading !== lastProblem) { html.push('<h2>' + esc(heading) + '</h2>'); lastProblem = heading; }  // print the title once per problem
+      html.push('<div class="a"><p class="q">' + esc(questionFor(el)) + '</p>');  // the question
+      var v = answers[id];  // the answer
+      if (el.tagName === 'TABLE') {  // a grid: rebuild it as a plain table
+        var rows = splitList(el.getAttribute('data-rows'), el.getAttribute('data-sep'));  // row labels
+        var cols = splitList(el.getAttribute('data-cols'), el.getAttribute('data-sep'));  // column labels
+        html.push('<table><tr><th></th>' + cols.map(function (c) { return '<th>' + esc(c) + '</th>'; }).join('') + '</tr>');  // header row
+        rows.forEach(function (r, ri) {  // one row per label
+          html.push('<tr><th>' + esc(r) + '</th>' + cols.map(function (c, ci) { var cell = (Array.isArray(v) && Array.isArray(v[ri]) && typeof v[ri][ci] === 'string') ? v[ri][ci] : ''; return '<td>' + esc(cell) + '</td>'; }).join('') + '</tr>');  // its cells
+        });  // end of rows
+        html.push('</table>');  // close the table
+      } else {  // a text answer
+        html.push(isFilled(v) ? '<pre>' + esc(v) + '</pre>' : '<p class="empty">(no answer)</p>');  // the answer exactly as typed, or a visible gap
+      }  // end of the answer kinds
+      html.push('</div>');  // close this answer
+    });  // end of every answer
+    var data = JSON.stringify({ hw: HW, answers: answers }).replace(/</g, '\\u003c');  // the raw answers, so this page can load the sheet back; < is escaped so the text can never end the script tag
+    var css = 'body{font:15px/1.55 system-ui,sans-serif;max-width:860px;margin:24px auto;padding:0 16px;color:#151c2c;background:#fff}h1{font-size:1.5rem;margin:0 0 4px}h2{font-size:1.15rem;margin:28px 0 8px;border-bottom:2px solid #d9deea;padding-bottom:4px}.meta{color:#69738c;margin:0 0 16px}.a{margin:0 0 14px}.q{margin:0 0 4px;color:#3d4760;font-size:.92rem}pre{white-space:pre-wrap;word-wrap:break-word;font:13px/1.5 ui-monospace,Menlo,Consolas,monospace;background:#f5f7fb;border:1px solid #d9deea;border-radius:6px;padding:8px 10px;margin:0}.empty{color:#b45309;margin:0}table{border-collapse:collapse;font:13px ui-monospace,Menlo,Consolas,monospace}th,td{border:1px solid #d9deea;padding:4px 8px;text-align:left}th{background:#f5f7fb}';  // a small built-in stylesheet so the sheet looks tidy on its own
+    return '<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n<title>' + esc(TITLE + ': answers of ' + name) + '</title>\n<style>' + css + '</style>\n</head>\n<body>\n<h1>' + esc(TITLE) + '</h1>\n<p class="meta">Answers of <b>' + esc(name) + '</b> · saved ' + esc(when) + '</p>\n' + html.join('\n') + '\n<script type="application/json" id="answer-data">' + data + '<\/script>\n</body>\n</html>\n';  // the finished document
+  }  // end of buildSheet
+
+  function download(filename, text, type) {  // hands the browser a file to save, made from text in memory
+    var blob = new Blob([text], { type: type });  // wrap the text as a file-like object
+    var url = URL.createObjectURL(blob);  // a temporary address for it
+    var a = document.createElement('a');  // an invisible link...
+    a.href = url;  // ...pointing at that address...
+    a.download = filename;  // ...that saves instead of opening...
+    document.body.appendChild(a);  // (some browsers need it on the page)
+    a.click();  // ...clicked by the script
+    setTimeout(function () { URL.revokeObjectURL(url); a.remove(); }, 1000);  // tidy up a second later
+  }  // end of download
+
+  function setMsg(text) {  // shows a message in every answer-sheet panel
+    document.querySelectorAll('.js-sheet-msg').forEach(function (el) { el.textContent = text; });  // write it
+  }  // end of setMsg
+
+  function loadSheet(file) {  // reads an answer sheet the student saved earlier and puts its answers back
+    var reader = new FileReader();  // the browser's tool for reading a chosen file
+    reader.onload = function () {  // runs once the file has been read
+      try {  // anything wrong with the file ends up in the catch below
+        var doc = new DOMParser().parseFromString(String(reader.result), 'text/html');  // parse it as HTML without running any of it
+        var tag = doc.getElementById('answer-data');  // the data block that buildSheet wrote
+        if (!tag) throw new Error('This file is not an answer sheet saved from this page.');  // some other file was chosen
+        var data = JSON.parse(tag.textContent);  // the saved answers
+        if (!data || data.hw !== HW || typeof data.answers !== 'object') throw new Error('This answer sheet belongs to a different homework.');  // wrong homework
+        var clean = {};  // only well-formed answers for boxes that exist on this page are accepted
+        var known = {};  // the ids that exist on this page
+        document.querySelectorAll('[data-answer]').forEach(function (el) { known[el.getAttribute('data-id')] = el.tagName; });  // collect them
+        Object.keys(data.answers).forEach(function (id) {  // look at each saved answer
+          var v = data.answers[id];  // its value
+          if (id === '__name' && typeof v === 'string') clean.__name = v.slice(0, 200);  // the name: text only, and not absurdly long
+          else if (known[id] === 'DIV' && typeof v === 'string') clean[id] = v.slice(0, 20000);  // a text answer: text only
+          else if (known[id] === 'TABLE' && Array.isArray(v)) clean[id] = v.map(function (row) { return Array.isArray(row) ? row.map(function (c) { return typeof c === 'string' ? c.slice(0, 500) : ''; }) : []; });  // a grid: rows of text only
+        });  // end of the saved answers
+        answers = clean;  // replace the current answers with the loaded ones
+        writeStore();  // save them in this browser too
+        fillAll();  // show them on the page
+        setMsg('Loaded ' + Object.keys(clean).filter(function (k) { return k !== '__name'; }).length + ' answers from ' + file.name + '.');  // confirm
+      } catch (e) {  // the file could not be used
+        setMsg('Could not load that file: ' + e.message);  // say why
+      }  // end of try/catch
+    };  // end of onload
+    reader.readAsText(file);  // start reading
+  }  // end of loadSheet
+
+  function wireSheetPanel() {  // connects the name box and the Download / Load / Clear buttons
+    var name = document.getElementById('student-name');  // the name box
+    if (name) {  // it exists on this page
+      name.value = typeof answers.__name === 'string' ? answers.__name : '';  // restore a saved name
+      name.addEventListener('input', function () { answers.__name = name.value; scheduleSave(null); });  // save it as it is typed
+    }  // end of the name box
+    document.querySelectorAll('.js-download').forEach(function (btn) {  // every Download button (there is one in the bar and one in the panel)
+      btn.addEventListener('click', function () {  // on click...
+        download(SHEET_FILE, buildSheet(), 'text/html');  // ...build the sheet and save it
+        setMsg('Saved ' + SHEET_FILE + ' to your Downloads folder. Put that file in your repository.');  // say where it went
+      });  // end of the click handler
+    });  // end of Download buttons
+    var picker = document.getElementById('sheet-file');  // the hidden file chooser
+    var loadBtn = document.getElementById('sheet-load');  // the visible "Load" button
+    if (picker && loadBtn) {  // both exist
+      loadBtn.addEventListener('click', function () { picker.click(); });  // the button opens the chooser
+      picker.addEventListener('change', function () { if (picker.files[0]) loadSheet(picker.files[0]); picker.value = ''; });  // read the chosen file, then reset the chooser
+    }  // end of Load
+    var clearBtn = document.getElementById('sheet-clear');  // the Clear button
+    var armed = null;  // the timer of a pending "click again to confirm"
+    if (clearBtn) clearBtn.addEventListener('click', function () {  // on click...
+      if (!armed) {  // first click: ask for a second one instead of clearing at once
+        clearBtn.textContent = 'Click again to erase every answer';  // the warning
+        armed = setTimeout(function () { clearBtn.textContent = 'Clear all answers'; armed = null; }, 4000);  // it disarms itself after 4 seconds
+        return;  // nothing erased yet
+      }  // end of the first click
+      clearTimeout(armed);  // second click within 4 seconds: stop the disarm timer
+      armed = null;  // back to the unarmed state
+      clearBtn.textContent = 'Clear all answers';  // restore the label
+      answers = {};  // forget every answer
+      writeStore();  // save the empty set
+      fillAll();  // empty every box on the page
+      setMsg('All answers erased from this page and this browser.');  // confirm
+    });  // end of Clear
+    if (!canSave) setMsg('This browser is not saving drafts. Download your answer sheet before you close the page, and load it back next time.');  // warn early if storage is blocked
+  }  // end of wireSheetPanel
+
+  function wireCode() {  // connects the Copy and Download buttons on every code block
+    document.querySelectorAll('.codebox').forEach(function (box) {  // each block
+      var code = box.querySelector('pre');  // the code itself
+      var file = box.getAttribute('data-file');  // its file name
+      var copy = box.querySelector('.js-copy');  // its Copy button
+      var save = box.querySelector('.js-save');  // its Download button
+      if (copy) copy.addEventListener('click', function () {  // Copy: put the code on the clipboard
+        var text = code.textContent;  // the plain code, without any coloring
+        var done = function () { copy.textContent = 'Copied'; setTimeout(function () { copy.textContent = 'Copy'; }, 1500); };  // brief confirmation
+        if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(text).then(done, function () { fallbackCopy(text); done(); });  // the modern way
+        else { fallbackCopy(text); done(); }  // the older way, for pages opened straight from a file
+      });  // end of Copy
+      if (save && file) save.addEventListener('click', function () { download(file, code.textContent.replace(/\s*$/, '\n'), 'application/octet-stream'); });  // Download: save the code as its own file, ending with one newline; the generic type stops browsers adding .txt to the name
+    });  // end of each block
+  }  // end of wireCode
+
+  function fallbackCopy(text) {  // copies text in browsers that do not offer navigator.clipboard here
+    var t = document.createElement('textarea');  // a temporary box...
+    t.value = text;  // ...holding the text...
+    t.style.position = 'fixed';  // ...kept out of the page flow...
+    t.style.opacity = '0';  // ...and invisible
+    document.body.appendChild(t);  // add it
+    t.select();  // select its contents
+    try { document.execCommand('copy'); } catch (e) { /* nothing more can be done; the student can still select the code by hand */ }  // copy the selection
+    t.remove();  // remove the temporary box
+  }  // end of fallbackCopy
+
+  answers = readStore();  // 1. load any saved drafts
+  document.querySelectorAll('.ans[data-id]').forEach(buildTextBox);  // 2. build every text box
+  document.querySelectorAll('table.grid[data-id]').forEach(buildGrid);  // 3. build every grid
+  wireSheetPanel();  // 4. connect the answer-sheet panel
+  wireCode();  // 5. connect the code blocks
+  updateProgress();  // 6. show the starting count
+})();  // run the function immediately
+</script>
+</body>
+</html>
