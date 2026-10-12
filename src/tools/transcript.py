@@ -51,7 +51,13 @@ def main():
         out = []
         for s in slides:
             sec = s['sec'] or ''
-            chap = sec.split('.')[0] if sec and not sec.startswith('ch') else (sec[2:] if sec.startswith('ch') else (s['key'][2:3] if s['key'].startswith('ch') else ''))
+            if sec and not sec.startswith('ch'):  # the slide is a step of a numbered section
+                chap = sec.split('.')[0]  # a section step: the whole number before the dot ('11.10' is chapter '11')
+            else:  # every other slide
+                # a chapter intro step (sec 'ch10') or a chapter slide without a section (key 'ch10', 'ch10-terms', 'ch10-quiz'):
+                # read every digit after 'ch', so ch10 is chapter 10 (the old key[2:3] read only '1' and mixed it up with chapter 1)
+                m = re.match(r'ch(\d+)', sec or s['key'])  # the digits right after 'ch', if the slide belongs to a chapter
+                chap = m.group(1) if m else ''  # home and the final challenge belong to no chapter
             if a.section and sec not in a.section: continue
             if a.chapter and chap not in a.chapter: continue
             if s['type'] in ('terms', 'chquiz', 'final', 'home'): continue

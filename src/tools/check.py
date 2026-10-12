@@ -16,7 +16,7 @@ What it reports for every slide and viewport
 Screenshots go to shots/<section>/<step>-<viewport>[-after].png (read them to eyeball layout).
 Exit code 1 when any error or overflow is found.
 """
-import argparse, json, os, sys, time
+import argparse, json, os, re, sys, time  # re (text patterns) reads the storage names out of the page
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 
@@ -27,11 +27,16 @@ async (maxClicks) => {
   const body = document.querySelector('#canvas .step-body');
   if (!body) return 0;
   const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+  // --mid: measure the step after every action, because a long caption shown halfway through can overflow even when
+  // the fuzzer happens to end on a short one; an overflow must still be there 600 ms later (not just an animation)
+  const tooBig = () => { const m = Guide.debug.metrics(); if (!m) return ''; const o = m.narrow ? (m.sw > m.cw + 2) : (m.sh > m.ch + 2 || m.sw > m.cw + 2); return o ? `${m.sw}x${m.sh} in ${m.cw}x${m.ch}` : ((m.clipped || [])[0] || ''); };
+  const probe = async (what) => { if (!window.__midOn || !tooBig()) return; await sleep(600); const b = tooBig(); if (b) (window.__mid = window.__mid || []).push(`${what}: ${b}`); };
   let n = 0;
   // ranges: sweep min → max → middle
   for (const r of body.querySelectorAll('input[type=range]')) {
     for (const v of [r.min || 0, r.max || 100, ((+r.min || 0) + (+r.max || 100)) / 2]) {
       r.value = v; r.dispatchEvent(new Event('input', { bubbles: true })); r.dispatchEvent(new Event('change', { bubbles: true })); await sleep(40);
+      await probe(`slider ${r.getAttribute('aria-label') || r.name || ''}=${v}`);
     }
   }
   for (const s of body.querySelectorAll('select')) {
@@ -56,6 +61,7 @@ async (maxClicks) => {
         el.dispatchEvent(new MouseEvent('pointerup', { bubbles: true }));
       } catch (e) {}
       n++; await sleep(70);
+      await probe(`after clicking "${(el.textContent || el.getAttribute('aria-label') || el.tagName).trim().slice(0, 40)}"`);
     }
   }
   return n;
@@ -139,6 +145,18 @@ async () => {
 }
 """
 
+def store_keys(html):  # store_keys(html): the saved-progress names a built page may use
+    # every name the page may keep its saved progress under: the engine's default (os-guide-v1, chapters 1-5) plus the
+    # storeKey of the volume settings baked into this page (os-guide-ch6-9-v1, os-guide-ch10-13-v1, ...), read from the
+    # file itself so a new volume needs no change here
+    text = Path(html).read_text(encoding='utf-8', errors='replace')  # the built page's source
+    return sorted(set(re.findall(r'storeKey["\']?\s*:\s*["\']([A-Za-z0-9_.-]+)["\']', text)) | {'os-guide-v1'})  # every storeKey value written in it, plus the default
+
+def theme_init_script(html, theme):  # theme_init_script(html, theme): the start-up script that opens the page in that theme
+    # a script that runs before the page's own scripts and saves the wanted theme under every progress name the page may
+    # read, so --dark really opens the page dark whichever volume it is
+    return f"try{{{json.dumps(store_keys(html))}.forEach(k => localStorage.setItem(k, JSON.stringify({{theme:'{theme}'}})))}}catch(e){{}}"  # storage may be blocked: then the page simply stays light
+
 def parse_vp(s):
     w, h = s.lower().split('x'); return int(w), int(h)
 
@@ -151,6 +169,7 @@ def main():
     ap.add_argument('--all', action='store_true')
     ap.add_argument('--vp', default='1280x720,390x844')
     ap.add_argument('--fuzz', action='store_true')
+    ap.add_argument('--mid', action='store_true', help='with --fuzz: also fail a step that overflows after any single action (not only at the end)')
     ap.add_argument('--text-spill', action='store_true', help='also fail boxes whose own text runs past their bottom edge')
     ap.add_argument('--min-text', type=float, default=0, help='fail a slide whose smallest visible text renders below this many screen pixels (e.g. 9)')
     ap.add_argument('--tabs', action='store_true', help='with --fuzz: also open every tab of every tab strip, fuzz inside it and check it')
@@ -179,13 +198,15 @@ def main():
                 logs = []
                 page.on('console', lambda m: logs.append((m.type, m.text)))
                 page.on('pageerror', lambda e: logs.append(('pageerror', str(e))))
-                page.add_init_script(f"try{{['os-guide-v1','os-guide-ch6-9-v1'].forEach(k => localStorage.setItem(k, JSON.stringify({{theme:'{theme}'}})))}}catch(e){{}}")
+                page.add_init_script(theme_init_script(html, theme))  # seeds the theme for this page's own volume (any volume, read from the page)
                 page.goto(url + '#home')
                 page.wait_for_function('window.Guide && Guide.debug && document.querySelector("#canvas")', timeout=15000)
                 slides = page.evaluate('Guide.debug.slides()')
                 want = []
                 for s in slides:
                     if a.all: want.append(s)
+                    # ids are compared whole: '11.1' never matches '11.10', and the chapter is the full number before the dot
+                    # ('11.10' is chapter '11'; 'ch10' is chapter '10'), so --chapter 1 never picks chapters 10-13
                     elif s['sec'] and (s['sec'] in a.section or s['sec'].split('.')[0] in a.chapter or (s['sec'].startswith('ch') and s['sec'][2:] in a.chapter)): want.append(s)
                     elif s['key'] in [k for k in a.keys.split(',') if k]: want.append(s)
                 if not want:
@@ -209,6 +230,7 @@ def main():
                     if a.fuzz and s['type'] in ('home', 'chapter'):
                         pass  # these slides only hold navigation buttons
                     elif a.fuzz:
+                        page.evaluate('on => { window.__midOn = on; window.__mid = []; }', bool(a.mid))  # --mid: arm the per-action overflow probe
                         try:
                             clicks = page.evaluate(FUZZ_JS, a.max_clicks)
                         except Exception as e:
@@ -263,6 +285,9 @@ def main():
                         for o in mm.get('walk', []): issues.append(f'during playback: {o}')
                         if mm.get('docOverflowX'): issues.append(f'page scrolls sideways{label}')
                     over(m, ''); over(after, ' (after clicking)')
+                    if a.fuzz and a.mid:  # overflows seen in the middle of the fuzz run, de-duplicated, first three
+                        mid = list(dict.fromkeys(page.evaluate('window.__mid || []')))
+                        for o in mid[:3]: issues.append(f'overflow mid-interaction: {o}')
                     if tiny: issues.append('text too small to read: ' + '; '.join(tiny))
                     for sp in spills: issues.append('text spills: ' + sp)
                     for lab, mt in tab_metrics: over(mt, lab)

@@ -14,7 +14,11 @@ const box = { console: { log() {}, warn() {}, error() {} }, setTimeout, clearTim
 box.window = box;
 vm.createContext(box);
 vm.runInContext(fs.readFileSync(path.join(HERE, 'shell/shell.js'), 'utf8'), box);
-vm.runInContext(fs.readFileSync(path.join(HERE, 'chapters.js'), 'utf8'), box);
+// every volume's chapter data (chapters.js, chapters-6-9.js, chapters-10-13.js, ...), oldest volume first; a volume whose
+// chapters file is not written yet is simply skipped
+const chapterFiles = fs.readdirSync(HERE).filter((f) => /^chapters(-\d+-\d+)?\.js$/.test(f)) // the chapter data files in src/
+  .sort((a, b) => (Number((a.match(/^chapters-(\d+)/) || [0, 1])[1]) - Number((b.match(/^chapters-(\d+)/) || [0, 1])[1]))); // sorted by first chapter as a whole number (1, 6, 10), never as text
+for (const f of chapterFiles) { try { vm.runInContext(fs.readFileSync(path.join(HERE, f), 'utf8'), box); } catch (e) { console.log(`! ${f} failed to load: ${e.message}`); } } // registers each volume's chapters and chapter-level terms; a broken file is reported and skipped
 const ids = fs.readdirSync(path.join(HERE, 'sections')).filter((f) => /^\d+\.\d+\.js$/.test(f)).map((f) => f.slice(0, -3))
   .sort((a, b) => { const [a1, a2] = a.split('.').map(Number); const [b1, b2] = b.split('.').map(Number); return a1 - b1 || a2 - b2; });
 for (const id of ids) { try { vm.runInContext(fs.readFileSync(path.join(HERE, 'sections', id + '.js'), 'utf8'), box); } catch (e) { console.log(`! ${id} failed to load: ${e.message}`); } }

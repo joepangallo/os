@@ -11,7 +11,7 @@
   'use strict';  // strict mode: the browser reports common mistakes as errors instead of silently ignoring them
 
   const CANVAS_W = 1200, CANVAS_H = 640, BODY_W = 1152, BODY_H = 540;  // fixed design size: every slide is laid out on a 1200 x 640 canvas with a 1152 x 540 content area, then scaled to fit
-  const BOOK = Object.assign({ id: '1-5', range: '1–5', storeKey: 'os-guide-v1', countWord: 'five', subtitle: 'Chapters 1–5: from the hardware up to concurrency', prior: '' }, (typeof window !== 'undefined' && window.GuideBook) || {});  // BOOK: which volume this page is (chapters 1-5 unless the build set window.GuideBook first); it supplies the page wording and the storage name
+  const BOOK = Object.assign({ id: '1-5', range: '1–5', storeKey: 'os-guide-v1', countWord: 'five', subtitle: 'Chapters 1–5: from the hardware up to concurrency', prior: '', priors: [] }, (typeof window !== 'undefined' && window.GuideBook) || {});  // BOOK: which volume this page is (chapters 1-5 unless the build set window.GuideBook first); it supplies the page wording, the storage name, and (in priors) the earlier volumes whose terms this page borrows
   const STORE_KEY = BOOK.storeKey;  // the name under which saved progress is kept in localStorage (the browser's small per-site storage); each volume has its own, so their progress never mixes
   const Guide = (window.Guide = { chapters: [], sections: {}, scale: 1, narrow: false, book: BOOK, CANVAS_W, CANVAS_H, BODY_W, BODY_H });  // creates the global Guide object that every section talks to: chapter list, section table, zoom, phone-width flag, sizes
   const renderErrors = [];  // renderErrors: every step that crashed while drawing is recorded here so the automated checker can report it
@@ -263,10 +263,13 @@
   Guide.glossary = gloss;  // exposed so sections and tests can read the full glossary list
   const extraTerms = [];  // extraTerms: terms from sections left out of a partial build, so their dotted words still show a definition
   Guide.extraTerms = (list) => { (list || []).forEach((x) => extraTerms.push(x)); };  // Guide.extraTerms(list): used by the build to add those terms, each as [term, definition, section id]
-  const priorTerms = [];  // priorTerms: terms taught in an earlier volume of the guide (chapters 1-5 for this page), so words like semaphore still show a definition here
-  Guide.priorTerms = (list) => { (list || []).forEach((x) => priorTerms.push(x)); };  // Guide.priorTerms(list): used by the build to add them, each as [term, definition, where it was taught in the earlier volume]
-  const isPrior = (src) => String(src).startsWith('prior:');  // isPrior(src): true for a term that was taught in the earlier volume rather than on this page
-  const priorWhere = (src) => { const w = String(src).slice(6); return (w.startsWith('ch') ? 'the Chapter ' + w.slice(2) + ' overview' : '§' + w) + ' of the Chapters ' + BOOK.prior + ' guide'; };  // priorWhere(src): says where an earlier-volume term was taught, for example "§5.4 of the Chapters 1–5 guide"
+  const priorTerms = [];  // priorTerms: terms taught in earlier volumes of the guide (chapters 1-5 for the chapters 6-9 page, chapters 1-9 for the chapters 10-13 page), so words like semaphore still show a definition here
+  Guide.priorTerms = (list) => { (list || []).forEach((x) => priorTerms.push(x)); };  // Guide.priorTerms(list): used by the build to add them, each as [term, definition, where it was taught in that earlier volume]
+  const isPrior = (src) => String(src).startsWith('prior:');  // isPrior(src): true for a term that was taught in an earlier volume rather than on this page
+  const priorChapter = (src) => { const m = /^(?:ch)?(\d+)/.exec(String(src).slice(6)); return m ? Number(m[1]) : NaN; };  // priorChapter(src): the chapter a borrowed term comes from, reading every digit as one whole number ("prior:ch10" gives 10, "prior:11.10" gives 11, "prior:1.10" gives 1), so chapter 1 is never taken for chapter 10
+  const priorBook = (src) => (BOOK.priors || []).find((b) => b && Array.isArray(b.chapters) && b.chapters.includes(priorChapter(src))) || { range: BOOK.prior, labels: {} };  // priorBook(src): the earlier volume whose chapter list holds that chapter; a page without that list falls back to its single earlier volume
+  const priorWhere = (src) => { const w = String(src).slice(6), pb = priorBook(src); return (w.startsWith('ch') ? 'the Chapter ' + w.slice(2) + ' overview' : '§' + ((pb.labels && pb.labels[w]) || w)) + ' of the Chapters ' + pb.range + ' guide'; };  // priorWhere(src): says where an earlier-volume term was taught, for example "§5.4 of the Chapters 1–5 guide" or "the Chapter 7 overview of the Chapters 6–9 guide" (an appendix shows its own label, such as §7A)
+  const priorLabel = (src) => 'Ch ' + priorBook(src).range + ' guide';  // priorLabel(src): the short tag the glossary panel shows for a borrowed term, naming its volume, for example "Ch 6–9 guide"
   function buildGlossary() {  // buildGlossary(): collects every term from sections and chapters into the glossary, run once at start-up
     const eachTerm = (arr, src) => (arr || []).forEach((t) => {  // eachTerm(arr, src): adds a list of terms from one place; each term may be [term, def] or { term, def }
       const [a, b] = Array.isArray(t) ? t : [t && t.term, t && t.def];  // unpacks the term and definition from either shape
@@ -279,7 +282,7 @@
     Object.values(Guide.sections).forEach((sec) => eachTerm(sec.terms, sec.id));  // second pass: any section not reached above (for example one whose chapter was never registered)
     extraTerms.forEach((x) => addTerm(x[0], x[1], x[2]));   // other sections' terms (partial dev builds only)
     sortedChapters().forEach((c) => eachTerm(c.terms, 'ch' + c.num));  // then chapter-level terms, which only fill gaps the sections left
-    priorTerms.forEach((x) => addTerm(x[0], x[1], 'prior:' + x[2]));  // last: terms from the earlier volume, which only fill gaps this volume left (its own wording always wins)
+    priorTerms.forEach((x) => addTerm(x[0], x[1], 'prior:' + x[2]));  // last: terms from earlier volumes, which only fill gaps this volume left (its own wording always wins); the build lists the newest earlier volume first, so a word two earlier volumes define reads as it did on the later one's page
     gloss.sort((a, b) => normTerm(a.term).localeCompare(normTerm(b.term)));  // sorts the glossary alphabetically by its tidied term for the Glossary panel
   }  // ends buildGlossary
 
@@ -432,6 +435,7 @@
     if (!slides.length) return;  // does nothing before the slide list exists
     idx = clamp(idx | 0, 0, slides.length - 1);  // turns idx into a whole number and keeps it inside the list
     const first = cur < 0, before = document.activeElement;  // first: true for the very first slide shown; before: whatever had keyboard focus, checked again once the new slide is drawn
+    const carried = opt.relayout && slides[clamp(idx | 0, 0, slides.length - 1)] === slides[cur] ? captureControls() : null;  // carried: on a phone/desktop redraw of the same slide, what the student had set (tabs, switches, sliders, boxes, cards, players), so the redraw can put it back
     if (curCtx) { curCtx._destroy(); curCtx = null; }  // tells the old slide to stop its timers, animations and listeners before it is removed
     hideTerm();  // hides any open definition pop-up
     if (els.toast) { clearTimeout(toast.t); els.toast.classList.remove('on'); }  // hides any toast message that belongs to the old slide
@@ -447,6 +451,7 @@
     store.data.visited[sl.key] = 1;  // marks this slide as visited (used for progress bars, dot fill and done marks)
     store.save();  // saves progress to the browser (the save waits a moment so rapid clicks cause one write)
     renderSlide(sl);  // draws the new slide into the canvas
+    if (carried) restoreControls(carried);  // a layout redraw: replays the student's settings on the freshly drawn step
     updateChrome();  // refreshes the bars and buttons around it
     if (!first) {  // after the first slide, keep keyboard and screen-reader users oriented
       const lost = !before || before === document.body || !before.isConnected;  // lost: focus was on nothing, or on part of the old slide that has just been removed
@@ -456,6 +461,98 @@
     }  // ends the orientation step
     if (!opt.keepFocus) els.stage.scrollTop = 0;  // scrolls the stage back to the top, unless the caller asked to keep the current scroll (used when redrawing in place)
   }  // ends go
+  /* A step that draws a different layout for phone-width screens is redrawn from scratch when the window crosses that
+     width, which would throw away what the student had done. So the guide keeps a log of the student's actions on the
+     step (each click on a button, card or tab, and each value set in a slider, box or drop-down), in the order they
+     happened, inside the step's keep store, which survives such a redraw. After the redraw the log is replayed on the
+     fresh step: the labs are deterministic, so the same actions rebuild the same state, including state built by
+     clicking (a grid of writes, a firmware configuration, a snapshot). A button is found again by its label, read just
+     before it was clicked, and a control by its kind and label, so a layout that lacks one simply skips it. Values the
+     program writes into a box itself are never logged, only the student's own edits. Not replayed: quizzes (they keep
+     their own saved answers), a player's own buttons (its frame is put back directly) and random or shuffle buttons
+     (their result cannot be repeated). A step that keeps its own state in ctx.keep restores itself, so for it only
+     tabs, switch buttons and player frames are put back, which never applies anything twice. */
+  const CTL_SEL = 'input[type=range],input[type=number],input[type=text],input[type=checkbox],input[type=radio],select,textarea';  // CTL_SEL: the kinds of form control whose values are logged
+  const outsideQuiz = (el) => !el.closest('.quiz, .qwrap, .player-ctl');  // outsideQuiz(el): true for elements that are not part of a quiz or of a player's own buttons
+  const ctlKind = (el) => (el.tagName === 'TEXTAREA' || el.type === 'text' ? 'TEXT' : el.tagName + ':' + (el.type || '') + ':' + (el.min || '') + ':' + (el.max || ''));  // ctlKind(el): a short description (tag, type, range) of a control; a one-line box and a multi-line box count as the same kind, because a phone layout may swap one for the other
+  const ctlName = (el) => el.getAttribute('aria-label') || (el.labels && el.labels[0] ? el.labels[0].textContent : '') || el.name || el.placeholder || '';  // ctlName(el): what the control is called (its screen-reader label, its <label>, or its name)
+  const btnName = (b) => String(b.getAttribute('aria-label') || b.textContent || b.getAttribute('title') || '').replace(/\s+/g, ' ').trim().slice(0, 80);  // btnName(b): what a button says (its screen-reader label, its text, or its tooltip)
+  const BTN_SEL = 'button, [role=button], .flip';  // BTN_SEL: the clickable things whose clicks are logged
+  function lastingId(el, body, sel, nameOf) {  // lastingId(): a name for an element that survives a redraw: its own name plus which one it is among elements with that name
+    const base = nameOf(el);  // base: the element's name
+    const same = [...body.querySelectorAll(sel)].filter((x) => outsideQuiz(x) && nameOf(x) === base);  // same: every element on the step with that name, in page order
+    return base + '#' + same.indexOf(el);  // the name plus its position among those
+  }  // ends lastingId
+  const ctlId = (el, body) => lastingId(el, body, CTL_SEL, (x) => ctlKind(x) + '|' + ctlName(x));  // ctlId(): a control's lasting name (kind, label, position)
+  const btnId = (b, body) => lastingId(b, body, BTN_SEL, btnName);  // btnId(): a button's lasting name (label, position)
+  const findBy = (body, sel, idOf, id) => [...body.querySelectorAll(sel)].find((x) => outsideQuiz(x) && idOf(x, body) === id);  // findBy(): the element on the redrawn step with that lasting name, if there is one
+  let replaying = false;  // replaying: true while the log is being replayed, so the replay is not logged a second time
+  let keyLogged = null;  // keyLogged: an element whose keyboard activation was just logged, so a click the step's own key handler then fires on it is not logged twice
+  let enterLogged = false;  // enterLogged: true for the moment after Enter in a text box was logged, so a click the box's own handler fires (an Apply button) is not logged as a second action
+  const LOG_MAX = 3000;  // LOG_MAX: the longest log kept; past it the step is marked as too long to replay (see restoreControls)
+  function recordAction(e) {  // recordAction(e): runs (before the step's own handlers) on every click, key press, input and change on the step; adds the student's action to the log
+    if (replaying || !keep || !keep.data) return;  // the replay itself is not logged
+    const body = e.target && e.target.closest && e.target.closest('.step-body'); if (!body) return;  // only actions on the step itself
+    const log = keep.data.__actions || (keep.data.__actions = []);  // log: this step's list of actions, kept in the keep store
+    if (keep.data.__overflow) return;  // the log already overflowed: nothing more is recorded (and nothing will be replayed)
+    const add = (rec) => { if (log.length >= LOG_MAX) { keep.data.__overflow = true; return; } log.push(rec); };  // add(rec): records one action; a log already this long marks the step instead, because replaying it would be slow and could end on a stale prefix
+    if (e.type === 'keydown' && e.key === 'Enter' && e.target.matches && e.target.matches(CTL_SEL) && outsideQuiz(e.target) && /^(TEXT|INPUT:number)/.test(ctlKind(e.target))) {  // Enter in a text or number box: many labs apply the typed value this way, without any button
+      add({ t: 'key', id: ctlId(e.target, body), key: 'Enter' });  // the box and the key, replayed as the same key press
+      enterLogged = true; setTimeout(() => { enterLogged = false; }, 0);  // a click the box's handler fires right now is part of this action
+      return;  // nothing else to do for this key press
+    }  // ends the Enter case
+    if (e.type === 'click' || e.type === 'keydown') {  // a click, or Enter or Space on something that acts like a button
+      const b = e.target.closest(BTN_SEL); if (!b || !body.contains(b) || !outsideQuiz(b) || b.disabled) return;  // only buttons, cards and tabs on the step, never quiz or player buttons
+      if (e.type === 'keydown') {  // a key press: a real button turns Enter and Space into a click by itself (logged below), so only other button-like elements are logged here
+        if ((e.key !== 'Enter' && e.key !== ' ') || b.tagName === 'BUTTON' || e.target !== b) return;  // only Enter or Space, on the button-like element itself
+        keyLogged = b; setTimeout(() => { keyLogged = null; }, 0);  // a click the step's key handler fires on it right now is the same action
+      } else if (b === keyLogged || enterLogged) return;  // that click was already logged as the key press
+      const name = btnName(b); if (/random|shuffle/i.test(name)) return;  // a random result cannot be repeated, so such a click is not logged
+      add({ t: 'click', id: btnId(b, body) });  // the button's lasting name, read before its own handler changes anything
+    } else {  // an input or change event
+      const el = e.target; if (!el.matches || !el.matches(CTL_SEL) || !outsideQuiz(el)) return;  // only form controls, never quiz answers
+      const rec = { t: 'edit', id: ctlId(el, body), value: el.value, checked: el.checked }, last = log[log.length - 1];  // rec: the control and the value the student chose, read now
+      if (last && last.t === 'edit' && last.id === rec.id && last.value === rec.value && last.checked === rec.checked) return;  // the same value again (an input event followed by its change event) adds nothing
+      add(rec);  // every other value is kept, even in the middle of a drag, because a value passed on the way can change other settings (a period dragged below a demand clamps that demand)
+    }  // ends the event kinds
+  }  // ends recordAction
+  function captureControls() {  // captureControls(): before a redraw, notes the open tabs, chosen switch buttons and player frames (the log itself is already in the keep store)
+    const body = els.canvas && els.canvas.querySelector('.step-body'); if (!body) return null;  // nothing to read without a step body
+    const pick = (sel) => [...body.querySelectorAll(sel)].filter(outsideQuiz);  // pick(sel): the matching elements in page order, quizzes and player controls left out
+    return {  // the snapshot
+      tabs: [...body.querySelectorAll('[role=tablist]')].filter(outsideQuiz).map((t) => [...t.querySelectorAll('[role=tab]')].findIndex((b) => b.getAttribute('aria-selected') === 'true')),  // the open tab of each tab strip
+      segs: pick('.seg').map((g) => [...g.querySelectorAll('button')].findIndex((b) => b.getAttribute('aria-pressed') === 'true')),  // the chosen button of each switch
+      players: pick('.player').map((p) => (p._player ? p._player.index : 0)),  // the frame each player shows
+      reveals: pick('.reveal-body').map((r) => r.classList.contains('on')),  // which show-the-answer boxes are open
+      flips: pick('.flip').map((f) => f.classList.contains('on')),  // which flip cards are turned over
+    };  // ends the snapshot
+  }  // ends captureControls
+  function restoreControls(s) {  // restoreControls(s): after a redraw, replays the student's actions and puts tabs, switches and players back
+    const body = els.canvas.querySelector('.step-body'); if (!body || !s) return;  // nothing to do without a step or a snapshot
+    const pick = (sel) => [...body.querySelectorAll(sel)].filter(outsideQuiz);  // pick(sel): the matching elements in page order
+    const fire = (el, ...types) => types.forEach((t) => el.dispatchEvent(new Event(t, { bubbles: true })));  // fire(): sends the same events a student's own change would send
+    const own = Object.keys(keep.data).some((k) => !k.startsWith('__'));  // own: true when the step keeps its own state in ctx.keep (it has already restored itself)
+    replaying = true;  // the replay is not logged again; the log already holds these actions
+    try {  // a step that rebuilds itself in an unexpected way must never break the redraw
+      const activate = (b) => (typeof b.click === 'function' ? b.click() : b.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true })));  // activate(b): clicks an element; an SVG shape acting as a button has no click() method, so it gets a click event instead
+      if (!own && !keep.data.__overflow) (keep.data.__actions || []).forEach((a) => {  // the log, in the order the student acted (a log that overflowed is not replayed: the step shows its start rather than a stale state)
+        try {  // one action that fails is skipped, without stopping the others
+          if (a.t === 'click') { const b = findBy(body, BTN_SEL, btnId, a.id); if (b && !b.disabled) activate(b); return; }  // a click on the same button (skipped if this layout does not have it)
+          if (a.t === 'key') { const el = findBy(body, CTL_SEL, ctlId, a.id); if (el) el.dispatchEvent(new KeyboardEvent('keydown', { key: a.key, bubbles: true, cancelable: true })); return; }  // Enter in the same box, so the lab applies it again
+          const el = findBy(body, CTL_SEL, ctlId, a.id); if (!el) return;  // the same control, if this layout has it
+          if (el.type === 'checkbox' || el.type === 'radio') { if (el.checked !== a.checked) el.click(); return; }  // tick boxes and radio buttons are clicked, so their own handlers run
+          el.value = a.value; fire(el, 'input', 'change');  // sliders, boxes and drop-downs get the value the student chose, with the usual events
+        } catch (e) { console.error(e); }  // a failed action is only logged
+      });  // ends the replay
+      [...body.querySelectorAll('[role=tablist]')].filter(outsideQuiz).forEach((t, i) => { const k = s.tabs[i], tabs = t.querySelectorAll('[role=tab]'); if (k >= 0 && tabs[k] && tabs[k].getAttribute('aria-selected') !== 'true') tabs[k].click(); });  // reopens each tab strip's tab (a tab can also be changed with the arrow keys, which the log does not see)
+      if (own) {  // a self-restoring step skipped the log, so its small widgets are put back from the snapshot
+        pick('.seg').forEach((g, i) => { const k = s.segs[i], b = g.querySelectorAll('button')[k]; if (k >= 0 && b && b.getAttribute('aria-pressed') !== 'true') b.click(); });  // re-chooses each switch's button
+        const rbtn = pick('.reveal-btn'); pick('.reveal-body').forEach((r, i) => { if (s.reveals && s.reveals[i] && !r.classList.contains('on') && rbtn[i]) rbtn[i].click(); });  // reopens each show-the-answer box that was open
+        pick('.flip').forEach((f, i) => { if (s.flips && s.flips[i] && !f.classList.contains('on')) f.click(); });  // turns over the cards that were turned over
+      }  // ends the self-restoring case
+      pick('.player').forEach((p, i) => { const k = s.players[i]; if (k > 0 && p._player && p._player.index !== k) p._player.go(k); });  // returns each player to its frame, without starting playback
+    } catch (e) { console.error(e); } finally { replaying = false; }  // a failure here is only logged: the step simply shows its starting state
+  }  // ends restoreControls
   const LEARN = { step: 1, terms: 1, chquiz: 1, final: 1 };  // LEARN: the slide types that count as learning pages for Continue; home and chapter overviews are left out
   // the core route keeps each section's Big Picture, steps flagged core:true, the recap and the quiz
   function isCore(sl) {  // isCore(sl): true if a slide is on the shorter core path
@@ -568,6 +665,7 @@
     const title = h('h2', { class: 'step-title', tabindex: '-1' });  // the slide title; tabindex -1 lets the guide move focus to it after a slide change without adding it to the Tab order
     c.append(h('header', { class: 'step-head' }, eyebrow, title), body);  // puts the heading (small line plus title) and the content area into the canvas
     const ctx = makeCtx(body, sl);  // builds the toolbox for this slide
+    ['click', 'keydown', 'input', 'change'].forEach((ev) => body.addEventListener(ev, recordAction, true));  // logs the student's actions on this step before the step's own handlers run, so a phone/desktop redraw can replay them (see recordAction)
     curCtx = ctx;  // remembers it so go() can shut it down when the student moves on
     try {  // anything that goes wrong while drawing is caught below, so one broken step does not break the whole guide
       if (sl.type === 'home') { eyebrow.innerHTML = '<span class="kind">Welcome</span>'; title.textContent = 'Operating Systems · Chapters ' + BOOK.range.replace('–', '\u2060–\u2060'); renderHome(body, ctx); }  // home page: a Welcome label, the guide title (invisible word joiners keep a range such as "1-5" on one line) and the home content
@@ -981,7 +1079,8 @@
     const ctl = h('div', { class: 'player-ctl' }, bReset, bPrev, bPlay, bNext, counter, bar, o.speed === false ? null : spd);  // the control row: buttons, counter, bar, then the speed switch unless o.speed is false
     const el = h('div', { class: 'player' }, o.captionBelow ? null : cap, ctl, o.captionBelow ? cap : null);  // the whole player: caption above the controls, or below them if o.captionBelow is true
     if (o.caption === false) cap.style.display = 'none';  // hides the caption box if the caller draws its own
-    function paintPlay() { bPlay.innerHTML = (timer ? ICON.pause + '<span>Pause</span>' : ICON.play + '<span>' + (i >= count - 1 ? 'Replay' : 'Play') + '</span>'); bPlay.querySelector('svg').style.width = '15px'; }  // paintPlay(): shows Pause while playing, otherwise Play, or Replay once the last frame is reached
+    let playLook = '';  // playLook: which face the Play button shows now ('play', 'pause' or 'replay'), so it is redrawn only when that face really changes
+    function paintPlay() { const look = timer ? 'pause' : (i >= count - 1 ? 'replay' : 'play'); if (look === playLook) return; playLook = look; bPlay.innerHTML = (timer ? ICON.pause + '<span>Pause</span>' : ICON.play + '<span>' + (i >= count - 1 ? 'Replay' : 'Play') + '</span>'); bPlay.querySelector('svg').style.width = '15px'; }  // paintPlay(): shows Pause while playing, otherwise Play, or Replay once the last frame is reached; it leaves the button's insides alone when the face is unchanged, because replacing them under a pressed mouse button would swallow that click
     function go(n) {  // go(n): jumps to frame n
       i = clamp(n, 0, Math.max(0, count - 1));  // keeps n between the first and last frame
       let out;  // out will hold the caption text for this frame
@@ -989,7 +1088,9 @@
       if (out != null) cap.innerHTML = out;  // updates the caption, unless the render function returned nothing (null) to keep the old one
       counter.textContent = `Step ${i + 1} / ${count}`;  // updates the counter (people count from 1, so i + 1)
       bar.firstChild.style.width = (count > 1 ? (i / (count - 1)) * 100 : 100) + '%';  // stretches the progress bar to the current frame's position
+      const had = document.activeElement;  // had: the element that has keyboard focus right now (perhaps the Next or Previous button just pressed)
       bPrev.disabled = i === 0; bNext.disabled = i >= count - 1;  // greys out Previous on the first frame and Next on the last one
+      if ((had === bNext || had === bPrev) && had.disabled) bPlay.focus();  // a button greyed out while focused would drop keyboard focus to the page, so it moves to the Play/Replay button beside it instead
       if (i >= count - 1 && timer) stop();  // stops automatic playback on reaching the end
       paintPlay();  // refreshes the Play/Pause button
       if (o.onStep) o.onStep(i);  // tells the caller the frame changed, if it asked
@@ -1005,6 +1106,7 @@
     const api = { el, go, play, stop, next: () => go(i + 1), prev: () => go(i - 1), reset: () => { stop(); go(0); }, get index() { return i; }, get count() { return count; },  // api: what the step gets back: the element and controls, plus index and count read live through getters
       setCount(n, keep) { count = Math.max(1, n); go(keep ? Math.min(i, count - 1) : 0); }, refresh: () => go(i), caption: cap };  // setCount(n, keep): changes the number of frames (keeping the current frame if asked); refresh redraws; caption is the box
     go(o.start || 0);  // draws the starting frame (the first unless o.start says otherwise)
+    el._player = api;  // lets a phone/desktop redraw find this player and return it to the frame the student was on (see restoreControls)
     if (o.autoplay) play();  // starts playing at once if o.autoplay is set
     return api;  // hands the controls back to the step
   };  // ends UI.player
@@ -1430,10 +1532,10 @@
     for (const g of list) {  // one entry per term
       const L = g.term.replace(/^[^A-Za-z0-9]+/, '').charAt(0).toUpperCase();  // L: the term's first letter or digit, in capitals, skipping any leading symbols
       if (L !== letter && !f) { letter = L; els.glBody.append(h('div', { class: 'gl-letter' }, L)); }  // when not searching, a new first letter gets its own heading
-      const prior = isPrior(g.src);  // prior: true when the term was taught in the earlier volume, which is a different page
+      const prior = isPrior(g.src);  // prior: true when the term was taught in an earlier volume, which is a different page
       const target = g.src.startsWith('ch') ? g.src : g.src + '/1';  // target: the slide that teaches this term: the chapter overview, or the section's first step
       if (slideIndex(target) < 0 && !g.src.startsWith('ch')) { /* term from a section not in this build */ }
-      els.glBody.append(h('div', { class: 'gl-item' }, h('b', {}, g.term), (prior ? h('span', { class: 'src', title: 'Taught in ' + priorWhere(g.src) }, 'Ch ' + BOOK.prior + ' guide') : h('span', { class: 'src', title: 'Go to where this term is taught', onclick: () => { closeAll(); go(slideIndex(target)); } }, g.src.startsWith('ch') ? 'Chapter ' + g.src.slice(2) : '§' + labOf(g.src))), h('p', {}, g.def)));  // the entry: the term in bold, a link naming where it is taught (a click closes the panel and goes there), the definition (an earlier-volume term names that volume instead of linking)
+      els.glBody.append(h('div', { class: 'gl-item' }, h('b', {}, g.term), (prior ? h('span', { class: 'src', title: 'Taught in ' + priorWhere(g.src) }, priorLabel(g.src)) : h('span', { class: 'src', title: 'Go to where this term is taught', onclick: () => { closeAll(); go(slideIndex(target)); } }, g.src.startsWith('ch') ? 'Chapter ' + g.src.slice(2) : '§' + labOf(g.src))), h('p', {}, g.def)));  // the entry: the term in bold, a link naming where it is taught (a click closes the panel and goes there), the definition (an earlier-volume term names its own volume, such as Ch 1–5 guide or Ch 6–9 guide, instead of linking)
     }  // ends the loop over terms
   }  // ends renderGloss
   function renderNotes() {  // renderNotes(): fills the notes panel with the notes of the section on screen
@@ -1645,6 +1747,7 @@
 
   /* ------------------------------------------------------------ start */
   Guide.start = function () {  // Guide.start(): called once, after every chapter and section file has registered, to build and show the guide
+    Object.values(Guide.sections).forEach((sec) => { if (Number.isInteger(sec.chapter) && !Guide.chapters.some((c) => c.num === sec.chapter)) Guide.chapters.push({ num: sec.chapter, title: 'Untitled chapter', placeholder: true }); });  // a section whose chapter never registered (its chapters file is not written yet) gets a stand-in chapter, so its slides still appear instead of vanishing
     buildGlossary();  // collects every key term into the glossary
     buildSlides();  // builds the ordered list of slides
     if (/[?&]print\b/.test(location.search)) { renderPrint(); return; }  // if the address asks for ?print, builds the printable study guide instead and stops there

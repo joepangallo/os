@@ -43,6 +43,7 @@
   /* chapter colours */
   --ch1: #2563eb; --ch2: #7c3aed; --ch3: #0891b2; --ch4: #db2777; --ch5: #ea580c; /* one color per chapter (1 blue, 2 purple, 3 teal, 4 pink, 5 orange) for chapter tags and headers */
   --ch6: #dc2626; --ch7: #047857; --ch8: #4f46e5; --ch9: #b45309; /* the second volume's chapter colors (6 red, 7 green, 8 indigo, 9 amber), each dark enough for small white text (at least 4.5 to 1 contrast) */
+  --ch10: #86198f; --ch11: #7c3f12; --ch12: #4d7c0f; --ch13: #9f1239; /* the third volume's chapter colors (10 plum, 11 brown, 12 olive green, 13 crimson): new hues kept clearly apart from chapters 1-9 and from each other, each dark enough for small white text (at least 4.9 to 1 contrast) */
   --chc: var(--accent); /* --chc: the color of the chapter now on screen; the script swaps it when the chapter changes, starting from the accent */
 
   --r-sm: 8px; --r: 12px; --r-lg: 18px; /* corner rounding sizes: --r (12px) rounds cards and callouts; --r-sm and --r-lg are spare smaller and larger sizes */
@@ -80,6 +81,7 @@ html[data-theme="dark"] { /* dark theme: these values replace the ones above whe
 
   --ch1: #6ea0ff; --ch2: #b69cff; --ch3: #38c7e6; --ch4: #f472b6; --ch5: #fb923c; /* dark-mode chapter colors: lighter versions of the five chapter colors */
   --ch6: #f87171; --ch7: #34d399; --ch8: #a5b4fc; --ch9: #fbbf24; /* dark-mode versions of the second volume's chapter colors */
+  --ch10: #e879f9; --ch11: #e0b084; --ch12: #a3e635; --ch13: #fda4af; /* dark-mode versions of the third volume's chapter colors (plum, brown, olive green, crimson made light), each light enough for the dark text placed on them (at least 7.5 to 1 contrast) */
 } /* ends the dark-theme values */
 
 *, *::before, *::after { box-sizing: border-box; } /* makes every box's width and height include its padding and border, so sizes add up the way you expect */
@@ -428,6 +430,7 @@ pre.code .ln.dim { opacity: .45; } /* .ln.dim: lines that do not matter at this 
 
 /* ----------------------------------------------------------- flip cards */
 .flip { perspective: 900px; cursor: pointer; min-height: 90px; } /* .flip: a flash card that turns over when clicked; perspective gives the turn a 3D depth */
+.flip { contain: paint; } /* paint containment: while a card turns, its near edge bulges a few pixels past its box in 3D; keeping that inside the card stops the bulge from counting as overflow, which used to switch on the slide's scrollbars mid-flip */
 .flip-in { position: relative; width: 100%; height: 100%; min-height: inherit; transition: transform .45s; transform-style: preserve-3d; } /* .flip-in: the inner layer that actually rotates, holding both faces in 3D space */
 .flip.on .flip-in { transform: rotateY(180deg); } /* when the card is flipped (class "on"), the inner layer turns half a circle around its vertical axis */
 .flip-face { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; border-radius: 12px; border: 1px solid var(--line); padding: 10px 12px; display: flex; align-items: center; justify-content: center; text-align: center; background: var(--panel-2); overflow: hidden; } /* .flip-face: each side of the card, stacked on top of each other; the side facing away from the viewer is hidden */
@@ -479,6 +482,8 @@ pre.code .ln.dim { opacity: .45; } /* .ln.dim: lines that do not matter at this 
 .quiz-fb .why { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--line-2); } /* .why: the explanation under the verdict, separated by a dashed line */
 .quiz-ctl { display: flex; align-items: center; gap: 8px; } /* .quiz-ctl: the bottom row of quiz buttons (Check, Next question and so on) */
 .qrow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 6px 10px; border: 2px solid var(--line); border-radius: 10px; background: var(--panel); font-size: 15px; } /* .qrow: one row of a matching question: the statement on the left and its answer picker on the right */
+body.narrow .qrow { grid-template-columns: minmax(0, 1fr); gap: 6px; align-items: stretch; } /* small screens: a matching or sorting row puts its statement on top and its answer control underneath, so a wide control never squeezes the statement to nothing */
+body.narrow .qrow select { max-width: 100%; } /* small screens: the drop-down list may use the whole width of its row */
 .qrow.right { border-color: var(--ok); background: var(--ok-bg); } /* a matching row answered right turns green */
 .qrow.wrong { border-color: var(--bad); background: var(--bad-bg); } /* a matching row answered wrong turns red */
 .qrow select { font: inherit; font-size: 14.5px; padding: 4px 8px; border-radius: 8px; border: 1px solid var(--line-2); background: var(--panel); color: var(--ink); max-width: 330px; } /* the drop-down list (select) in a matching row matches the page font and colors and is at most 330px wide */
@@ -492,6 +497,7 @@ pre.code .ln.dim { opacity: .45; } /* .ln.dim: lines that do not matter at this 
 .qord .mv button { width: 26px; height: 26px; border-radius: 7px; border: 1px solid var(--line); background: var(--panel-2); cursor: pointer; font-size: 12px; } /* each up or down button is a 26px rounded square */
 .qnum { display: flex; gap: 8px; align-items: center; } /* .qnum: the row for a type-in number answer (input box, unit, Check button) */
 .qnum input { font: inherit; font-size: 18px; width: 170px; height: 42px; border-radius: 10px; border: 2px solid var(--line-2); padding: 0 12px; background: var(--panel); color: var(--ink); font-family: var(--mono); } /* the number input box: large fixed-width digits, 170px wide, with a thick rounded border */
+body.narrow .qnum { flex-wrap: wrap; row-gap: 6px; } /* small screens: the Check button may drop to a second line instead of being cut off when the answer box and a long unit fill the row */
 .qnum input.right { border-color: var(--ok); background: var(--ok-bg); } /* a correct typed answer turns the box green */
 .qnum input.wrong { border-color: var(--bad); background: var(--bad-bg); } /* a wrong typed answer turns the box red */
 .quiz-sum { display: grid; place-items: center; text-align: center; height: 100%; } /* .quiz-sum: the end-of-quiz summary, centered in the full quiz area */
