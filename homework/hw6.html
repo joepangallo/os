@@ -1,0 +1,1072 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Chapters 5 and 12: race conditions, software and hardware mutual exclusion, semaphores, monitors and message passing, file organization, record blocking, B-trees and file allocation, plus a Python program that checks every interleaving of two threads.">
+<title>Homework 6: Mutual Exclusion and Files</title>
+<style>
+:root {  /* design tokens: every color and size the page uses is named once here */
+  --font: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;  /* the reading typeface: whatever system font the computer already has */
+  --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;  /* a fixed-width typeface for code, registers and hex values */
+  --bg: #eef1f7;  /* the pale blue-grey page background behind the cards */
+  --panel: #ffffff;  /* white, the fill for cards and answer boxes */
+  --panel-2: #f5f7fb;  /* a slightly tinted white for boxes nested inside cards */
+  --ink: #151c2c;  /* the main text color, a very dark blue */
+  --ink-2: #3d4760;  /* a lighter text color for secondary text */
+  --muted: #69738c;  /* grey text for hints and small print */
+  --line: #d9deea;  /* the thin border color around panels and table cells */
+  --accent: #4f46e5;  /* indigo, for buttons, links and focus rings */
+  --accent-bg: #e8e7fd;  /* a pale indigo fill behind highlighted items */
+  --accent-ink: #ffffff;  /* text placed on top of the accent color */
+  --hw: #2563eb;  /* this homework's own color; each page overrides it in its body tag */
+  --good: #15803d;  /* green, for "saved" and success messages */
+  --warn: #b45309;  /* amber, for cautions */
+  --code-bg: #0f172a;  /* the dark background of code blocks */
+  --code-ink: #e2e8f0;  /* the light text inside code blocks */
+  --code-comment: #94a3b8;  /* comments inside code, dimmer than the code itself */
+  --code-string: #fbbf24;  /* strings inside code */
+  --code-keyword: #c4b5fd;  /* Python keywords inside code */
+  --code-number: #7dd3fc;  /* numbers inside code */
+  --radius: 12px;  /* the corner rounding used by cards and boxes */
+  --shadow: 0 1px 2px rgba(20, 28, 48, .06), 0 6px 18px rgba(20, 28, 48, .06);  /* a soft shadow that lifts cards off the page */
+}  /* end of the light-theme tokens */
+@media (prefers-color-scheme: dark) {  /* when the computer is set to dark mode... */
+  :root {  /* ...swap the tokens for darker ones; every rule below uses the tokens, so nothing else changes */
+    --bg: #0d1220;  /* near-black blue page */
+    --panel: #151c2e;  /* dark cards */
+    --panel-2: #1b2438;  /* slightly lighter nested boxes */
+    --ink: #e7ebf5;  /* light main text */
+    --ink-2: #c3cadb;  /* light secondary text */
+    --muted: #8f99b3;  /* grey hints that still read on dark */
+    --line: #2b3550;  /* dark borders */
+    --accent: #8b85ff;  /* a lighter indigo that stays readable on dark */
+    --accent-bg: #25234d;  /* dark indigo fill */
+    --accent-ink: #0d1220;  /* dark text on the light-indigo buttons */
+    --good: #4ade80;  /* lighter green */
+    --warn: #fbbf24;  /* lighter amber */
+    --shadow: 0 1px 2px rgba(0, 0, 0, .4);  /* shadows barely show on dark, so keep them small */
+  }  /* end of the dark tokens */
+}  /* end of the dark-mode block */
+*, *::before, *::after { box-sizing: border-box; }  /* widths include padding and border, which makes layouts predictable */
+html { scroll-behavior: smooth; scroll-padding-top: 76px; }  /* in-page links glide, and stop below the sticky bar instead of under it */
+body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.6 var(--font); -webkit-font-smoothing: antialiased; }  /* base page: background, text color, size and line spacing */
+a { color: var(--accent); }  /* links use the accent color */
+code, kbd, pre, textarea.mono, .grid input { font-family: var(--mono); }  /* code and hex values use the fixed-width face */
+code { background: var(--panel-2); border: 1px solid var(--line); border-radius: 5px; padding: 0 .3em; font-size: .92em; }  /* inline code gets a small tinted pill */
+kbd { border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; padding: 0 .35em; font-size: .88em; background: var(--panel); }  /* a key on the keyboard */
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }  /* a clear ring shows where keyboard focus is */
+.wrap { width: min(920px, calc(100% - 32px)); margin: 0 auto; }  /* the reading column: at most 920px wide, 16px gutter each side on phones */
+.skip { position: absolute; left: 12px; top: -60px; z-index: 50; padding: 8px 12px; background: var(--ink); color: var(--bg); border-radius: 8px; }  /* "skip to content" link, hidden above the page... */
+.skip:focus { top: 8px; }  /* ...until a keyboard user tabs onto it */
+header.hero { background: linear-gradient(135deg, var(--hw), #1e1b4b); color: #fff; padding: 40px 0 34px; }  /* the colored title band at the top */
+.hero .kicker { display: block; font-size: .78rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; opacity: .85; }  /* the small label above the title */
+.hero h1 { margin: 6px 0 10px; font-size: clamp(1.9rem, 5vw, 2.9rem); line-height: 1.15; letter-spacing: -.02em; }  /* the title grows with the screen but never overflows a phone */
+.hero p { margin: 0; max-width: 62ch; font-size: 1.06rem; opacity: .95; }  /* the one-paragraph summary under the title */
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; padding: 0; list-style: none; }  /* a row of small labels that wraps on phones */
+.chips li { border: 1px solid rgba(255, 255, 255, .35); border-radius: 999px; padding: 3px 11px; font-size: .8rem; font-weight: 700; background: rgba(255, 255, 255, .1); }  /* one pill-shaped label */
+nav.bar { position: sticky; top: 0; z-index: 20; background: var(--panel); border-bottom: 1px solid var(--line); box-shadow: var(--shadow); }  /* the navigation bar that stays at the top while scrolling */
+.bar .wrap { display: flex; align-items: center; gap: 6px 14px; flex-wrap: wrap; padding: 8px 0; }  /* bar contents sit in one row and wrap onto two on phones */
+.bar a.nav { color: var(--ink-2); text-decoration: none; font-weight: 650; font-size: .9rem; padding: 4px 2px; }  /* each section link */
+.bar a.nav:hover { color: var(--accent); }  /* links light up under the mouse */
+.bar .spacer { flex: 1; }  /* pushes the progress counter and button to the right-hand end */
+.bar .progress { font-size: .85rem; color: var(--muted); white-space: nowrap; }  /* "7 of 40 answered" */
+button, .btn { font: inherit; font-size: .9rem; font-weight: 700; border: 1px solid var(--accent); background: var(--accent); color: var(--accent-ink); border-radius: 8px; padding: 6px 12px; cursor: pointer; }  /* the main button style */
+button.ghost { background: transparent; color: var(--accent); }  /* a quieter outline button for secondary actions */
+button:hover { filter: brightness(1.08); }  /* buttons brighten slightly under the mouse */
+main { padding: 26px 0 60px; }  /* space above and below the main content */
+section.card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 22px 24px; margin: 0 0 22px; }  /* one white card per problem or topic */
+@media (max-width: 600px) { section.card { padding: 16px 14px; } }  /* phones get tighter card padding so text has room */
+h2 { margin: 0 0 10px; font-size: 1.45rem; line-height: 1.25; }  /* problem titles */
+h2 .num { color: var(--hw); margin-right: .35em; }  /* the "Problem 3" part of a title, in the homework color */
+h3 { margin: 22px 0 8px; font-size: 1.1rem; }  /* sub-headings inside a card */
+.part-label { display: block; margin: 36px 0 12px; font-size: .8rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--hw); }  /* the "Part A" / "Part B" divider label */
+.given { background: var(--panel-2); border: 1px solid var(--line); border-left: 4px solid var(--hw); border-radius: 8px; padding: 12px 16px; margin: 12px 0; }  /* a box that holds the facts a problem gives you */
+.given > :first-child { margin-top: 0; }  /* no extra gap at the top of that box */
+.given > :last-child { margin-bottom: 0; }  /* no extra gap at the bottom either */
+.note { border-left: 4px solid var(--accent); background: var(--accent-bg); border-radius: 8px; padding: 10px 14px; margin: 12px 0; }  /* a tip */
+.caution { border-left: 4px solid var(--warn); background: var(--panel-2); border-radius: 8px; padding: 10px 14px; margin: 12px 0; }  /* a caution */
+.scroll-x { overflow-x: auto; -webkit-overflow-scrolling: touch; }  /* wide tables scroll sideways inside their own box instead of widening the page */
+table.data { border-collapse: collapse; margin: 8px 0; font-size: .95rem; }  /* a table of given facts */
+table.data th, table.data td { border: 1px solid var(--line); padding: 5px 10px; text-align: left; vertical-align: top; }  /* its cells */
+table.data th { background: var(--panel-2); font-weight: 700; }  /* its header cells */
+table.data td.mono, table.data th.mono { font-family: var(--mono); }  /* cells that hold hex values */
+.part { margin: 18px 0 0; padding-top: 14px; border-top: 1px dashed var(--line); }  /* one lettered sub-question, separated by a dashed line */
+.part .q { margin: 0 0 8px; }  /* the question text */
+.part .q b.letter { color: var(--hw); }  /* the (a), (b), (c) letter */
+.ans { margin: 6px 0 0; }  /* the space that holds an answer box */
+.ans textarea { width: 100%; min-height: 96px; resize: vertical; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--ink); font: inherit; font-size: .95rem; line-height: 1.5; padding: 9px 11px; }  /* a free-text answer box */
+.ans textarea.mono { font-size: .85rem; white-space: pre; overflow-wrap: normal; overflow-x: auto; }  /* the box for pasted program output keeps columns lined up */
+.ans textarea:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px var(--accent-bg); }  /* the box being typed in is highlighted */
+.ans .status { display: block; min-height: 1.2em; font-size: .78rem; color: var(--muted); margin-top: 2px; }  /* "saved" appears here after typing */
+.ans .status.saved { color: var(--good); }  /* the saved message is green */
+table.grid { border-collapse: collapse; margin: 6px 0; font-size: .9rem; }  /* a table of small answer boxes */
+table.grid th, table.grid td { border: 1px solid var(--line); padding: 0; }  /* grid cells: the input fills the cell, so no padding */
+table.grid th { background: var(--panel-2); padding: 5px 8px; font-weight: 700; text-align: left; white-space: nowrap; }  /* row and column labels */
+table.grid thead th { text-align: center; }  /* column labels are centered over their inputs */
+table.grid tbody th { white-space: normal; min-width: 110px; max-width: 240px; }  /* long row labels wrap onto several lines instead of pushing the inputs off a phone screen */
+table.grid td input { width: 100%; min-width: 64px; border: 0; background: var(--panel); color: var(--ink); padding: 6px 8px; font-size: .9rem; }  /* the input inside a grid cell */
+table.grid.wide td input { min-width: 150px; }  /* grids whose answers are sentences get wider cells */
+table.grid td input:focus { outline: 2px solid var(--accent); outline-offset: -2px; }  /* the focused cell is outlined */
+.sheet { display: grid; gap: 10px; }  /* the answer-sheet panel near the top of the page */
+.sheet label { font-weight: 700; font-size: .9rem; }  /* "Your name" */
+.sheet input[type=text] { width: 100%; max-width: 360px; border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; font: inherit; background: var(--panel); color: var(--ink); }  /* the name box */
+.sheet .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }  /* the row of sheet buttons */
+.sheet .msg { font-size: .88rem; color: var(--muted); min-height: 1.3em; }  /* messages such as "Loaded 38 answers" */
+ol.steps { padding-left: 1.3em; }  /* numbered setup steps */
+ol.steps > li { margin: 0 0 12px; }  /* space between steps */
+.os { display: grid; grid-template-columns: 88px 1fr; gap: 4px 10px; margin: 6px 0; align-items: baseline; }  /* "Windows: ... / macOS: ..." rows */
+.os > b { font-size: .82rem; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }  /* the operating-system name */
+@media (max-width: 520px) { .os { grid-template-columns: 1fr; } }  /* on phones the name sits above its instructions */
+.codebox { margin: 12px 0; border-radius: 10px; overflow: hidden; border: 1px solid #1e293b; }  /* a code block with its toolbar */
+.codebox .tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; background: #1e293b; color: #cbd5e1; padding: 6px 10px; font-size: .85rem; }  /* the toolbar: file name plus buttons */
+.codebox .tools .name { font-family: var(--mono); font-weight: 700; flex: 1; }  /* the file name */
+.codebox .tools button { background: #334155; border-color: #475569; color: #f1f5f9; padding: 3px 10px; font-size: .8rem; }  /* toolbar buttons */
+.codebox pre, pre.term { margin: 0; background: var(--code-bg); color: var(--code-ink); padding: 12px 14px; overflow-x: auto; font-size: .8rem; line-height: 1.5; tab-size: 4; }  /* the code itself scrolls sideways inside its box */
+.codebox pre.tall { max-height: 560px; overflow-y: auto; }  /* long files scroll inside a box instead of filling several screens */
+pre.term { border-radius: 10px; margin: 8px 0; }  /* a terminal command or output shown on its own */
+pre code { background: none; border: 0; padding: 0; font-size: inherit; color: inherit; }  /* code inside a code block must not get the inline-code pill style */
+pre .c { color: var(--code-comment); }  /* comments */
+pre .s { color: var(--code-string); }  /* strings */
+pre .k { color: var(--code-keyword); }  /* keywords */
+pre .n { color: var(--code-number); }  /* numbers */
+ul.check { list-style: none; padding-left: 0; }  /* the submission checklist */
+ul.check li { padding-left: 1.6em; position: relative; margin: 0 0 8px; }  /* each item leaves room for its box */
+ul.check li::before { content: "\2610"; position: absolute; left: 0; color: var(--hw); }  /* an empty checkbox drawn in front of each item */
+footer { color: var(--muted); font-size: .85rem; text-align: center; padding: 10px 0 40px; }  /* the small print at the very bottom */
+@media print {  /* when the page is printed or saved as a PDF */
+  nav.bar, .skip, .sheet .row, .codebox .tools button { display: none; }  /* hide things that only work on screen */
+  section.card { box-shadow: none; break-inside: avoid-page; }  /* no shadows, and try not to split a card across pages */
+  body { background: #fff; }  /* white paper */
+}  /* end of the print block */
+.answer { border-left: 4px solid var(--good); background: var(--panel-2); border-radius: 8px; padding: 10px 14px; margin: 10px 0; }  /* solutions: the final answer to a part, in a green-edged box */
+.answer > :first-child { margin-top: 0; }  /* no extra gap at the top of an answer box */
+.answer > :last-child { margin-bottom: 0; }  /* nor at the bottom */
+.mistake { border-left: 4px solid var(--warn); background: var(--panel-2); border-radius: 8px; padding: 10px 14px; margin: 10px 0; }  /* solutions: a common mistake and how to spot it */
+.mistake > :first-child { margin-top: 0; }  /* no extra gap at the top of a mistake box */
+.mistake > :last-child { margin-bottom: 0; }  /* nor at the bottom */
+</style>
+</head>
+<body data-hw="os-hw6" data-sheet="hw6-answers.html" style="--hw: #15803d;">
+<a class="skip" href="#main">Skip to the content</a>
+<header class="hero">
+  <div class="wrap">
+    <span class="kicker">Operating Systems · Homework 6</span>
+    <h1>Mutual Exclusion and Files</h1>
+    <p>Chapters 5 and 12. Find every value a race can leave behind, test locks against the six requirements, trace semaphores through a bounded buffer and watch a stream of readers keep a writer waiting. Then pack records into blocks, grow a B-tree one key at a time and follow an inode's pointers to any byte of a file. In Part B you finish a program that tries every possible interleaving of two threads and reports exactly how a lock can fail.</p>
+    <ul class="chips">
+      <li>Chapter 5: Mutual Exclusion and Synchronization</li>
+      <li>Chapter 12: File Management</li>
+      <li>Part A: 4 problems</li>
+      <li>Part B: check every interleaving</li>
+    </ul>
+  </div>
+</header>
+
+<nav class="bar" aria-label="Homework sections">
+  <div class="wrap">
+    <a class="nav" href="#start">Start</a>
+    <a class="nav" href="#part-a">Part A</a>
+    <a class="nav" href="#part-b">Part B</a>
+    <a class="nav" href="#submit">Submit</a>
+    <span class="spacer"></span>
+    <span class="progress js-progress"></span>
+    <button type="button" class="js-download">Download answer sheet</button>
+  </div>
+</nav>
+
+<main id="main" class="wrap">
+
+<section class="card" id="start">
+  <h2>How this homework works</h2>
+  <p>There are two parts. <b>Part A</b> is four problems: two about mutual exclusion and synchronization (races, the requirements a lock must meet, hardware support, semaphores, readers and writers, and messages) and two about file management (record blocking, file organizations, B-trees, inodes, file allocation and free space). <b>Part B</b> is a Python program, <code>mutex.py</code>, that tries every order in which two threads' steps could run. You write the two missing pieces, run it, and explain what it finds.</p>
+  <p>Every question has an answer box right under it. What you type is saved automatically in this browser. When you are done, <b>Download answer sheet</b> saves all of your answers as one HTML file, <code>hw6-answers.html</code>, which goes into a GitHub repository together with your finished <code>mutex.py</code>.</p>
+  <div class="note"><b>Show your work.</b> For every calculation, write the formula, the numbers you put into it, and the result. For every trace, a short note on any step you found tricky helps show your reasoning.</div>
+  <div class="caution"><b>Switching computers?</b> Drafts live in one browser only. Download the answer sheet, then use <b>Load a saved answer sheet</b> on the other computer to pick up where you left off.</div>
+  <h3>Your answer sheet</h3>
+  <div class="sheet">
+    <div>
+      <label for="student-name">Your name (printed at the top of the answer sheet)</label><br>
+      <input type="text" id="student-name" autocomplete="name">
+    </div>
+    <div class="row">
+      <button type="button" class="js-download">Download answer sheet</button>
+      <button type="button" class="ghost" id="sheet-load">Load a saved answer sheet</button>
+      <input type="file" id="sheet-file" accept=".html,text/html" hidden>
+      <button type="button" class="ghost" id="sheet-clear">Clear all answers</button>
+      <span class="progress js-progress"></span>
+    </div>
+    <p class="msg js-sheet-msg" aria-live="polite"></p>
+  </div>
+</section>
+
+<span class="part-label" id="part-a">Part A · Problems</span>
+
+<!-- ============================ Problem 1 ============================ -->
+<section class="card" id="p1">
+  <h2><span class="num">Problem 1</span>Races and the rules a lock must follow</h2>
+  <div class="given">
+    <p>A statement such as <code>count = count + 1</code> is not one action. The processor runs it as three steps: <b>load</b> (copy <code>count</code> from memory into one of the thread's own registers), <b>compute</b> (change the register), and <b>store</b> (copy the register back into <code>count</code>). Each thread has its own registers. The scheduler can switch from one thread to another between any two steps, but never in the middle of one.</p>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(a)</b> (i) <code>count</code> starts at <b>3</b>. Thread T0 runs <code>count = count + 1</code> once and thread T1 runs <code>count = count * 2</code> once. List <b>every</b> value <code>count</code> can hold after both have finished, and for each value give one order of the six steps that produces it (for example: T0 load, T0 add, T1 load, ...). (ii) <code>count</code> starts at <b>0</b>, and each of two threads runs <code>count = count + 1</code> <b>four times</b>. What are the largest and the smallest possible final values? The values alone are not the answer (Part B's program can confirm them): the answer is an order of steps that produces the smallest, step by step, and an explanation of why no order can produce anything smaller.</p>
+    <div class="ans" data-id="p1a" data-rows="8" data-label="Problem 1(a)"></div>
+  </div>
+  <div class="part">
+    <div class="given">
+      <p>The six requirements any mutual exclusion scheme must meet:</p>
+      <ol>
+        <li><b>Only one process inside:</b> at most one process at a time is in its critical section for a resource.</li>
+        <li><b>Halting outside must not hurt others:</b> a process that stops in its non-critical code must not stop the others from entering.</li>
+        <li><b>No deadlock and no starvation:</b> a process that wants to enter is never delayed forever.</li>
+        <li><b>Free means enter at once:</b> if nobody is inside, a process that asks to enter gets in without delay.</li>
+        <li><b>No assumptions about speed or processors:</b> the scheme works whatever the relative speeds and however many processors there are.</li>
+        <li><b>Stay inside for a finite time:</b> a process leaves its critical section after a finite time.</li>
+      </ol>
+    </div>
+    <p class="q"><b class="letter">(b)</b> Each scheme below is flawed. Name the requirement (1 to 6) that is the <b>root cause</b> of its trouble, and explain in one or two sentences.</p>
+    <div class="scroll-x"><table class="grid wide" data-id="p1b" data-corner="Scheme" data-rows="A: Each process raises its own 'I want in' flag, then waits until the other process's flag is down. Both processes raise their flags at the same moment.|B: Entry is shared out in fixed time slots: P may enter only during even-numbered milliseconds and Q only during odd ones, even when the other process is nowhere near the critical section.|C: To keep the lock working, every process must keep 'checking in' from its non-critical code. One process stops in its non-critical code (it waits for a user who has gone home), and now nobody can enter.|D: A thread locks the shared log file, then asks a network service for the current time and waits for the reply with no time limit, still holding the lock.|E: After raising its flag, each process pauses for 2 ms, on the theory that by then the other process will surely have raised its flag too if it also wants to enter.|F: A process reads a shared busy variable and, if it is 0, sets it to 1 in the next instruction and enters." data-cols="Requirement (1–6)|Why" data-label="Problem 1(b) table"></table></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(c)</b> A kernel protects its run queue by disabling interrupts on entry to the critical section and enabling them again on exit. (i) Why does this guarantee mutual exclusion on a computer with <b>one</b> processor? (ii) Give two costs of the approach, even on one processor. (iii) The same kernel is moved to a computer with <b>four</b> cores. Describe exactly how two threads can now be in the critical section at the same time.</p>
+    <div class="ans" data-id="p1c" data-rows="6" data-label="Problem 1(c)"></div>
+  </div>
+  <div class="part">
+    <div class="given">
+      <p><code>compare_and_swap(word, testval, newval)</code> is one machine instruction, so it cannot be interrupted: it reads <code>*word</code>, writes <code>newval</code> into it only if the value read equals <code>testval</code>, and returns the value it read. A spin lock built on it:</p>
+<pre class="term">int bolt = 0;                                  /* shared: 0 = free, 1 = taken */
+while (compare_and_swap(&amp;bolt, 0, 1) == 1)
+    ;                                          /* spin until the lock was free */
+/* critical section */
+bolt = 0;                                      /* release */</pre>
+    </div>
+    <p class="q"><b class="letter">(d)</b> (i) What does the call return, and what does it change, when <code>bolt</code> is 0 and when it is 1? Use scheme F from (b) to explain why the read and the write must happen in one instruction. (ii) On a four-core machine, P1 is inside its critical section while P2, P3 and P4 spin. P1 leaves and soon asks to enter again. Which process gets in next, and can P4 wait forever? Which requirement is at risk? (iii) On a <b>one</b>-processor machine with strict priorities, low-priority L holds <code>bolt</code> when high-priority H becomes ready and starts spinning on it. What happens, and why?</p>
+    <div class="ans" data-id="p1d" data-rows="7" data-label="Problem 1(d)"></div>
+  </div>
+</section>
+
+<!-- ============================ Problem 2 ============================ -->
+<section class="card" id="p2">
+  <h2><span class="num">Problem 2</span>Semaphores, readers and writers, and messages</h2>
+  <div class="given">
+    <p>A producer P and a consumer C share a buffer with room for <b>2 items</b>, guarded by three semaphores: <code>s</code> (one process at a time in the buffer), <code>n</code> (items waiting) and <code>e</code> (empty slots).</p>
+<pre class="term">/* producer P */                    /* consumer C */
+while (true) {                      while (true) {
+    v = produce();                      semWait(n);
+    semWait(e);                         semWait(s);
+    semWait(s);                         w = take();
+    append(v);                          semSignal(s);
+    semSignal(s);                       semSignal(e);
+    semSignal(n);                       consume(w);
+}                                   }</pre>
+    <p>Semaphores work as in the chapter: <code>semWait</code> subtracts 1 and, if the value is now <b>negative</b>, blocks the caller; <code>semSignal</code> adds 1 and, if the value is still <b>zero or negative</b>, releases one blocked process. So a negative value counts the processes waiting.</p>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(a)</b> The buffer already holds item A, so <code>s</code> = 1, <code>n</code> = 1 and <code>e</code> = 1. The twelve operations below run in this order. After each one, write the values of the three semaphores, the items in the buffer (oldest first), and which process is blocked and on which semaphore (or "none").</p>
+    <div class="scroll-x"><table class="grid" data-id="p2a" data-corner="Operation" data-rows="1. P: semWait(e)|2. P: semWait(s)|3. C: semWait(n)|4. C: semWait(s)|5. P: append(B)|6. P: semSignal(s)|7. P: semSignal(n)|8. P: semWait(e) (for its next item)|9. C: take()|10. C: semSignal(s)|11. C: semSignal(e)|12. P: semWait(s)" data-cols="s|n|e|Items in the buffer|Blocked (who, on which semaphore)" data-label="Problem 2(a) table"></table></div>
+    <div class="ans" data-id="p2a-why" data-rows="3" data-label="Problem 2(a) explanation" data-placeholder="What does the value of e after operation 8 tell you? Which item does C take at operation 9, and why does C not need to wait on s there?"></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(b)</b> A programmer swaps the producer's two waits, so it runs <code>semWait(s)</code> and then <code>semWait(e)</code>. (i) Start with a <b>full</b> buffer: <code>s</code> = 1, <code>n</code> = 2, <code>e</code> = 0. Give the shortest sequence of semaphore operations that leaves both processes blocked forever, with each semaphore's value after every operation. Who holds what, and who is waiting for whom? (ii) If the buffer is not full when the two processes start, can they still end up in the same deadlock later? How? (iii) Would swapping the producer's two <b>semSignal</b> calls instead cause the same problem? Why or why not?</p>
+    <div class="ans" data-id="p2b" data-rows="7" data-label="Problem 2(b)"></div>
+  </div>
+  <div class="part">
+    <div class="given">
+      <p>Readers may share a file; a writer needs it alone. Each reader reads for <b>4</b> time units and the writer writes for <b>2</b>. Arrivals: R1 at time 0, W1 at time 1, R2 at 2, R3 at 5, R4 at 8. Nobody else arrives.</p>
+      <ul>
+        <li><b>Readers priority:</b> only the first reader to arrive while nobody is reading has to wait for the file; any reader that arrives while others are reading goes straight in. The writer starts only when no one is reading.</li>
+        <li><b>Writers priority:</b> once a writer is waiting, no <b>new</b> reader may start until no writer is waiting or writing; readers already reading finish normally.</li>
+      </ul>
+    </div>
+    <p class="q"><b class="letter">(c)</b> Give each start and finish time under both policies.</p>
+    <div class="scroll-x"><table class="grid" data-id="p2c-grid" data-corner="Process" data-rows="R1|W1|R2|R3|R4" data-cols="Readers priority: start|Readers priority: finish|Writers priority: start|Writers priority: finish" data-label="Problem 2(c) table"></table></div>
+    <div class="ans" data-id="p2c" data-rows="4" data-label="Problem 2(c)" data-placeholder="How long does W1 wait under each policy? If a new reader kept arriving every 3 time units forever, when would W1 write under readers priority, and what is that called?"></div>
+  </div>
+  <div class="part">
+    <div class="given">
+      <p>Mutual exclusion with a mailbox. <code>receive</code> blocks until a message is there; <code>send</code> never blocks.</p>
+<pre class="term">create_mailbox(box);
+send(box, null);              /* done once, before any process starts */
+/* every process: */
+while (true) {
+    receive(box, msg);
+    /* critical section */
+    send(box, msg);
+    /* remainder */
+}</pre>
+    </div>
+    <p class="q"><b class="letter">(d)</b> (i) What does the single message stand for, and why can at most one process be in its critical section? (ii) What happens if the mailbox starts with <b>two</b> messages, and what if it starts with <b>none</b>? (iii) Why would the scheme fail if <code>receive</code> returned at once, empty-handed, when the box is empty?</p>
+    <div class="ans" data-id="p2d" data-rows="5" data-label="Problem 2(d)"></div>
+  </div>
+</section>
+
+<!-- ============================ Problem 3 ============================ -->
+<section class="card" id="p3">
+  <h2><span class="num">Problem 3</span>Records, blocks and organizations</h2>
+  <div class="part">
+    <p class="q"><b class="letter">(a)</b> (i) <b>Fixed blocking.</b> A file holds <b>10,000</b> records of <b>300 bytes</b> each, in blocks of <b>2,048 bytes</b>. Records are never split. Give the blocking factor, the unused bytes at the end of each full block, the number of blocks the file needs, and the block and slot of record number 4,321 (records, blocks and slots are all numbered from 0). What percentage of all the bytes in the file's blocks holds no record data? Count the unused bytes in every block, including the space left at the end of the last block.</p>
+    <div class="ans" data-id="p3a-fixed" data-rows="5" data-label="Problem 3(a)(i)"></div>
+    <p class="q">(ii) <b>Variable-length records.</b> Eight records are written in this order into blocks of <b>1,024 bytes</b>: A 300, B 500, C 450, D 200, E 700, F 350, G 600, H 400 (sizes in bytes). Ignore any space taken by pointers or headers. Pack them both ways.</p>
+    <div class="scroll-x"><table class="grid" data-id="p3a-grid" data-corner="Method" data-rows="Variable-length spanned|Variable-length unspanned" data-cols="Blocks used|Unused bytes (gaps left inside blocks plus the space left at the end of the last block)|Records split across two blocks" data-label="Problem 3(a)(ii) table"></table></div>
+    <div class="ans" data-id="p3a" data-rows="3" data-label="Problem 3(a)(ii)" data-placeholder="Show which records go in each block. Then: how many disk reads does it take to fetch record E under each method, and why might someone choose unspanned blocking anyway?"></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(b)</b> Choose a file organization for each job: pile, sequential, indexed sequential, indexed, or direct (hashed). Use each one once, and say why it fits better than the others.</p>
+    <div class="scroll-x"><table class="grid wide" data-id="p3b" data-corner="Job" data-rows="A weather station appends readings of different shapes as they arrive; once a month the whole file is analyzed in bulk.|A weekly payroll run processes every employee in ID order; no one ever looks up a single employee.|A bank file of accounts is processed in account-number order every night, and single accounts are looked up by number all day.|A library catalog is searched by title, by author, by subject and by ISBN, and its records vary a lot in length.|A login service checks thousands of user names per second by exact match and never lists users in order." data-cols="Organization|Why" data-label="Problem 3(b) table"></table></div>
+  </div>
+  <div class="part">
+    <div class="given">
+      <p>B-trees in this problem follow the chapter's rules for a tree of <b>minimum degree <i>d</i></b>: every node holds at most 2<i>d</i> − 1 keys; every node except the root holds at least <i>d</i> − 1 keys; a node with <i>k</i> keys that is not a leaf has <i>k</i> + 1 children; all leaves are on the same level. Insertion works <b>top-down</b>: on the way down from the root, every <b>full</b> node met (including the root, and including the leaf) is split before going further. A split moves the full node's middle key up into its parent and leaves the keys on each side in two separate nodes; splitting the root creates a new root, which is the only way the tree grows taller.</p>
+    </div>
+    <p class="q"><b class="letter">(c)</b> (i) Insert these keys, in order, into an empty B-tree with <i>d</i> = <b>2</b> (so a node holds 1 to 3 keys): <span class="mono">50, 20, 80, 10, 30, 60, 90, 70, 40, 25, 35</span>. Say which insertions cause splits and which key moves up each time, and draw the final tree level by level, for example <code>[40] / [10 20] [60 80]</code>. (ii) A B-tree with <i>d</i> = <b>50</b> holds <b>1,000,000</b> keys. How many keys can one node hold at most, and at least (if it is not the root)? Using the height bound <i>h</i> ≤ log<sub><i>d</i></sub>((<i>n</i> + 1) / 2), what is the most nodes a search can read? How many levels would the shortest possible binary search tree of the same keys have?</p>
+    <div class="ans" data-id="p3c" data-rows="8" data-label="Problem 3(c)"></div>
+  </div>
+</section>
+
+<!-- ============================ Problem 4 ============================ -->
+<section class="card" id="p4">
+  <h2><span class="num">Problem 4</span>Where a file's blocks live</h2>
+  <div class="given">
+    <p>Sizes use powers of two: 1 KiB = 1,024 bytes, 1 MiB = 1,024 KiB, 1 GiB = 1,024 MiB, 1 TiB = 1,024 GiB.</p>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(a)</b> A UNIX-style file system uses <b>1 KiB blocks</b> and <b>4-byte block addresses</b>. Each inode holds 15 addresses: 12 direct, then one single indirect, one double indirect and one triple indirect pointer. How many data blocks, and how many bytes, can be reached through each kind of pointer, and what is the largest possible file, in bytes and in GiB (two decimal places)?</p>
+    <div class="scroll-x"><table class="grid" data-id="p4a-size" data-corner="Pointer" data-rows="12 direct|Single indirect|Double indirect|Triple indirect|Whole file (total)" data-cols="Data blocks|Bytes" data-label="Problem 4(a) sizes"></table></div>
+    <p class="q">A program reads one byte at each offset below (counted from 0). The inode is already in memory and no other block is. Give the file's logical block number (from 0), the pointer that leads to it, and the number of disk reads needed to get the byte.</p>
+    <div class="scroll-x"><table class="grid" data-id="p4a-reach" data-corner="Byte offset" data-rows="9,000|100,000|5,000,000|100,000,000" data-cols="Logical block|Pointer (direct / single / double / triple)|Disk reads" data-label="Problem 4(a) offsets"></table></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(b)</b> A file is <b>50 blocks</b> long (blocks 0 to 49). For each allocation method, count disk reads: to reach block 30 on its own (with nothing in memory except the directory entry), on average over all 50 blocks, and to read the whole file in order once.</p>
+    <div class="scroll-x"><table class="grid" data-id="p4b-grid" data-corner="Method" data-rows="Contiguous|Chained|Indexed (one index block)" data-cols="Reads to reach block 30|Average reads per block|Reads for the whole file in order|External fragmentation? (yes / no)" data-label="Problem 4(b) table"></table></div>
+    <div class="ans" data-id="p4b" data-rows="4" data-label="Problem 4(b)" data-placeholder="Why does contiguous allocation suffer external fragmentation and the other two do not? What is lost in a chained file if the pointer in block 12 is damaged?"></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">(c)</b> A <b>4 TiB</b> disk is divided into <b>4 KiB</b> blocks and keeps free space in a <b>bit table</b> (one bit per block). How many blocks does the disk have? How large is the bit table, in bytes and in MiB, what percentage of the disk is that, and how many disk blocks does it fill? A free block list on the empty disk would store each block number as a whole number of bytes: how many bytes does a block number need, and how large would that list be? Finally, why would allocating a block be slow if the OS searched the bit table from the start every time, and what extra table helps?</p>
+    <div class="ans" data-id="p4c" data-rows="7" data-label="Problem 4(c)"></div>
+  </div>
+</section>
+
+<span class="part-label" id="part-b">Part B · Check every interleaving</span>
+
+<section class="card" id="b-setup">
+  <h2><span class="num">B1</span>Set up your computer and repository</h2>
+  <p>You need <b>Python</b> to run the program, <b>Git</b> to track your files and a free <b>GitHub</b> account to hold the repository. If you set these up for an earlier homework, check them with <code>python --version</code> (macOS: <code>python3 --version</code>) and <code>git --version</code>, then start at step 4.</p>
+  <p>Every command below is typed into a <b>terminal</b>: on Windows open <b>PowerShell</b> (Start menu, type "PowerShell"); on macOS open <b>Terminal</b> (press <kbd>⌘</kbd> + <kbd>Space</kbd>, type "Terminal"). Type a command, then press <kbd>Enter</kbd>.</p>
+  <ol class="steps">
+    <li><b>Install Python 3</b> from <a href="https://www.python.org/downloads/">python.org/downloads</a> (any version 3.10 or newer; use the standard installer).
+      <div class="os"><b>Windows</b><span>On the installer's first screen, tick <b>"Add python.exe to PATH"</b> before clicking Install. Check it with <code>python --version</code>.</span></div>
+      <div class="os"><b>macOS</b><span>Run the downloaded installer. Check it with <code>python3 --version</code>.</span></div>
+      <p>On macOS and Linux the command is <code>python3</code> everywhere this page says <code>python</code>.</p>
+    </li>
+    <li><b>Install Git.</b>
+      <div class="os"><b>Windows</b><span>Download it from <a href="https://git-scm.com/downloads">git-scm.com/downloads</a> and accept the installer's defaults. Close and reopen PowerShell, then check with <code>git --version</code>.</span></div>
+      <div class="os"><b>macOS</b><span>Type <code>git --version</code>. If Git is missing, macOS offers to install the command-line developer tools; accept, wait, and run the command again.</span></div>
+    </li>
+    <li><b>Tell Git who you are</b> (once per computer):
+      <pre class="term">git config --global user.name "Your Name"
+git config --global user.email "you@example.com"</pre>
+    </li>
+    <li><b>Create the repository on GitHub.</b> Sign in at <a href="https://github.com">github.com</a>, click <b>+</b> at the top right, then <b>New repository</b>. Name it <code>os-hw6</code>, tick <b>Add a README file</b>, and click <b>Create repository</b>.</li>
+    <li><b>Copy it to your computer.</b> Click the green <b>Code</b> button, copy the HTTPS address, then:
+      <pre class="term">cd ~
+git clone https://github.com/YOUR-USERNAME/os-hw6.git
+cd os-hw6</pre>
+      <code>cd ~</code> moves the terminal into your home folder, where the repository is created. Run every later command from inside the <code>os-hw6</code> folder.</li>
+    <li><b>Get the starter file.</b> Click <b>Download</b> on the code box in B2 and move <code>mutex.py</code> into the <code>os-hw6</code> folder (check that the name ends in <code>.py</code>, not <code>.py.txt</code>) (or create the file in a code editor such as VS Code and paste in what <b>Copy</b> gives you).</li>
+    <li><b>Run it once before changing anything:</b>
+      <pre class="term">python mutex.py</pre>
+      Experiment 1 and the first three locks of Experiment 2 appear. Experiment 2 then prints <code>-&gt; stopped here: TODO 1 ...</code> and Experiment 3 prints <code>-&gt; stopped here: TODO 2 ...</code>. Seeing that output means your setup is correct. The complete program finishes in well under a second.</li>
+  </ol>
+  <pre class="term">Experiment 1: two threads each add 1 to count 3 times (count = count + 1 is load, add, store)
+  Increment race: 1193 reachable states
+    possible final values of count: 2, 3, 4, 5, 6
+
+Experiment 2: four ways to guard a critical section
+  Look, then flag (visits: T0 2, T1 2): 121 reachable states
+    both threads in the critical section at once: POSSIBLE. The shortest way:
+      T0  while flag[other]: wait                    flag0=False  flag1=False
+      T1  while flag[other]: wait                    flag0=False  flag1=False
+      T0  flag[me] = True                            flag0=True  flag1=False
+      T1  flag[me] = True                            flag0=True  flag1=True
+    can always still finish: yes
+  Flag, then look (visits: T0 2, T1 2): 105 reachable states
+    both threads in the critical section at once: never
+    can always still finish: NO (4 of 105 states are stuck). The shortest way to a dead end (a state no step can change):
+      T0  flag[me] = True                            flag0=True  flag1=False
+      T1  flag[me] = True                            flag0=True  flag1=True
+      stuck: T0 spins forever on 'while flag[other]: wait'; T1 spins forever on 'while flag[other]: wait'
+  Strict turns (visits: T0 1, T1 2): 13 reachable states
+    both threads in the critical section at once: never
+    can always still finish: NO (13 of 13 states are stuck). The shortest way to a dead end (a state no step can change):
+      T0  while turn != me: wait                     turn=0
+      T0  CS: critical section                       turn=0
+      T0  turn = other                               turn=1
+      T0  repeat if visits remain                    turn=1
+      T1  while turn != me: wait                     turn=1
+      T1  CS: critical section                       turn=1
+      T1  turn = other                               turn=0
+      T1  repeat if visits remain                    turn=0
+      stuck: T0 has finished; T1 spins forever on 'while turn != me: wait'
+  -&gt; stopped here: TODO 1: peterson is not written yet
+
+Experiment 3: a producer and a consumer pass 3 items through a buffer that holds 2
+  -&gt; stopped here: TODO 2: bounded_buffer is not written yet</pre>
+</section>
+
+<section class="card" id="b-code">
+  <h2><span class="num">B2</span>The starter program</h2>
+  <p>Testing a lock by running real threads proves very little: a bad interleaving may need the scheduler to switch at one exact instruction, and that can happen once in a million runs, or never on your computer. This program does the opposite. It writes each thread as a short list of <b>atomic steps</b> and then tries <b>every</b> order in which the two threads' steps could run.</p>
+  <ul>
+    <li><b>A thread</b> is a list of steps numbered 0, 1, 2, .... Each step is a pair: a text such as <code>"flag[me] = True"</code> and a small function that does it. The function gets the shared variables (a dictionary called <code>sh</code>) and the thread's number <code>me</code> (0 or 1, so the other thread is <code>1 - me</code>). It returns the number of the step the thread runs next. Returning its <b>own</b> number makes the thread spin on that step (busy waiting); returning <code>None</code> means the step cannot happen yet, so the thread is blocked (that is how <code>semWait</code> on a zero semaphore is written). A step whose text starts with <code>CS:</code> is inside the critical section.</li>
+    <li><b>A state</b> is everything that matters at one moment: each thread's next step number plus the value of every shared variable. From each state, each thread that can move gives one next state. The program visits every reachable state once, breadth first (all states one step from the start, then all states two steps away, and so on), so the first time it finds a bad state it has found the <b>shortest</b> interleaving that leads there, and it prints that interleaving.</li>
+    <li>For every model it reports: <b>can both threads be in the critical section at once?</b> and <b>can every reachable state still finish?</b> A state that cannot reach "both threads finished" by any order of steps is <b>stuck</b>: a deadlock (both blocked) or a spin that can never end. For the stuck case it also prints what each thread is doing there forever.</li>
+  </ul>
+  <div class="note"><b>What "can always still finish" means.</b> From every reachable state there is at least <i>one</i> order of steps that lets both threads finish. It says nothing about which order the scheduler actually picks. A scheduler is <b>fair</b> if it gives every thread that can move a turn sooner or later.</div>
+  <div class="note">Why the output is the same on every computer: nothing is random and nothing depends on timing. The program lists every interleaving in a fixed order, so your output should match a classmate's line for line once both programs are correct.</div>
+  <p>Read it from top to bottom first; every line carries a comment. The semaphores in Experiment 3 never go below 0: <code>semWait</code> simply cannot happen while the value is 0. The chapter's version lets the value go negative to count the waiting processes, but which steps can happen next is the same, so the checker finds the same problems.</p>
+  <div class="codebox" data-file="mutex.py"><div class="tools"><span class="name">mutex.py</span><button type="button" class="js-copy">Copy</button><button type="button" class="js-save">Download</button></div><pre class="tall"><code><span class="s">"""mutex.py: try every order in which two threads' steps can run, and report what can go wrong.
+
+Run it from a terminal in the folder that holds this file:
+    python mutex.py           (Windows)   or   python3 mutex.py   (macOS / Linux)
+
+Your work is marked with TODO. Everything else already works: run the file before you change
+anything; each experiment that reaches an unwritten TODO says which one and the rest still run.
+Nothing here is random and nothing depends on timing. The program lists EVERY interleaving of the
+two threads, so the output is the same on every computer and every run.
+"""</span>
+
+<span class="k">from</span> collections <span class="k">import</span> deque  <span class="c"># a queue with fast removal from the front: the to-do list of the search</span>
+
+INCREMENTS = <span class="n">3</span>  <span class="c"># Experiment 1: how many times each thread adds 1 to count</span>
+VISITS = <span class="n">2</span>  <span class="c"># Experiment 2: how many times each thread passes through its critical section</span>
+SIZE = <span class="n">2</span>  <span class="c"># Experiment 3: how many items the bounded buffer can hold</span>
+ITEMS = <span class="n">3</span>  <span class="c"># Experiment 3: how many items the producer makes (and the consumer takes)</span>
+
+
+<span class="k">class</span> NotWrittenYet(Exception):  <span class="c"># a custom error the starter raises wherever a TODO has not been written yet</span>
+    <span class="k">pass</span>  <span class="c"># it needs no extra behavior; its name and message say everything</span>
+
+
+<span class="c"># ---------------------------------------------------------------------------</span>
+<span class="c"># How a thread is written down</span>
+<span class="c">#   A thread's program is a list of steps, numbered 0, 1, 2, ... Each step is a pair (text, action).</span>
+<span class="c">#   The action is a function action(sh, me). sh is a dictionary holding the shared variables (the</span>
+<span class="c">#   action may change it); me is this thread's number, 0 or 1, so the other thread is 1 - me.</span>
+<span class="c">#   The action returns the number of the step this thread runs next, or None when the step cannot</span>
+<span class="c">#   happen yet (the thread is blocked; the action must then leave sh unchanged).</span>
+<span class="c">#   A thread whose next step number equals the length of its program has finished.</span>
+<span class="c">#   A step whose text starts with "CS:" is inside the critical section.</span>
+<span class="c">#   One step is one atomic action: the other thread can run between two steps, never inside one.</span>
+<span class="c"># ---------------------------------------------------------------------------</span>
+<span class="k">def</span> put(sh, name, value, nxt):  <span class="c"># a helper for actions that assign: sh[name] = value, then go to step nxt</span>
+    sh[name] = value  <span class="c"># the assignment</span>
+    <span class="k">return</span> nxt  <span class="c"># the number of the step that runs next</span>
+
+
+<span class="k">def</span> again(sh, me, first, done):  <span class="c"># the last step of a loop: count one pass, then go round again or finish</span>
+    sh[<span class="s">f"left{me}"</span>] -= <span class="n">1</span>  <span class="c"># one pass fewer left for this thread (left0 belongs to thread 0, left1 to thread 1)</span>
+    <span class="k">return</span> first <span class="k">if</span> sh[<span class="s">f"left{me}"</span>] &gt; <span class="n">0</span> <span class="k">else</span> done  <span class="c"># back to step `first` while passes remain, else to step `done`</span>
+
+
+<span class="k">def</span> sem_wait(name, nxt):  <span class="c"># builds a semWait step on the semaphore called `name`, followed by step nxt</span>
+    <span class="k">def</span> action(sh, me):  <span class="c"># what the step does when the thread tries to take it</span>
+        <span class="k">if</span> sh[name] == <span class="n">0</span>:  <span class="c"># no unit is available...</span>
+            <span class="k">return</span> <span class="k">None</span>  <span class="c"># ...so the thread is blocked here, and nothing changes</span>
+        sh[name] -= <span class="n">1</span>  <span class="c"># take one unit</span>
+        <span class="k">return</span> nxt  <span class="c"># and carry on</span>
+    <span class="k">return</span> (<span class="s">f"semWait({name})"</span>, action)  <span class="c"># the step: its text and its action</span>
+
+
+<span class="k">def</span> sem_signal(name, nxt):  <span class="c"># builds a semSignal step on the semaphore called `name`, followed by step nxt</span>
+    <span class="k">return</span> (<span class="s">f"semSignal({name})"</span>, <span class="k">lambda</span> sh, me: put(sh, name, sh[name] + <span class="n">1</span>, nxt))  <span class="c"># give one unit back; never blocks</span>
+
+
+<span class="k">def</span> append_item(nxt):  <span class="c"># builds the producer's critical-section step: one more item in the buffer</span>
+    <span class="k">return</span> (<span class="s">"CS: append an item"</span>, <span class="k">lambda</span> sh, me: put(sh, <span class="s">"items"</span>, sh[<span class="s">"items"</span>] + <span class="n">1</span>, nxt))  <span class="c"># items counts what the buffer holds</span>
+
+
+<span class="k">def</span> take_item(nxt):  <span class="c"># builds the consumer's critical-section step: one item fewer in the buffer</span>
+    <span class="k">return</span> (<span class="s">"CS: take an item"</span>, <span class="k">lambda</span> sh, me: put(sh, <span class="s">"items"</span>, sh[<span class="s">"items"</span>] - <span class="n">1</span>, nxt))  <span class="c"># the item leaves the buffer</span>
+
+
+<span class="c"># ---------------------------------------------------------------------------</span>
+<span class="c"># The checker: a breadth-first search over every state the two threads can reach</span>
+<span class="c">#   A state = (each thread's next step number, the values of every shared variable).</span>
+<span class="c"># ---------------------------------------------------------------------------</span>
+<span class="k">def</span> freeze(sh):  <span class="c"># turns the shared dictionary into a tuple, because only unchangeable values can go in a set</span>
+    <span class="k">return</span> tuple(sorted(sh.items()))  <span class="c"># e.g. (("flag0", True), ("flag1", False), ("turn", 1))</span>
+
+
+<span class="k">def</span> explore(threads, init):  <span class="c"># visits every reachable state; returns how each was first reached, and every move</span>
+    start = ((<span class="n">0</span>,) * len(threads), freeze(init))  <span class="c"># both threads at step 0, shared variables at their starting values</span>
+    came_from = {start: <span class="k">None</span>}  <span class="c"># for each state seen: (the state before it, the thread that moved); None for the start</span>
+    moves = {}  <span class="c"># for each state: the list of states one step away</span>
+    queue = deque([start])  <span class="c"># states whose moves have not been tried yet</span>
+    <span class="k">while</span> queue:  <span class="c"># until every reachable state has been expanded</span>
+        state = queue.popleft()  <span class="c"># oldest first, so every state is first reached by a shortest path</span>
+        pcs, frozen = state  <span class="c"># the step numbers and the shared variables</span>
+        moves[state] = []  <span class="c"># filled in by the loop below</span>
+        <span class="k">for</span> t, program <span class="k">in</span> enumerate(threads):  <span class="c"># let thread 0, then thread 1, try its next step</span>
+            <span class="k">if</span> pcs[t] == len(program):  <span class="c"># this thread has finished...</span>
+                <span class="k">continue</span>  <span class="c"># ...so it has no step to take</span>
+            sh = dict(frozen)  <span class="c"># a fresh, changeable copy of the shared variables</span>
+            nxt = program[pcs[t]][<span class="n">1</span>](sh, t)  <span class="c"># run thread t's next step on that copy</span>
+            <span class="k">if</span> nxt <span class="k">is</span> <span class="k">None</span>:  <span class="c"># the step is blocked...</span>
+                <span class="k">continue</span>  <span class="c"># ...so thread t cannot move in this state</span>
+            new = (pcs[:t] + (nxt,) + pcs[t + <span class="n">1</span>:], freeze(sh))  <span class="c"># the state after the step</span>
+            moves[state].append(new)  <span class="c"># remember the move</span>
+            <span class="k">if</span> new <span class="k">not</span> <span class="k">in</span> came_from:  <span class="c"># a state never seen before...</span>
+                came_from[new] = (state, t)  <span class="c"># ...remember how we got there</span>
+                queue.append(new)  <span class="c"># ...and expand it later</span>
+    <span class="k">return</span> came_from, moves  <span class="c"># the keys of came_from are all the reachable states, in the order they were found</span>
+
+
+<span class="k">def</span> trace(came_from, threads, end):  <span class="c"># the moves that lead from the start to state `end`</span>
+    steps = []  <span class="c"># collected backwards, from `end` to the start</span>
+    <span class="k">while</span> came_from[end] <span class="k">is</span> <span class="k">not</span> <span class="k">None</span>:  <span class="c"># only the start has no previous state</span>
+        before, t = came_from[end]  <span class="c"># the state before, and the thread that moved</span>
+        steps.append((t, threads[t][before[<span class="n">0</span>][t]][<span class="n">0</span>], end[<span class="n">1</span>]))  <span class="c"># (thread, text of the step it took, shared variables after)</span>
+        end = before  <span class="c"># one step further back</span>
+    <span class="k">return</span> steps[::-<span class="n">1</span>]  <span class="c"># reversed, so the first move comes first</span>
+
+
+<span class="k">def</span> show(steps):  <span class="c"># prints a trace, one line per step</span>
+    <span class="k">for</span> t, text, frozen <span class="k">in</span> steps:  <span class="c"># every move in order</span>
+        shared = <span class="s">"  "</span>.join(<span class="s">f"{k}={v}"</span> <span class="k">for</span> k, v <span class="k">in</span> frozen <span class="k">if</span> <span class="k">not</span> k.startswith((<span class="s">"left"</span>, <span class="s">"reg"</span>)))  <span class="c"># the shared variables, minus loop counters and registers</span>
+        print(<span class="s">f"      T{t}  {text:&lt;42} {shared}"</span>)  <span class="c"># e.g. "T0  flag[me] = True    flag0=True  flag1=False"</span>
+
+
+<span class="k">def</span> status(threads, state):  <span class="c"># describes what each thread is doing in a state, e.g. "T0 blocked at semWait(e)"</span>
+    words = []  <span class="c"># one description per thread</span>
+    <span class="k">for</span> t, program <span class="k">in</span> enumerate(threads):  <span class="c"># each thread</span>
+        pc = state[<span class="n">0</span>][t]  <span class="c"># its next step number</span>
+        <span class="k">if</span> pc == len(program):  <span class="c"># past its last step</span>
+            words.append(<span class="s">f"T{t} has finished"</span>)  <span class="c"># nothing left to do</span>
+            <span class="k">continue</span>  <span class="c"># next thread</span>
+        sh = dict(state[<span class="n">1</span>])  <span class="c"># a copy of the shared variables to try the step on</span>
+        nxt = program[pc][<span class="n">1</span>](sh, t)  <span class="c"># try the step</span>
+        <span class="k">if</span> nxt <span class="k">is</span> <span class="k">None</span>:  <span class="c"># the step cannot happen</span>
+            how = <span class="s">"is blocked at"</span>  <span class="c"># waiting inside the OS, using no processor time</span>
+        <span class="k">elif</span> nxt == pc <span class="k">and</span> freeze(sh) == state[<span class="n">1</span>]:  <span class="c"># the step leads straight back to itself and changes nothing</span>
+            how = <span class="s">"spins forever on"</span>  <span class="c"># busy waiting that can never end</span>
+        <span class="k">else</span>:  <span class="c"># the step can still change something</span>
+            how = <span class="s">"can still take"</span>  <span class="c"># (only possible in a stuck state that loops through several states)</span>
+        words.append(<span class="s">f"T{t} {how} '{program[pc][0]}'"</span>)  <span class="c"># e.g. "T1 spins forever on 'while turn != me: wait'"</span>
+    <span class="k">return</span> <span class="s">"; "</span>.join(words)  <span class="c"># both descriptions on one line</span>
+
+
+<span class="k">def</span> in_cs(program, pc):  <span class="c"># is a thread whose next step is pc inside its critical section?</span>
+    <span class="k">return</span> pc &lt; len(program) <span class="k">and</span> program[pc][<span class="n">0</span>].startswith(<span class="s">"CS:"</span>)  <span class="c"># only steps marked "CS:" count</span>
+
+
+<span class="k">def</span> check(name, model):  <span class="c"># explores one model and prints what can and cannot happen</span>
+    threads, init = model[<span class="s">"threads"</span>], model[<span class="s">"init"</span>]  <span class="c"># the two programs, and the shared variables' starting values</span>
+    came_from, moves = explore(threads, init)  <span class="c"># every reachable state</span>
+    states = list(came_from)  <span class="c"># in breadth-first order: a state earlier in the list is fewer steps from the start</span>
+    print(<span class="s">f"  {name}: {len(states)} reachable states"</span>)  <span class="c"># how big the search was</span>
+    done = [s <span class="k">for</span> s <span class="k">in</span> states <span class="k">if</span> all(pc == len(p) <span class="k">for</span> pc, p <span class="k">in</span> zip(s[<span class="n">0</span>], threads))]  <span class="c"># states where both threads have finished</span>
+    <span class="k">if</span> <span class="s">"result"</span> <span class="k">in</span> model:  <span class="c"># Experiment 1 only asks which final values are possible</span>
+        values = sorted({dict(s[<span class="n">1</span>])[model[<span class="s">"result"</span>]] <span class="k">for</span> s <span class="k">in</span> done})  <span class="c"># each distinct final value once, smallest first</span>
+        print(<span class="s">f"    possible final values of {model['result']}: {', '.join(map(str, values))}"</span>)  <span class="c"># the answer</span>
+        <span class="k">return</span>  <span class="c"># nothing else to check</span>
+    <span class="k">if</span> <span class="k">not</span> all(any(text.startswith(<span class="s">"CS:"</span>) <span class="k">for</span> text, _ <span class="k">in</span> p) <span class="k">for</span> p <span class="k">in</span> threads):  <span class="c"># some thread has no step marked "CS:"...</span>
+        print(<span class="s">"    WARNING: a thread has no step marked 'CS:', so the mutual exclusion check means nothing"</span>)  <span class="c"># ...so the next check cannot see it inside</span>
+    both_in = [s <span class="k">for</span> s <span class="k">in</span> states <span class="k">if</span> all(in_cs(p, pc) <span class="k">for</span> p, pc <span class="k">in</span> zip(threads, s[<span class="n">0</span>]))]  <span class="c"># states with both threads inside</span>
+    <span class="k">if</span> both_in:  <span class="c"># mutual exclusion can fail...</span>
+        print(<span class="s">"    both threads in the critical section at once: POSSIBLE. The shortest way:"</span>)  <span class="c"># say so</span>
+        show(trace(came_from, threads, both_in[<span class="n">0</span>]))  <span class="c"># and show how (the first one found is the closest to the start)</span>
+    <span class="k">else</span>:  <span class="c"># no interleaving gets both inside</span>
+        print(<span class="s">"    both threads in the critical section at once: never"</span>)  <span class="c"># mutual exclusion holds</span>
+    <span class="k">if</span> <span class="s">"broken"</span> <span class="k">in</span> model:  <span class="c"># an extra test of the shared variables (Experiment 3: the buffer's limits)</span>
+        bad = [s <span class="k">for</span> s <span class="k">in</span> states <span class="k">if</span> model[<span class="s">"broken"</span>](dict(s[<span class="n">1</span>]))]  <span class="c"># states that fail the test</span>
+        <span class="k">if</span> bad:  <span class="c"># the test can fail...</span>
+            print(<span class="s">f"    {model['broken'](dict(bad[0][1]))}: POSSIBLE. The shortest way:"</span>)  <span class="c"># say what went wrong</span>
+            show(trace(came_from, threads, bad[<span class="n">0</span>]))  <span class="c"># and how</span>
+        <span class="k">else</span>:  <span class="c"># no reachable state fails it</span>
+            print(<span class="s">"    buffer overflow or underflow: never"</span>)  <span class="c"># the limits always hold</span>
+    behind = {}  <span class="c"># the moves turned around: for each state, the states that lead into it</span>
+    <span class="k">for</span> state, outs <span class="k">in</span> moves.items():  <span class="c"># every state...</span>
+        <span class="k">for</span> out <span class="k">in</span> outs:  <span class="c"># ...and every move out of it</span>
+            behind.setdefault(out, []).append(state)  <span class="c"># record the move backwards</span>
+    can_finish = set(done)  <span class="c"># states from which both threads can still finish; it grows backwards from the finished ones</span>
+    queue = deque(done)  <span class="c"># states whose predecessors have not been looked at yet</span>
+    <span class="k">while</span> queue:  <span class="c"># walk the moves backwards</span>
+        state = queue.popleft()  <span class="c"># a state that can finish...</span>
+        <span class="k">for</span> before <span class="k">in</span> behind.get(state, []):  <span class="c"># ...so every state that leads into it can finish too</span>
+            <span class="k">if</span> before <span class="k">not</span> <span class="k">in</span> can_finish:  <span class="c"># new</span>
+                can_finish.add(before)  <span class="c"># mark it</span>
+                queue.append(before)  <span class="c"># and walk back from it later</span>
+    stuck = [s <span class="k">for</span> s <span class="k">in</span> states <span class="k">if</span> s <span class="k">not</span> <span class="k">in</span> can_finish]  <span class="c"># reachable states from which finishing is impossible</span>
+    <span class="k">if</span> stuck:  <span class="c"># some interleaving traps the threads (deadlock, or spinning forever)</span>
+        traps = [s <span class="k">for</span> s <span class="k">in</span> stuck <span class="k">if</span> all(out == s <span class="k">for</span> out <span class="k">in</span> moves[s])]  <span class="c"># stuck states where no step changes anything at all</span>
+        end = (traps <span class="k">or</span> stuck)[<span class="n">0</span>]  <span class="c"># show the nearest such trap (or, if there is none, the nearest stuck state)</span>
+        where = <span class="s">"a dead end (a state no step can change)"</span> <span class="k">if</span> traps <span class="k">else</span> <span class="s">"a stuck state"</span>  <span class="c"># what the trace below leads to</span>
+        print(<span class="s">f"    can always still finish: NO ({len(stuck)} of {len(states)} states are stuck). The shortest way to {where}:"</span>)  <span class="c"># say so</span>
+        show(trace(came_from, threads, end))  <span class="c"># the moves that lead there (none if the start itself is stuck)</span>
+        print(<span class="s">f"      stuck: {status(threads, end)}"</span>)  <span class="c"># what each thread is doing there, forever</span>
+    <span class="k">else</span>:  <span class="c"># from every reachable state, some order of steps still finishes both threads</span>
+        print(<span class="s">"    can always still finish: yes"</span>)  <span class="c"># no deadlock and no state that spins forever</span>
+
+
+<span class="c"># ---------------------------------------------------------------------------</span>
+<span class="c"># Experiment 1: count = count + 1 is really three steps</span>
+<span class="c"># ---------------------------------------------------------------------------</span>
+<span class="k">def</span> increment_race():  <span class="c"># each thread adds 1 to count INCREMENTS times; registers are private, count is shared</span>
+    program = [  <span class="c"># the same program for both threads</span>
+        (<span class="s">"reg = count"</span>, <span class="k">lambda</span> sh, me: put(sh, <span class="s">f"reg{me}"</span>, sh[<span class="s">"count"</span>], <span class="n">1</span>)),  <span class="c"># load: copy count into my own register</span>
+        (<span class="s">"reg = reg + 1"</span>, <span class="k">lambda</span> sh, me: put(sh, <span class="s">f"reg{me}"</span>, sh[<span class="s">f"reg{me}"</span>] + <span class="n">1</span>, <span class="n">2</span>)),  <span class="c"># add 1, in the register only</span>
+        (<span class="s">"count = reg"</span>, <span class="k">lambda</span> sh, me: put(sh, <span class="s">"count"</span>, sh[<span class="s">f"reg{me}"</span>], <span class="n">3</span>)),  <span class="c"># store: copy the register back into count</span>
+        (<span class="s">"repeat if increments remain"</span>, <span class="k">lambda</span> sh, me: again(sh, me, <span class="n">0</span>, <span class="n">4</span>)),  <span class="c"># loop back to step 0, or finish</span>
+    ]  <span class="c"># reg0 and reg1 live in sh too, but each is only ever touched by its own thread</span>
+    init = {<span class="s">"count"</span>: <span class="n">0</span>, <span class="s">"reg0"</span>: <span class="n">0</span>, <span class="s">"reg1"</span>: <span class="n">0</span>, <span class="s">"left0"</span>: INCREMENTS, <span class="s">"left1"</span>: INCREMENTS}  <span class="c"># starting values</span>
+    <span class="k">return</span> {<span class="s">"threads"</span>: [program, program], <span class="s">"init"</span>: init, <span class="s">"result"</span>: <span class="s">"count"</span>}  <span class="c"># the model</span>
+
+
+<span class="c"># ---------------------------------------------------------------------------</span>
+<span class="c"># Experiment 2: four ways to guard a critical section</span>
+<span class="c"># ---------------------------------------------------------------------------</span>
+<span class="k">def</span> look_then_flag():  <span class="c"># wait while the other thread's flag is up, then raise my own and go in</span>
+    program = [  <span class="c"># the same program for both threads</span>
+        (<span class="s">"while flag[other]: wait"</span>, <span class="k">lambda</span> sh, me: <span class="n">0</span> <span class="k">if</span> sh[<span class="s">f"flag{1 - me}"</span>] <span class="k">else</span> <span class="n">1</span>),  <span class="c"># spin on step 0 while the other wants in</span>
+        (<span class="s">"flag[me] = True"</span>, <span class="k">lambda</span> sh, me: put(sh, <span class="s">f"flag{me}"</span>, <span class="k">True</span>, <span class="n">2</span>)),  <span class="c"># raise my flag</span>
+        (<span class="s">"CS: critical section"</span>, <span class="k">lambda</span> sh, me: <span class="n">3</span>),  <span class="c"># the critical section itself</span>
+        (<span class="s">"flag[me] = False"</span>, <span class="k">lambda</span> sh, me: put(sh, <span class="s">f"flag{me}"</span>, <span class="k">False</span>, <span class="n">4</span>)),  <span class="c"># lower my flag on the way out</span>
+        (<span class="s">"repeat if visits remain"</span>, <span class="k">lambda</span> sh, me: again(sh, me, <span class="n">0</span>, <span class="n">5</span>)),  <span class="c"># loop back, or finish</span>
+    ]  <span class="c"># the look (step 0) and the flag (step 1) are two separate steps</span>
+    init = {<span class="s">"flag0"</span>: <span class="k">False</span>, <span class="s">"flag1"</span>: <span class="k">False</span>, <span class="s">"left0"</span>: VISITS, <span class="s">"left1"</span>: VISITS}  <span class="c"># nobody wants in yet</span>
+    <span class="k">return</span> {<span class="s">"threads"</span>: [program, program], <span class="s">"init"</span>: init}  <span class="c"># the model</span>
+
+
+<span class="k">def</span> flag_then_look():  <span class="c"># raise my flag first, then wait while the other thread's flag is up</span>
+    program = [  <span class="c"># the same program for both threads</span>
+        (<span class="s">"flag[me] = True"</span>, <span class="k">lambda</span> sh, me: put(sh, <span class="s">f"flag{me}"</span>, <span class="k">True</span>, <span class="n">1</span>)),  <span class="c"># raise my flag</span>
+        (<span class="s">"while flag[other]: wait"</span>, <span class="k">lambda</span> sh, me: <span class="n">1</span> <span class="k">if</span> sh[<span class="s">f"flag{1 - me}"</span>] <span class="k">else</span> <span class="n">2</span>),  <span class="c"># spin on step 1 while the other wants in</span>
+        (<span class="s">"CS: critical section"</span>, <span class="k">lambda</span> sh, me: <span class="n">3</span>),  <span class="c"># the critical section itself</span>
+        (<span class="s">"flag[me] = False"</span>, <span class="k">lambda</span> sh, me: put(sh, <span class="s">f"flag{me}"</span>, <span class="k">False</span>, <span class="n">4</span>)),  <span class="c"># lower my flag on the way out</span>
+        (<span class="s">"repeat if visits remain"</span>, <span class="k">lambda</span> sh, me: again(sh, me, <span class="n">0</span>, <span class="n">5</span>)),  <span class="c"># loop back, or finish</span>
+    ]  <span class="c"># the same two steps as above, in the opposite order</span>
+    init = {<span class="s">"flag0"</span>: <span class="k">False</span>, <span class="s">"flag1"</span>: <span class="k">False</span>, <span class="s">"left0"</span>: VISITS, <span class="s">"left1"</span>: VISITS}  <span class="c"># nobody wants in yet</span>
+    <span class="k">return</span> {<span class="s">"threads"</span>: [program, program], <span class="s">"init"</span>: init}  <span class="c"># the model</span>
+
+
+<span class="k">def</span> strict_turns():  <span class="c"># one shared turn variable; thread 0 visits once and leaves, thread 1 wants VISITS visits</span>
+    program = [  <span class="c"># the same program for both threads</span>
+        (<span class="s">"while turn != me: wait"</span>, <span class="k">lambda</span> sh, me: <span class="n">0</span> <span class="k">if</span> sh[<span class="s">"turn"</span>] != me <span class="k">else</span> <span class="n">1</span>),  <span class="c"># spin until it is my turn</span>
+        (<span class="s">"CS: critical section"</span>, <span class="k">lambda</span> sh, me: <span class="n">2</span>),  <span class="c"># the critical section itself</span>
+        (<span class="s">"turn = other"</span>, <span class="k">lambda</span> sh, me: put(sh, <span class="s">"turn"</span>, <span class="n">1</span> - me, <span class="n">3</span>)),  <span class="c"># hand the turn to the other thread</span>
+        (<span class="s">"repeat if visits remain"</span>, <span class="k">lambda</span> sh, me: again(sh, me, <span class="n">0</span>, <span class="n">4</span>)),  <span class="c"># loop back, or finish</span>
+    ]  <span class="c"># the threads can only ever go in the order 0, 1, 0, 1, ...</span>
+    init = {<span class="s">"turn"</span>: <span class="n">0</span>, <span class="s">"left0"</span>: <span class="n">1</span>, <span class="s">"left1"</span>: VISITS}  <span class="c"># thread 0 has the first turn but needs only one visit</span>
+    <span class="k">return</span> {<span class="s">"threads"</span>: [program, program], <span class="s">"init"</span>: init}  <span class="c"># the model</span>
+
+
+<span class="k">def</span> peterson():  <span class="c"># Peterson's algorithm: raise my flag, give the turn away, wait only if the other wants in AND has the turn</span>
+    <span class="c"># TODO 1: return Peterson's algorithm as a model, built exactly like look_then_flag() above.</span>
+    <span class="c">#         Shared variables: flag0 and flag1 (False at the start), turn (0 at the start), and the loop counters</span>
+    <span class="c">#         left0 and left1 (VISITS each). Each thread's program has six steps:</span>
+    <span class="c">#           0  flag[me] = True</span>
+    <span class="c">#           1  turn = other                                   (the other thread's number is 1 - me)</span>
+    <span class="c">#           2  while flag[other] and turn == other: wait      ONE step: return 2 to spin, or 3 to go on</span>
+    <span class="c">#           3  the critical section                           its text must start with "CS:"</span>
+    <span class="c">#           4  flag[me] = False</span>
+    <span class="c">#           5  the loop step: ("repeat if visits remain", lambda sh, me: again(sh, me, 0, 6))</span>
+    <span class="k">raise</span> NotWrittenYet(<span class="s">"TODO 1: peterson is not written yet"</span>)  <span class="c"># delete this line once your code is in place</span>
+
+
+LOCKS = [  <span class="c"># Experiment 2 checks these in order; an unwritten TODO stops the experiment there</span>
+    (<span class="s">"Look, then flag"</span>, look_then_flag),  <span class="c"># can both get in?</span>
+    (<span class="s">"Flag, then look"</span>, flag_then_look),  <span class="c"># can both get stuck?</span>
+    (<span class="s">"Strict turns"</span>, strict_turns),  <span class="c"># what if one thread stops coming?</span>
+    (<span class="s">"Peterson's algorithm"</span>, peterson),  <span class="c"># TODO 1: write peterson() above</span>
+]  <span class="c"># the end of the list</span>
+
+
+<span class="c"># ---------------------------------------------------------------------------</span>
+<span class="c"># Experiment 3: a bounded buffer guarded by three semaphores</span>
+<span class="c">#   s = 1 (one thread at a time in the buffer), n = 0 (items waiting), e = SIZE (empty slots).</span>
+<span class="c">#   In this checker a semaphore's value never goes below 0: semWait simply cannot happen while the value</span>
+<span class="c">#   is 0. (The guide's version lets the value go negative to count the waiters; which steps can happen</span>
+<span class="c">#   next is the same.)</span>
+<span class="c"># ---------------------------------------------------------------------------</span>
+<span class="k">def</span> bounded_buffer():  <span class="c"># thread 0 is the producer, thread 1 the consumer; each handles ITEMS items</span>
+    <span class="c"># TODO 2: build the two programs in the order of Problem 2's semaphore code, using the helpers near the top:</span>
+    <span class="c">#         sem_wait(name, nxt), sem_signal(name, nxt), append_item(nxt) and take_item(nxt). Number the steps from 0;</span>
+    <span class="c">#         each step's nxt is the number of the step after it. End each program with the loop step</span>
+    <span class="c">#         ("repeat if items remain", lambda sh, me: again(sh, me, 0, 6)). Then delete the raise line below.</span>
+    <span class="c">#           producer: wait for an empty slot (e), lock the buffer (s), append, unlock (s), announce the item (n)</span>
+    <span class="c">#           consumer: wait for an item (n), lock the buffer (s), take, unlock (s), announce the empty slot (e)</span>
+    <span class="k">raise</span> NotWrittenYet(<span class="s">"TODO 2: bounded_buffer is not written yet"</span>)  <span class="c"># delete this line once your code is in place</span>
+    producer = []  <span class="c"># thread 0's steps: put the producer's six steps in this list</span>
+    consumer = []  <span class="c"># thread 1's steps: put the consumer's six steps in this list</span>
+    init = {<span class="s">"s"</span>: <span class="n">1</span>, <span class="s">"n"</span>: <span class="n">0</span>, <span class="s">"e"</span>: SIZE, <span class="s">"items"</span>: <span class="n">0</span>, <span class="s">"left0"</span>: ITEMS, <span class="s">"left1"</span>: ITEMS}  <span class="c"># an empty buffer</span>
+    broken = <span class="k">lambda</span> sh: (<span class="s">"buffer overflow"</span> <span class="k">if</span> sh[<span class="s">"items"</span>] &gt; SIZE <span class="k">else</span> <span class="s">"buffer underflow"</span> <span class="k">if</span> sh[<span class="s">"items"</span>] &lt; <span class="n">0</span> <span class="k">else</span> <span class="k">None</span>)  <span class="c"># a broken state, or None if fine</span>
+    <span class="k">return</span> {<span class="s">"threads"</span>: [producer, consumer], <span class="s">"init"</span>: init, <span class="s">"broken"</span>: broken}  <span class="c"># the model</span>
+
+
+<span class="k">def</span> main():  <span class="c"># runs the three experiments in order</span>
+    print(<span class="s">f"Experiment 1: two threads each add 1 to count {INCREMENTS} times (count = count + 1 is load, add, store)"</span>)  <span class="c"># the title</span>
+    check(<span class="s">"Increment race"</span>, increment_race())  <span class="c"># explore it</span>
+    print(<span class="s">"\nExperiment 2: four ways to guard a critical section"</span>)  <span class="c"># the title</span>
+    <span class="k">try</span>:  <span class="c"># one lock after another</span>
+        <span class="k">for</span> name, build <span class="k">in</span> LOCKS:  <span class="c"># in order</span>
+            model = build()  <span class="c"># an unwritten TODO stops here</span>
+            visits = <span class="s">f"visits: T0 {model['init']['left0']}, T1 {model['init']['left1']}"</span>  <span class="c"># how often each thread enters, read from the model itself</span>
+            check(<span class="s">f"{name} ({visits})"</span>, model)  <span class="c"># explore it</span>
+    <span class="k">except</span> NotWrittenYet <span class="k">as</span> missing:  <span class="c"># a TODO was reached</span>
+        print(<span class="s">f"  -&gt; stopped here: {missing}"</span>)  <span class="c"># say which one</span>
+    print(<span class="s">f"\nExperiment 3: a producer and a consumer pass {ITEMS} items through a buffer that holds {SIZE}"</span>)  <span class="c"># the title</span>
+    <span class="k">try</span>:  <span class="c"># the semaphore solution</span>
+        check(<span class="s">"Bounded buffer"</span>, bounded_buffer())  <span class="c"># an unwritten TODO stops here</span>
+    <span class="k">except</span> NotWrittenYet <span class="k">as</span> missing:  <span class="c"># a TODO was reached</span>
+        print(<span class="s">f"  -&gt; stopped here: {missing}"</span>)  <span class="c"># say which one</span>
+
+
+<span class="k">if</span> __name__ == <span class="s">"__main__"</span>:  <span class="c"># true when the file is run directly (not imported)</span>
+    main()  <span class="c"># start the program</span></code></pre></div>
+</section>
+
+<section class="card" id="b-tasks">
+  <h2><span class="num">B3</span>Write the missing pieces, run, and explain</h2>
+  <ol class="steps">
+    <li><b>TODO 1</b>: <code>peterson</code>. Write Peterson's algorithm as six steps, in the same style as <code>look_then_flag</code> just above it. The waiting loop is <b>one</b> step that reads both <code>flag[other]</code> and <code>turn</code>.</li>
+    <li><b>TODO 2</b>: <code>bounded_buffer</code>. Write the producer's and the consumer's six steps with the helpers <code>sem_wait</code>, <code>sem_signal</code>, <code>append_item</code> and <code>take_item</code>, in the order of Problem 2's code.</li>
+    <li>Run the complete program:
+      <pre class="term">python mutex.py</pre>
+      No line may say "stopped here". Peterson's algorithm and the bounded buffer should both report "never" and "yes". The checker finds a critical section only by the exact text <code>CS:</code> at the start of a step (capital letters, with the colon); if a thread has no such step, it prints a <code>WARNING</code> line, because its mutual exclusion check cannot see anyone inside.</li>
+  </ol>
+
+  <div class="part">
+    <p class="q"><b class="letter">B-a</b> Paste the complete output of <code>python mutex.py</code>, run before your B-c and B-d changes.</p>
+    <div class="ans" data-id="ba" data-kind="output" data-rows="16" data-label="Part B (a) output" data-placeholder="Paste the terminal output here."></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">B-b</b> <b>Experiment 2.</b> For each of the three flawed locks, use its printed trace to tell, in your own words, what the two threads did and why the result is bad, and name the requirement from Problem 1(b) that is the <b>root cause</b> of its failure. For strict turns, explain why <b>all</b> of its states are stuck. Then explain what makes Peterson's algorithm pass both checks: why can the two threads never both get past the waiting step, and why can they never both spin forever? Finally, apply the definition in B2's note to Peterson's algorithm: describe an endless schedule of steps under which thread 1 never enters its critical section, even though the checker says "yes". Is that schedule fair? Then explain why, under a fair scheduler, thread 1 is sure to get in, and which step of the algorithm makes that so.</p>
+    <div class="ans" data-id="bb" data-rows="9" data-label="Part B (b)"></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">B-c</b> <b>Experiment 3, broken on purpose.</b> In <code>bounded_buffer</code>, swap the producer's first two steps by exchanging the names <code>"e"</code> and <code>"s"</code> in them, so the producer locks the buffer before it waits for an empty slot (the bug of Problem 2(b)). Run the program and paste the Experiment 3 lines. Using the trace, explain how many items were in the buffer when the threads got stuck, who holds <code>s</code>, and who waits for whom. Why does the checker still say "both threads in the critical section at once: never"? Then put the two steps back the way they were and check that Experiment 3 reports "yes" again.</p>
+    <div class="ans" data-id="bc" data-rows="8" data-label="Part B (c)"></div>
+  </div>
+  <div class="part">
+    <p class="q"><b class="letter">B-d</b> <b>Your own experiment.</b> Change one thing in <code>mutex.py</code> to test an idea of your own, and mark the changed line with a comment that starts <code># B-d</code>. Some starting points: in <code>peterson</code>, run <code>turn = other</code> before <code>flag[me] = True</code> (swap the two steps' actions and keep their step numbers); give thread 0 in <code>strict_turns</code> as many visits as thread 1; make <code>SIZE</code> 1; or replace the producer's <code>semWait(e)</code> with a step that does nothing, <code>("skip", lambda sh, me: 1)</code>. <b>Before running it</b>, write down the change, what you predict will happen and why. Then run it, paste the relevant lines of output, and say whether your prediction held and what explains any surprise.</p>
+    <div class="ans" data-id="bd" data-rows="8" data-label="Part B (d)" data-placeholder="Change: ...&#10;Prediction and reason (written before running): ...&#10;Output: ...&#10;Did it hold? Why or why not: ..."></div>
+  </div>
+</section>
+
+<section class="card" id="submit">
+  <h2>Submit</h2>
+  <ol class="steps">
+    <li>Click <b>Download answer sheet</b> (in the bar at the top) after your last answer is typed. Move <code>hw6-answers.html</code> from your Downloads folder into the <code>os-hw6</code> folder, and open it once in a browser to check that every answer is there.</li>
+    <li>Send both files to GitHub, from inside the <code>os-hw6</code> folder:
+      <pre class="term">git add mutex.py hw6-answers.html
+git commit -m "Homework 6"
+git push</pre>
+      The first push opens a browser window to sign in (Windows) or asks for a username and password (macOS). GitHub does not accept your account password there. Instead, create a token: GitHub → Settings → Developer settings → Personal access tokens → <b>Tokens (classic)</b> → Generate new token (classic), tick the <b>repo</b> box, and generate it. Paste the token when asked for the password; nothing appears on screen while you paste, which is normal. If you would rather skip the command line, the repository page's <b>Add file → Upload files</b> button works too.</li>
+    <li>Refresh your repository's page on GitHub and check that both files are there.</li>
+  </ol>
+  <p>Your repository should contain:</p>
+  <ul class="check">
+    <li><code>mutex.py</code> with both TODOs written, so that all three experiments run to the end without a "stopped here" line, the producer's steps back in their correct order after B-c, and your B-d change marked with <code># B-d</code>.</li>
+    <li><code>hw6-answers.html</code>, downloaded from this page, with every question answered.</li>
+  </ul>
+  <p><b>Submit your GitHub repo link.</b></p>
+</section>
+
+</main>
+<footer>Operating Systems · Homework 6 · Chapters 5 and 12</footer>
+
+<script>
+(function () {  // everything lives inside this function so none of its names can clash with anything else on the page
+  'use strict';  // strict mode turns silent JavaScript mistakes into visible errors
+  var HW = document.body.getAttribute('data-hw');  // this page's short id, such as "os-hw1", written on the <body> tag
+  var SHEET_FILE = document.body.getAttribute('data-sheet');  // the answer-sheet file name, such as "hw1-answers.html"
+  var TITLE = document.title;  // the page title, reused as the answer sheet's title
+  var STORE_KEY = 'answers:' + HW;  // the name under which this page's drafts are kept in the browser
+  var answers = {};  // every answer typed so far, as { answerId: value }
+  var canSave = true;  // becomes false if this browser refuses to store anything (private windows sometimes do)
+
+  function readStore() {  // loads saved drafts from the browser, if there are any
+    try { return JSON.parse(window.localStorage.getItem(STORE_KEY) || '{}') || {}; }  // stored as JSON text; parse it back into an object
+    catch (e) { canSave = false; return {}; }  // storage blocked or the text is damaged: start empty and remember that saving is off
+  }  // end of readStore
+  function writeStore() {  // saves every answer back into the browser
+    try { window.localStorage.setItem(STORE_KEY, JSON.stringify(answers)); return true; }  // turn the object into JSON text and store it
+    catch (e) { canSave = false; return false; }  // storage blocked or full: report failure
+  }  // end of writeStore
+
+  function isFilled(value) {  // does this answer contain anything yet?
+    if (typeof value === 'string') return value.trim() !== '';  // a text answer counts once it has a non-space character
+    if (Array.isArray(value)) return value.some(function (row) { return Array.isArray(row) && row.some(function (cell) { return typeof cell === 'string' && cell.trim() !== ''; }); });  // a grid counts once any cell is filled
+    return false;  // anything else (missing, wrong type) counts as empty
+  }  // end of isFilled
+
+  function updateProgress() {  // refreshes every "n of m answered" counter on the page
+    var items = document.querySelectorAll('[data-answer]');  // every answer box and answer grid
+    var done = 0;  // how many have something in them
+    items.forEach(function (el) { if (isFilled(answers[el.getAttribute('data-id')])) done += 1; });  // count the filled ones
+    document.querySelectorAll('.js-progress').forEach(function (el) { el.textContent = done + ' of ' + items.length + ' answered'; });  // write the count
+  }  // end of updateProgress
+
+  var saveTimer = null;  // used to wait until typing pauses before saving
+  var pendingStatus = [];  // the status lines of every box edited since the last save
+  function scheduleSave(statusEl) {  // called on every keystroke; saves 400 ms after the last one
+    if (statusEl && pendingStatus.indexOf(statusEl) === -1) pendingStatus.push(statusEl);  // remember this box so its status is updated too
+    clearTimeout(saveTimer);  // cancel the save that was waiting, because another key arrived
+    saveTimer = setTimeout(function () {  // start a fresh 400 ms wait
+      var ok = writeStore();  // save everything (all boxes at once)
+      pendingStatus.forEach(function (el) {  // every box edited since the last save
+        el.textContent = ok ? 'Saved in this browser' : 'Not saved: this browser blocks storage. Download your answer sheet before closing the page.';  // say what happened
+        el.className = ok ? 'status saved' : 'status';  // green when saved
+      });  // end of status updates
+      pendingStatus = [];  // start a fresh list for the next round of typing
+      updateProgress();  // the counter may have changed
+    }, 400);  // 400 milliseconds
+  }  // end of scheduleSave
+
+  function buildTextBox(holder) {  // turns an empty <div class="ans" data-id="..."> into a working answer box
+    var id = holder.getAttribute('data-id');  // this answer's id, such as "p3b"
+    var box = document.createElement('textarea');  // the box itself
+    box.rows = Number(holder.getAttribute('data-rows') || 4);  // starting height, in lines
+    box.setAttribute('aria-label', holder.getAttribute('data-label') || id);  // what a screen reader announces for this box
+    box.spellcheck = holder.getAttribute('data-kind') !== 'output';  // no red squiggles under pasted program output
+    if (holder.getAttribute('data-kind') === 'output') box.className = 'mono';  // program output keeps its columns in a fixed-width face
+    box.placeholder = holder.getAttribute('data-placeholder') || 'Type your answer here.';  // grey hint text shown while empty
+    var status = document.createElement('span');  // the small "Saved" line under the box
+    status.className = 'status';  // styled grey until something is saved
+    status.setAttribute('aria-live', 'polite');  // screen readers announce the saved message without interrupting
+    box.value = typeof answers[id] === 'string' ? answers[id] : '';  // restore a saved draft, if there is one
+    box.addEventListener('input', function () { answers[id] = box.value; scheduleSave(status); });  // keep the answer object up to date and save soon
+    holder.setAttribute('data-answer', '');  // mark it as an answer for the progress counter
+    holder.appendChild(box);  // put the box on the page
+    holder.appendChild(status);  // and its status line under it
+  }  // end of buildTextBox
+
+  function splitList(text, sep) {  // "PC|IR|AC" becomes ["PC", "IR", "AC"]
+    return (text || '').split(sep || '|').map(function (s) { return s.trim(); });  // split on the separator (a bar unless the grid names another) and trim spaces
+  }  // end of splitList
+
+  function buildGrid(table) {  // turns <table class="grid" data-rows="..." data-cols="..."> into a table of small inputs
+    var id = table.getAttribute('data-id');  // this grid's id
+    var rows = splitList(table.getAttribute('data-rows'), table.getAttribute('data-sep'));  // the row labels (a grid whose labels contain "|" names another separator in data-sep)
+    var cols = splitList(table.getAttribute('data-cols'), table.getAttribute('data-sep'));  // the column labels
+    var saved = Array.isArray(answers[id]) ? answers[id] : [];  // a saved draft, if there is one
+    var head = document.createElement('thead');  // the header row
+    var headRow = document.createElement('tr');  // one row inside it
+    var corner = document.createElement('th');  // the top-left corner cell
+    corner.textContent = table.getAttribute('data-corner') || '';  // an optional label for the row-label column
+    headRow.appendChild(corner);  // add the corner
+    cols.forEach(function (c) { var th = document.createElement('th'); th.scope = 'col'; th.textContent = c; headRow.appendChild(th); });  // one header cell per column
+    head.appendChild(headRow);  // finish the header
+    var body = document.createElement('tbody');  // the input rows
+    var status = document.createElement('span');  // the "Saved" line under the grid
+    status.className = 'status';  // grey until something is saved
+    status.setAttribute('aria-live', 'polite');  // announced politely to screen readers
+    rows.forEach(function (r, ri) {  // one table row per row label
+      var tr = document.createElement('tr');  // the row
+      var th = document.createElement('th');  // its label cell
+      th.scope = 'row';  // tells screen readers this cell labels the row
+      th.textContent = r;  // the label text
+      tr.appendChild(th);  // add the label
+      cols.forEach(function (c, ci) {  // one input per column
+        var td = document.createElement('td');  // the cell
+        var input = document.createElement('input');  // the input inside it
+        input.type = 'text';  // plain text, so hex values like 13A0 are allowed
+        input.autocomplete = 'off';  // no browser suggestions from other sites
+        input.spellcheck = false;  // hex values are not words
+        input.setAttribute('aria-label', r + ', ' + c);  // e.g. "Fetch 1, PC"
+        input.value = (Array.isArray(saved[ri]) && typeof saved[ri][ci] === 'string') ? saved[ri][ci] : '';  // restore a saved value
+        input.addEventListener('input', function () {  // on every change to this cell...
+          if (!Array.isArray(answers[id])) answers[id] = rows.map(function () { return cols.map(function () { return ''; }); });  // ...make sure a full empty grid exists...
+          if (!Array.isArray(answers[id][ri])) answers[id][ri] = cols.map(function () { return ''; });  // ...including this row...
+          answers[id][ri][ci] = input.value;  // ...store the new value...
+          scheduleSave(status);  // ...and save soon
+        });  // end of the input listener
+        td.appendChild(input);  // put the input in the cell
+        tr.appendChild(td);  // and the cell in the row
+      });  // end of the columns
+      body.appendChild(tr);  // add the finished row
+    });  // end of the rows
+    table.appendChild(head);  // attach the header
+    table.appendChild(body);  // attach the body
+    table.setAttribute('data-answer', '');  // mark it as an answer for the progress counter
+    var wrapper = table.parentNode;  // grids sit inside a sideways-scrolling wrapper
+    wrapper.parentNode.insertBefore(status, wrapper.nextSibling);  // the status line goes just below that wrapper
+  }  // end of buildGrid
+
+  function fillAll() {  // puts the values in `answers` back into every box and grid (used after loading a sheet)
+    document.querySelectorAll('.ans[data-id]').forEach(function (holder) {  // each text box
+      var box = holder.querySelector('textarea');  // the box inside the holder
+      var v = answers[holder.getAttribute('data-id')];  // its value
+      box.value = typeof v === 'string' ? v : '';  // write it (or clear it)
+    });  // end of text boxes
+    document.querySelectorAll('table.grid[data-id]').forEach(function (table) {  // each grid
+      var v = answers[table.getAttribute('data-id')];  // its value: an array of rows
+      table.querySelectorAll('tbody tr').forEach(function (tr, ri) {  // each row
+        tr.querySelectorAll('input').forEach(function (input, ci) {  // each cell
+          input.value = (Array.isArray(v) && Array.isArray(v[ri]) && typeof v[ri][ci] === 'string') ? v[ri][ci] : '';  // write it (or clear it)
+        });  // end of cells
+      });  // end of rows
+    });  // end of grids
+    var name = document.getElementById('student-name');  // the name box
+    if (name) name.value = typeof answers.__name === 'string' ? answers.__name : '';  // restore the name
+    updateProgress();  // the counter changed
+  }  // end of fillAll
+
+  function esc(text) {  // makes any text safe to put inside HTML: < > & " ' become harmless codes
+    return String(text).replace(/[&<>"']/g, function (ch) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]; });  // one replacement per dangerous character
+  }  // end of esc
+
+  function questionFor(el) {  // finds the question text that belongs to an answer box or grid
+    var part = el.closest('.part');  // the lettered sub-question that holds it
+    var q = part ? part.querySelector('.q') : null;  // its question paragraph
+    return q ? q.textContent.replace(/\s+/g, ' ').trim() : (el.getAttribute('data-label') || '');  // its text, squeezed onto one line
+  }  // end of questionFor
+
+  function buildSheet() {  // writes the whole answer sheet as one standalone HTML document (a string)
+    var name = (answers.__name || '').trim() || '(no name entered)';  // the student's name
+    var when = new Date().toLocaleString();  // the date and time the sheet was made
+    var html = [];  // the sheet is built up as a list of pieces, joined at the end
+    var lastProblem = '';  // remembers which problem heading was printed last
+    document.querySelectorAll('[data-answer]').forEach(function (el) {  // every answer in page order
+      var id = el.getAttribute('data-id');  // its id
+      var card = el.closest('section');  // the card (problem) it sits in
+      var heading = card && card.querySelector('h2') ? card.querySelector('h2').textContent.trim() : '';  // that problem's title
+      if (heading !== lastProblem) { html.push('<h2>' + esc(heading) + '</h2>'); lastProblem = heading; }  // print the title once per problem
+      html.push('<div class="a"><p class="q">' + esc(questionFor(el)) + '</p>');  // the question
+      var v = answers[id];  // the answer
+      if (el.tagName === 'TABLE') {  // a grid: rebuild it as a plain table
+        var rows = splitList(el.getAttribute('data-rows'), el.getAttribute('data-sep'));  // row labels
+        var cols = splitList(el.getAttribute('data-cols'), el.getAttribute('data-sep'));  // column labels
+        html.push('<table><tr><th></th>' + cols.map(function (c) { return '<th>' + esc(c) + '</th>'; }).join('') + '</tr>');  // header row
+        rows.forEach(function (r, ri) {  // one row per label
+          html.push('<tr><th>' + esc(r) + '</th>' + cols.map(function (c, ci) { var cell = (Array.isArray(v) && Array.isArray(v[ri]) && typeof v[ri][ci] === 'string') ? v[ri][ci] : ''; return '<td>' + esc(cell) + '</td>'; }).join('') + '</tr>');  // its cells
+        });  // end of rows
+        html.push('</table>');  // close the table
+      } else {  // a text answer
+        html.push(isFilled(v) ? '<pre>' + esc(v) + '</pre>' : '<p class="empty">(no answer)</p>');  // the answer exactly as typed, or a visible gap
+      }  // end of the answer kinds
+      html.push('</div>');  // close this answer
+    });  // end of every answer
+    var data = JSON.stringify({ hw: HW, answers: answers }).replace(/</g, '\\u003c');  // the raw answers, so this page can load the sheet back; < is escaped so the text can never end the script tag
+    var css = 'body{font:15px/1.55 system-ui,sans-serif;max-width:860px;margin:24px auto;padding:0 16px;color:#151c2c;background:#fff}h1{font-size:1.5rem;margin:0 0 4px}h2{font-size:1.15rem;margin:28px 0 8px;border-bottom:2px solid #d9deea;padding-bottom:4px}.meta{color:#69738c;margin:0 0 16px}.a{margin:0 0 14px}.q{margin:0 0 4px;color:#3d4760;font-size:.92rem}pre{white-space:pre-wrap;word-wrap:break-word;font:13px/1.5 ui-monospace,Menlo,Consolas,monospace;background:#f5f7fb;border:1px solid #d9deea;border-radius:6px;padding:8px 10px;margin:0}.empty{color:#b45309;margin:0}table{border-collapse:collapse;font:13px ui-monospace,Menlo,Consolas,monospace}th,td{border:1px solid #d9deea;padding:4px 8px;text-align:left}th{background:#f5f7fb}';  // a small built-in stylesheet so the sheet looks tidy on its own
+    return '<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n<title>' + esc(TITLE + ': answers of ' + name) + '</title>\n<style>' + css + '</style>\n</head>\n<body>\n<h1>' + esc(TITLE) + '</h1>\n<p class="meta">Answers of <b>' + esc(name) + '</b> · saved ' + esc(when) + '</p>\n' + html.join('\n') + '\n<script type="application/json" id="answer-data">' + data + '<\/script>\n</body>\n</html>\n';  // the finished document
+  }  // end of buildSheet
+
+  function download(filename, text, type) {  // hands the browser a file to save, made from text in memory
+    var blob = new Blob([text], { type: type });  // wrap the text as a file-like object
+    var url = URL.createObjectURL(blob);  // a temporary address for it
+    var a = document.createElement('a');  // an invisible link...
+    a.href = url;  // ...pointing at that address...
+    a.download = filename;  // ...that saves instead of opening...
+    document.body.appendChild(a);  // (some browsers need it on the page)
+    a.click();  // ...clicked by the script
+    setTimeout(function () { URL.revokeObjectURL(url); a.remove(); }, 1000);  // tidy up a second later
+  }  // end of download
+
+  function setMsg(text) {  // shows a message in every answer-sheet panel
+    document.querySelectorAll('.js-sheet-msg').forEach(function (el) { el.textContent = text; });  // write it
+  }  // end of setMsg
+
+  function loadSheet(file) {  // reads an answer sheet the student saved earlier and puts its answers back
+    var reader = new FileReader();  // the browser's tool for reading a chosen file
+    reader.onload = function () {  // runs once the file has been read
+      try {  // anything wrong with the file ends up in the catch below
+        var doc = new DOMParser().parseFromString(String(reader.result), 'text/html');  // parse it as HTML without running any of it
+        var tag = doc.getElementById('answer-data');  // the data block that buildSheet wrote
+        if (!tag) throw new Error('This file is not an answer sheet saved from this page.');  // some other file was chosen
+        var data = JSON.parse(tag.textContent);  // the saved answers
+        if (!data || data.hw !== HW || typeof data.answers !== 'object') throw new Error('This answer sheet belongs to a different homework.');  // wrong homework
+        var clean = {};  // only well-formed answers for boxes that exist on this page are accepted
+        var known = {};  // the ids that exist on this page
+        document.querySelectorAll('[data-answer]').forEach(function (el) { known[el.getAttribute('data-id')] = el.tagName; });  // collect them
+        Object.keys(data.answers).forEach(function (id) {  // look at each saved answer
+          var v = data.answers[id];  // its value
+          if (id === '__name' && typeof v === 'string') clean.__name = v.slice(0, 200);  // the name: text only, and not absurdly long
+          else if (known[id] === 'DIV' && typeof v === 'string') clean[id] = v.slice(0, 20000);  // a text answer: text only
+          else if (known[id] === 'TABLE' && Array.isArray(v)) clean[id] = v.map(function (row) { return Array.isArray(row) ? row.map(function (c) { return typeof c === 'string' ? c.slice(0, 500) : ''; }) : []; });  // a grid: rows of text only
+        });  // end of the saved answers
+        answers = clean;  // replace the current answers with the loaded ones
+        writeStore();  // save them in this browser too
+        fillAll();  // show them on the page
+        setMsg('Loaded ' + Object.keys(clean).filter(function (k) { return k !== '__name'; }).length + ' answers from ' + file.name + '.');  // confirm
+      } catch (e) {  // the file could not be used
+        setMsg('Could not load that file: ' + e.message);  // say why
+      }  // end of try/catch
+    };  // end of onload
+    reader.readAsText(file);  // start reading
+  }  // end of loadSheet
+
+  function wireSheetPanel() {  // connects the name box and the Download / Load / Clear buttons
+    var name = document.getElementById('student-name');  // the name box
+    if (name) {  // it exists on this page
+      name.value = typeof answers.__name === 'string' ? answers.__name : '';  // restore a saved name
+      name.addEventListener('input', function () { answers.__name = name.value; scheduleSave(null); });  // save it as it is typed
+    }  // end of the name box
+    document.querySelectorAll('.js-download').forEach(function (btn) {  // every Download button (there is one in the bar and one in the panel)
+      btn.addEventListener('click', function () {  // on click...
+        download(SHEET_FILE, buildSheet(), 'text/html');  // ...build the sheet and save it
+        setMsg('Saved ' + SHEET_FILE + ' to your Downloads folder. Put that file in your repository.');  // say where it went
+      });  // end of the click handler
+    });  // end of Download buttons
+    var picker = document.getElementById('sheet-file');  // the hidden file chooser
+    var loadBtn = document.getElementById('sheet-load');  // the visible "Load" button
+    if (picker && loadBtn) {  // both exist
+      loadBtn.addEventListener('click', function () { picker.click(); });  // the button opens the chooser
+      picker.addEventListener('change', function () { if (picker.files[0]) loadSheet(picker.files[0]); picker.value = ''; });  // read the chosen file, then reset the chooser
+    }  // end of Load
+    var clearBtn = document.getElementById('sheet-clear');  // the Clear button
+    var armed = null;  // the timer of a pending "click again to confirm"
+    if (clearBtn) clearBtn.addEventListener('click', function () {  // on click...
+      if (!armed) {  // first click: ask for a second one instead of clearing at once
+        clearBtn.textContent = 'Click again to erase every answer';  // the warning
+        armed = setTimeout(function () { clearBtn.textContent = 'Clear all answers'; armed = null; }, 4000);  // it disarms itself after 4 seconds
+        return;  // nothing erased yet
+      }  // end of the first click
+      clearTimeout(armed);  // second click within 4 seconds: stop the disarm timer
+      armed = null;  // back to the unarmed state
+      clearBtn.textContent = 'Clear all answers';  // restore the label
+      answers = {};  // forget every answer
+      writeStore();  // save the empty set
+      fillAll();  // empty every box on the page
+      setMsg('All answers erased from this page and this browser.');  // confirm
+    });  // end of Clear
+    if (!canSave) setMsg('This browser is not saving drafts. Download your answer sheet before you close the page, and load it back next time.');  // warn early if storage is blocked
+  }  // end of wireSheetPanel
+
+  function wireCode() {  // connects the Copy and Download buttons on every code block
+    document.querySelectorAll('.codebox').forEach(function (box) {  // each block
+      var code = box.querySelector('pre');  // the code itself
+      var file = box.getAttribute('data-file');  // its file name
+      var copy = box.querySelector('.js-copy');  // its Copy button
+      var save = box.querySelector('.js-save');  // its Download button
+      if (copy) copy.addEventListener('click', function () {  // Copy: put the code on the clipboard
+        var text = code.textContent;  // the plain code, without any coloring
+        var done = function () { copy.textContent = 'Copied'; setTimeout(function () { copy.textContent = 'Copy'; }, 1500); };  // brief confirmation
+        if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(text).then(done, function () { fallbackCopy(text); done(); });  // the modern way
+        else { fallbackCopy(text); done(); }  // the older way, for pages opened straight from a file
+      });  // end of Copy
+      if (save && file) save.addEventListener('click', function () { download(file, code.textContent.replace(/\s*$/, '\n'), 'application/octet-stream'); });  // Download: save the code as its own file, ending with one newline; the generic type stops browsers adding .txt to the name
+    });  // end of each block
+  }  // end of wireCode
+
+  function fallbackCopy(text) {  // copies text in browsers that do not offer navigator.clipboard here
+    var t = document.createElement('textarea');  // a temporary box...
+    t.value = text;  // ...holding the text...
+    t.style.position = 'fixed';  // ...kept out of the page flow...
+    t.style.opacity = '0';  // ...and invisible
+    document.body.appendChild(t);  // add it
+    t.select();  // select its contents
+    try { document.execCommand('copy'); } catch (e) { /* nothing more can be done; the student can still select the code by hand */ }  // copy the selection
+    t.remove();  // remove the temporary box
+  }  // end of fallbackCopy
+
+  answers = readStore();  // 1. load any saved drafts
+  document.querySelectorAll('.ans[data-id]').forEach(buildTextBox);  // 2. build every text box
+  document.querySelectorAll('table.grid[data-id]').forEach(buildGrid);  // 3. build every grid
+  wireSheetPanel();  // 4. connect the answer-sheet panel
+  wireCode();  // 5. connect the code blocks
+  updateProgress();  // 6. show the starting count
+})();  // run the function immediately
+</script>
+</body>
+</html>
